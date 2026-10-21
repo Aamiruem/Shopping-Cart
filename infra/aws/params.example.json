@@ -1,0 +1,13 @@
+[
+  { "ParameterKey": "Environment", "ParameterValue": "prod" },
+  { "ParameterKey": "VpcId", "ParameterValue": "vpc-0123456789abcdef0" },
+  { "ParameterKey": "SubnetIds", "ParameterValue": "subnet-aaaa1111,subnet-bbbb2222" },
+  { "ParameterKey": "MongoUri", "ParameterValue": "mongodb+srv://veyra:CHANGE_ME@cluster0.example.mongodb.net/veyra?retryWrites=true&w=majority" },
+  { "ParameterKey": "GoogleClientId", "ParameterValue": "" },
+  { "ParameterKey": "AnthropicApiKey", "ParameterValue": "" },
+  { "ParameterKey": "SmtpHost", "ParameterValue": "" },
+  { "ParameterKey": "SmtpUser", "ParameterValue": "" },
+  { "ParameterKey": "SmtpPass", "ParameterValue": "" },
+  { "ParameterKey": "MailFrom", "ParameterValue": "Veyra <no-reply@yourdomain.com>" },
+  { "ParameterKey": "DesiredCount", "ParameterValue": "1" }
+]

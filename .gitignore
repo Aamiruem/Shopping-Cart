@@ -1,0 +1,24 @@
+# Dependencies & builds
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Local config & data (never commit secrets)
+.env
+backend/uploads/
+backend/src/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# AWS deploy parameters (contain secrets)
+infra/aws/params.json
+*.backup

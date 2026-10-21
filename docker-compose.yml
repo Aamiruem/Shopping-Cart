@@ -1,0 +1,63 @@
+# Runs the whole stack locally:   docker compose up --build
+# Seed demo data once:            docker compose exec backend python -m scripts.seed
+# Then open http://localhost:8080 (API docs: http://localhost:5000/docs)
+services:
+  mongo:
+    image: mongo:7
+    ports: ["27017:27017"]
+    volumes: [mongo-data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      retries: 10
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      POSTGRES_DB: shop
+    ports: ["5432:5432"]
+    volumes: [pg-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      APP_ENV: development
+      MONGO_URI: mongodb://mongo:27017/shop
+      DATABASE_URL: postgres://shop:shop@postgres:5432/shop
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      AI_SERVICE_URL: http://ai-service:8000
+      CORS_ORIGIN: http://localhost:8080
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    ports: ["5000:5000"]
+    volumes: [uploads:/app/uploads]
+    depends_on:
+      mongo: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+
+  ai-service:
+    build: ./ai-service
+    environment:
+      BACKEND_URL: http://backend:5000
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports: ["8000:8000"]
+    depends_on: [backend]
+
+  frontend:
+    build: ./frontend
+    ports: ["8080:80"]
+    depends_on: [backend]
+
+volumes:
+  mongo-data:
+  pg-data:
+  uploads:

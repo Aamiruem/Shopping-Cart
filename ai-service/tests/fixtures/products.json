@@ -1,0 +1,12 @@
+[
+  { "name": "Classic Cotton T-Shirt", "description": "Soft 100% cotton crew-neck tee, breathable for everyday wear.", "category": "clothing", "tags": ["tshirt", "cotton", "casual"], "price": 499, "stock": 120 },
+  { "name": "Slim Fit Denim Jeans", "description": "Stretch denim jeans with a slim fit and five pockets.", "category": "clothing", "tags": ["jeans", "denim", "casual"], "price": 1599, "stock": 60 },
+  { "name": "Running Shoes", "description": "Lightweight running shoes with cushioned sole for long runs.", "category": "footwear", "tags": ["shoes", "running", "sports"], "price": 2999, "stock": 40 },
+  { "name": "Yoga Mat", "description": "Non-slip 6mm yoga mat for home workouts and yoga.", "category": "sports", "tags": ["yoga", "fitness", "mat"], "price": 899, "stock": 75 },
+  { "name": "Wireless Headphones", "description": "Over-ear Bluetooth headphones with noise cancellation and 30h battery.", "category": "electronics", "tags": ["audio", "bluetooth", "headphones"], "price": 3499, "stock": 35 },
+  { "name": "Bluetooth Speaker", "description": "Portable waterproof Bluetooth speaker with deep bass.", "category": "electronics", "tags": ["audio", "bluetooth", "speaker"], "price": 1999, "stock": 50 },
+  { "name": "Smart Watch", "description": "Fitness smart watch with heart-rate monitor and step tracking.", "category": "electronics", "tags": ["watch", "fitness", "wearable"], "price": 4999, "stock": 30 },
+  { "name": "Ceramic Coffee Mug", "description": "350ml ceramic mug for coffee and tea, dishwasher safe.", "category": "home", "tags": ["mug", "coffee", "kitchen"], "price": 299, "stock": 200 },
+  { "name": "French Press Coffee Maker", "description": "Glass French press for rich brewed coffee at home.", "category": "home", "tags": ["coffee", "kitchen", "brewing"], "price": 1299, "stock": 45 },
+  { "name": "Leather Wallet", "description": "Slim genuine leather wallet with card slots.", "category": "accessories", "tags": ["wallet", "leather"], "price": 799, "stock": 90 }
+]

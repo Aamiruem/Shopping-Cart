@@ -1,0 +1,52 @@
+/* Design tokens - change the look of the whole store from here */
+:root {
+  /* Brand */
+  --brand: #2874f0;
+  --brand-dark: #1a5dc9;
+  --brand-light: #e8f0fe;
+  --accent: #ffe500;            /* logo highlight */
+  --cart: #ff9f00;              /* "Add to cart" */
+  --buy: #fb641b;               /* "Buy now" / primary CTA */
+
+  /* Status */
+  --success: #388e3c;
+  --success-bg: #e8f5e9;
+  --warn: #f57c00;
+  --error: #d32f2f;
+  --error-bg: #fdecea;
+  --rating-ok: #ff9f00;
+  --rating-low: #ff6161;
+
+  /* Neutrals */
+  --bg: #f1f3f6;
+  --surface: #ffffff;
+  --text: #212121;
+  --text-muted: #878787;
+  --border: #e0e0e0;
+  --border-light: #f0f0f0;
+  --footer-bg: #172337;
+  --footer-text: #c2c8d0;
+
+  /* Type */
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 28px;
+
+  /* Shape & depth */
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+
+  /* Layout */
+  --container: 1280px;
+  --nav-height: 64px;
+  --gap: 12px;
+  --transition: 0.18s ease;
+}

@@ -1,0 +1,132 @@
+import { useRef, useState } from 'react';
+import { api } from '../../api/client';
+import { CATEGORIES } from '../../constants/catalog';
+import { discountPercent } from '../../utils/format';
+import Icon from '../common/Icon';
+
+const EMPTY = { name: '', brand: '', category: 'electronics', description: '', price: '', mrp: '', stock: '10', tags: '', images: [], active: true };
+
+const fromProduct = (p) => ({
+  name: p.name, brand: p.brand || '', category: p.category, description: p.description || '',
+  price: String(p.price), mrp: p.mrp ? String(p.mrp) : '', stock: String(p.stock ?? 0),
+  tags: (p.tags || []).join(', '), images: p.images?.length ? p.images : p.image ? [p.image] : [], active: p.active !== false,
+});
+
+function validate(f) {
+  if (f.name.trim().length < 2) return 'Product name must be at least 2 characters';
+  if (!(Number(f.price) > 0)) return 'Enter a selling price greater than 0';
+  if (f.mrp && Number(f.mrp) < Number(f.price)) return 'MRP cannot be lower than the selling price';
+  if (!(Number(f.stock) >= 0) || !Number.isInteger(Number(f.stock))) return 'Stock must be a whole number';
+  if (!f.images.length) return 'Add at least one product image';
+  return '';
+}
+
+// Create / edit dialog. `product` = null for a new product.
+export default function ProductForm({ product, onSaved, onClose }) {
+  const [form, setForm] = useState(product ? fromProduct(product) : EMPTY);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
+  const fileRef = useRef(null);
+  const set = (key) => (e) => setForm({ ...form, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+  const off = discountPercent(Number(form.price), Number(form.mrp));
+
+  const addImages = async (files) => {
+    setUploading(true);
+    setError('');
+    try {
+      const urls = [];
+      for (const file of [...files].slice(0, 8 - form.images.length)) urls.push((await api.uploadImage(file)).url);
+      setForm((f) => ({ ...f, images: [...f.images, ...urls] }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const addUrl = () => {
+    if (!/^https?:\/\/\S+$/i.test(imageUrl.trim())) return setError('Enter a full image URL starting with https://');
+    setForm({ ...form, images: [...form.images, imageUrl.trim()] });
+    setImageUrl('');
+    setError('');
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const problem = validate(form);
+    if (problem) return setError(problem);
+    setBusy(true);
+    setError('');
+    const body = {
+      name: form.name, brand: form.brand, category: form.category, description: form.description,
+      price: Number(form.price), mrp: form.mrp ? Number(form.mrp) : null, stock: Number(form.stock),
+      tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean), images: form.images, image: form.images[0], active: form.active,
+    };
+    try {
+      onSaved(product ? await api.sellerUpdateProduct(product._id, body) : await api.sellerCreateProduct(body), !product);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="otp-overlay" role="dialog" aria-modal="true" aria-labelledby="product-form-title">
+      <form className="panel product-form" onSubmit={submit} noValidate>
+        <header>
+          <h2 id="product-form-title">{product ? 'Edit product' : 'Add a new product'}</h2>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
+        </header>
+
+        <div className="product-form-body">
+          <div className="form-grid">
+            <label className="field span-2">Product name<input value={form.name} onChange={set('name')} maxLength={200} required /></label>
+            <label className="field">Brand<input value={form.brand} onChange={set('brand')} maxLength={80} /></label>
+            <label className="field">Category
+              <select value={form.category} onChange={set('category')}>{CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
+            </label>
+            <label className="field">Selling price (₹)<input type="number" min="1" step="1" value={form.price} onChange={set('price')} required /></label>
+            <label className="field">MRP (₹) <span className="muted">{off > 0 ? `· ${off}% off` : ''}</span><input type="number" min="1" step="1" value={form.mrp} onChange={set('mrp')} /></label>
+            <label className="field">Stock<input type="number" min="0" step="1" value={form.stock} onChange={set('stock')} required /></label>
+            <label className="field">Tags <span className="muted">(comma separated)</span><input value={form.tags} onChange={set('tags')} placeholder="5g, android, dual sim" /></label>
+            <label className="field span-2">Description<textarea rows={4} value={form.description} onChange={set('description')} maxLength={5000} /></label>
+          </div>
+
+          <div className="image-manager">
+            <p className="field-label">Images <span className="muted small">(first image is the cover · JPEG/PNG/WebP up to 5 MB)</span></p>
+            <div className="image-grid">
+              {form.images.map((src, i) => (
+                <figure key={src}>
+                  <img src={src} alt="" />
+                  {i === 0 && <span className="cover">Cover</span>}
+                  <button type="button" onClick={() => setForm({ ...form, images: form.images.filter((x) => x !== src) })} aria-label="Remove image"><Icon name="x" size={14} /></button>
+                </figure>
+              ))}
+              {form.images.length < 8 && (
+                <button type="button" className="image-add" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                  <Icon name="upload" size={22} /> {uploading ? 'Uploading…' : 'Upload'}
+                </button>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => addImages(e.target.files)} />
+            <div className="url-row">
+              <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="…or paste an image URL" aria-label="Image URL" />
+              <button type="button" className="btn btn-outline btn-sm" onClick={addUrl}>Add</button>
+            </div>
+          </div>
+
+          <label className="check-row"><input type="checkbox" checked={form.active} onChange={set('active')} /> Listed in the store</label>
+        </div>
+
+        {error && <p className="alert alert-error" role="alert">{error}</p>}
+        <footer>
+          <button type="button" className="btn-text" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={busy || uploading}>{busy ? 'Saving…' : product ? 'Save changes' : 'Add product'}</button>
+        </footer>
+      </form>
+    </div>
+  );
+}
