@@ -102,6 +102,32 @@
 .main-image > img { width: 100%; height: 100%; object-fit: contain; }
 .detail-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
+/* ---------- 360° view ---------- */
+.badge-360 { position: absolute; top: 0; left: 0; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; background: var(--brand-light); color: var(--brand); font-size: 11px; font-weight: 700; }
+.thumbs .thumb-360 { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: var(--brand); font-size: 11px; font-weight: 700; }
+.view-360-btn { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 18px; background: var(--surface); color: var(--brand); font-size: var(--fs-sm); font-weight: 600; box-shadow: var(--shadow); transition: box-shadow var(--transition); }
+.view-360-btn:hover { box-shadow: var(--shadow-lg); }
+
+.spin360 { position: absolute; inset: 0; display: grid; grid-template-rows: 1fr auto; padding: 16px 16px 10px; }
+.spin360-stage { position: relative; min-height: 0; cursor: grab; touch-action: pan-y; user-select: none; border-radius: var(--radius-sm); }
+.spin360-stage.dragging { cursor: grabbing; }
+.spin360-stage:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; }
+.spin360-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; transition: opacity 0.35s ease; }
+.spin360-stage.dragging img { transition: none; }
+.spin360-badge { position: absolute; top: 16px; left: 16px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 12px; background: var(--brand); color: #fff; font-size: var(--fs-xs); font-weight: 700; }
+.spin360-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 6px 14px; border-radius: 16px; background: rgba(33, 33, 33, 0.72); color: #fff; font-size: var(--fs-sm); pointer-events: none; animation: spin360-hint 2.4s ease-in-out infinite; }
+@keyframes spin360-hint { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.45; } }
+.spin360-controls { display: flex; align-items: center; justify-content: center; gap: 8px; padding-top: 8px; }
+.spin360-controls button { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: border-color var(--transition), color var(--transition); }
+.spin360-controls button:hover { border-color: var(--brand); color: var(--brand); }
+.spin360-dots { display: inline-flex; gap: 5px; margin-left: 6px; }
+.spin360-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: background var(--transition); }
+.spin360-dots i.on { background: var(--brand); }
+@media (prefers-reduced-motion: reduce) {
+  .spin360-stage img { transition: none; }
+  .spin360-hint { animation: none; }
+}
+
 .detail-info { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .detail-brand { color: var(--text-muted); font-weight: 600; }
 .detail-info h1 { font-size: 20px; font-weight: 500; line-height: 1.4; }
@@ -148,3 +174,8 @@
   .detail-grid { grid-template-columns: 1fr; gap: 4px; }
   .rail-arrow { display: none; }
 }
+
+/* Category groups inside the filter sidebar */
+.filter-subhead { margin: 8px 0 2px; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.filter-subgroup { display: flex; flex-direction: column; gap: 8px; }
+.filter-subgroup:first-child .filter-subhead { margin-top: 0; }

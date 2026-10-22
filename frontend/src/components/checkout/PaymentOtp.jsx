@@ -92,7 +92,7 @@ export default function PaymentOtp({ amount, onConfirm, onCancel }) {
           Didn’t get it?{' '}
           {wait > 0 ? <span className="muted">Resend in {wait}s</span> : <button type="button" className="btn-link" disabled={sending} onClick={send}>{sending ? 'Sending…' : 'Resend code'}</button>}
         </p>
-        <p className="muted small otp-note"><Icon name="shield" size={12} /> Never share this code. Veyra will never ask for it by phone.</p>
+        <p className="muted small otp-note"><Icon name="shield" size={12} /> Never share this code. Arvixa will never ask for it by phone.</p>
       </form>
     </div>
   );

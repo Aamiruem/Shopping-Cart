@@ -14,8 +14,8 @@ function Start-Window($title, $dir, $cmd) {
     Start-Process powershell -WorkingDirectory (Join-Path $root $dir) -ArgumentList '-NoExit', '-Command', "`$Host.UI.RawUI.WindowTitle='$title'; $cmd"
 }
 
-Start-Window 'Veyra API :5000' 'backend' '.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 5000'
-Start-Window 'Veyra AI :8100' 'ai-service' '.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8100'
-Start-Window 'Veyra web :5173' 'frontend' 'npm run dev'
+Start-Window 'Arvixa API :5000' 'backend' '.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 5000'
+Start-Window 'Arvixa AI :8100' 'ai-service' '.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8100'
+Start-Window 'Arvixa web :5173' 'frontend' 'npm run dev'
 
 Write-Host 'Starting... open http://localhost:5173 (API docs: http://localhost:5000/docs)'

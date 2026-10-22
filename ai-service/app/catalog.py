@@ -1,4 +1,4 @@
-"""Loads the product catalog from the Veyra backend API, with a short cache."""
+"""Loads the product catalog from the Arvixa backend API, with a short cache."""
 import time
 
 import httpx

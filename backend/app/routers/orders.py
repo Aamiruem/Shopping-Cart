@@ -70,12 +70,12 @@ async def request_otp(user: CurrentUser = Depends(get_current_user)):
     try:
         await mailer.send_mail(
             to=account["email"],
-            subject=f"{code} is your Veyra payment code",
+            subject=f"{code} is your Arvixa payment code",
             text=f"Hi {account['name']}, use {code} to confirm your payment of {amount}. It expires in {settings.otp_ttl_minutes} minutes. "
             "Never share this code with anyone.",
             html=f"<p>Hi {account['name']},</p><p>Use this code to confirm your payment of <b>{amount}</b>:</p>"
             f'<p style="font-size:28px;letter-spacing:6px;font-weight:bold">{code}</p>'
-            f"<p>It expires in {settings.otp_ttl_minutes} minutes. Never share this code with anyone, including Veyra staff.</p>",
+            f"<p>It expires in {settings.otp_ttl_minutes} minutes. Never share this code with anyone, including Arvixa staff.</p>",
         )
     except OSError:  # SMTP down, bad credentials, network...
         log.exception("could not send payment OTP email")

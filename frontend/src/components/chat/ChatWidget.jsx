@@ -73,7 +73,7 @@ export default function ChatWidget() {
     <div className="chat-panel" role="dialog" aria-label="Shopping help">
       <header className="chat-head">
         <div>
-          <strong>Veyra Assistant</strong>
+          <strong>Arvixa Assistant</strong>
           <span>Usually replies instantly</span>
         </div>
         <button type="button" onClick={() => setOpen(false)} aria-label="Close chat"><Icon name="x" size={18} /></button>

@@ -10,7 +10,7 @@ from ..deps import CurrentUser, get_optional_user, require_seller
 from ..schemas.product import ProductIn
 from ..services import events
 from ..services import products as product_service
-from ..services.catalog import serialize_product, to_object_id
+from ..services.catalog import CATEGORY_GROUPS, serialize_product, to_object_id
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 
@@ -24,14 +24,18 @@ SORTS = {
 }
 
 
-def _base_filter(q: str | None, category: str | None) -> dict:
-    """Shared by list and facets so both see the same search + category scope."""
+def _base_filter(q: str | None, category: str | None, audience: str | None = None, use: str | None = None) -> dict:
+    """Shared by list and facets so both see the same search + category + audience + use scope."""
     query: dict = {"active": {"$ne": False}}
     if q and q.strip():
         pattern = re.compile(re.escape(q.strip()), re.I)
         query["$or"] = [{"name": pattern}, {"brand": pattern}, {"category": pattern}, {"subCategory": pattern}, {"tags": pattern}]
     if category:
         query["category"] = category
+    elif use in CATEGORY_GROUPS:
+        query["category"] = {"$in": CATEGORY_GROUPS[use]}
+    if audience in ("women", "men"):
+        query["audience"] = {"$in": [audience, "unisex"]}
     return query
 
 
@@ -46,6 +50,8 @@ def _number(value: str | None) -> float | None:
 async def list_products(
     q: str | None = None,
     category: str | None = None,
+    audience: str | None = None,
+    use: str | None = None,
     brand: str | None = None,
     minPrice: str | None = None,
     maxPrice: str | None = None,
@@ -55,7 +61,7 @@ async def list_products(
     limit: int = 200,
 ):
     """Returns a plain array - the AI service depends on this shape."""
-    query = _base_filter(q, category)
+    query = _base_filter(q, category, audience, use)
     if brand:
         query["brand"] = {"$in": brand.split(",")}
     low, high = _number(minPrice), _number(maxPrice)
@@ -83,10 +89,10 @@ async def categories():
 
 
 @router.get("/facets")
-async def facets(q: str | None = None, category: str | None = None):
+async def facets(q: str | None = None, category: str | None = None, audience: str | None = None, use: str | None = None):
     """Brands and price range for the filter sidebar."""
     db = get_db()
-    query = _base_filter(q, category)
+    query = _base_filter(q, category, audience, use)
     brands = await db.products.distinct("brand", query)
     ranges = [
         r

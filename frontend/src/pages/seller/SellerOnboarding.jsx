@@ -44,7 +44,7 @@ export default function SellerOnboarding() {
     <div className="container page-onboard">
       <div className="auth-card">
         <div className="auth-aside">
-          <h1>Sell on Veyra</h1>
+          <h1>Sell on Arvixa</h1>
           <p>Reach shoppers across India and grow with built-in analytics.</p>
           <ul className="perk-list">
             {PERKS.map((p) => <li key={p.title}><Icon name={p.icon} size={20} /><div><strong>{p.title}</strong><span>{p.text}</span></div></li>)}

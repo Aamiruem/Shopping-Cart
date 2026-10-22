@@ -5,9 +5,9 @@ import { EmptyState, ErrorMessage, SkeletonGrid } from '../components/common/Fee
 import Icon from '../components/common/Icon';
 import FilterSidebar from '../components/product/FilterSidebar';
 import ProductCard from '../components/product/ProductCard';
-import { categoryLabel, SORT_OPTIONS } from '../constants/catalog';
+import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, SORT_OPTIONS } from '../constants/catalog';
 
-const FILTER_KEYS = ['q', 'category', 'brand', 'minPrice', 'maxPrice', 'minRating', 'sort'];
+const FILTER_KEYS = ['q', 'use', 'category', 'audience', 'brand', 'minPrice', 'maxPrice', 'minRating', 'sort'];
 const EMPTY_FACETS = { brands: [], minPrice: 0, maxPrice: 0 };
 
 // Search results + category listing. All filter state lives in the URL so it is shareable.
@@ -32,8 +32,8 @@ export default function Products() {
   useEffect(load, [load]);
 
   useEffect(() => {
-    api.facets({ q: filters.q, category: filters.category }).then(setFacets).catch(() => setFacets(EMPTY_FACETS));
-  }, [filters.q, filters.category]);
+    api.facets({ q: filters.q, use: filters.use, category: filters.category, audience: filters.audience }).then(setFacets).catch(() => setFacets(EMPTY_FACETS));
+  }, [filters.q, filters.use, filters.category, filters.audience]);
 
   const update = (patch) => {
     const next = { ...filters, ...patch };
@@ -41,7 +41,13 @@ export default function Products() {
   };
   const clear = () => setParams(filters.q ? { q: filters.q } : {});
 
-  const heading = filters.q ? `Results for “${filters.q}”` : filters.category ? categoryLabel(filters.category) : 'All Products';
+  const audience = AUDIENCES.find((a) => a.id === filters.audience);
+  const group = CATEGORY_GROUPS.find((g) => g.id === filters.use);
+  const heading = filters.q
+    ? `Results for “${filters.q}”`
+    : audience && filters.category === 'fashion'
+      ? audience.heading
+      : filters.category ? categoryLabel(filters.category) : group ? group.label : 'All Products';
 
   return (
     <div className="page-listing container">

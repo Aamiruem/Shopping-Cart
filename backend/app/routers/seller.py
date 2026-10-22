@@ -57,7 +57,7 @@ async def register_seller(body: SellerIn, user: CurrentUser = Depends(get_curren
 @router.get("/profile")
 async def profile(user: CurrentUser = Depends(require_seller)):
     record = await get_pool().fetchrow("SELECT * FROM sellers WHERE user_id = $1", user.id)
-    return dict(record) if record else {"user_id": user.id, "store_name": "Veyra (admin)", "gstin": None}
+    return dict(record) if record else {"user_id": user.id, "store_name": "Arvixa (admin)", "gstin": None}
 
 
 # ---------- Products (CRUD) ----------

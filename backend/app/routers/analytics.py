@@ -156,7 +156,7 @@ async def export(dataset: str = "orders", sellerId: int | None = None, user: Cur
 
     buffer = io.StringIO()
     frame.to_csv(buffer, index=False)
-    filename = f"veyra-{dataset}-{local_today():%Y%m%d}.csv"
+    filename = f"arvixa-{dataset}-{local_today():%Y%m%d}.csv"
     return StreamingResponse(
         iter([buffer.getvalue()]), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )

@@ -43,7 +43,7 @@ export default function AnalyticsDashboard() {
 
   const exportCsv = async (dataset) => {
     try {
-      await downloadFile(api.exportUrl({ dataset, sellerId: sellerId || undefined }), `veyra-${dataset}.csv`);
+      await downloadFile(api.exportUrl({ dataset, sellerId: sellerId || undefined }), `arvixa-${dataset}.csv`);
     } catch (err) {
       toast.show(err.message, 'error');
     }

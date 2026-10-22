@@ -26,8 +26,8 @@ Electronics carry a 1-year manufacturer warranty. Keep your invoice for warranty
 You can sign up with your email and a password (at least 8 characters with a letter and a number) or with Continue with Google.
 Forgot your password? Use the login page, or sign in with Google if your account uses the same email.
 
-# Selling on Veyra
+# Selling on Arvixa
 Anyone can become a seller from the account menu (Become a Seller). Sellers manage products, stock and orders in the Seller Hub and get AI sales insights.
 
 # Contact
-Raise a ticket from the Help Center (Contact support) or chat with the shopping assistant. Email support@veyra.example.
+Raise a ticket from the Help Center (Contact support) or chat with the shopping assistant. Email support@arvixa.example.

@@ -19,7 +19,7 @@ export default function SellerLayout() {
         <div className="seller-store">
           <span className="avatar">{(user.storeName || user.name)[0]?.toUpperCase()}</span>
           <div>
-            <strong>{user.storeName || 'Veyra Admin'}</strong>
+            <strong>{user.storeName || 'Arvixa Admin'}</strong>
             <span className="muted small">{user.role === 'admin' ? 'Marketplace admin' : 'Seller hub'}</span>
           </div>
         </div>

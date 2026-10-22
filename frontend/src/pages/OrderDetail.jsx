@@ -49,7 +49,7 @@ export default function OrderDetail() {
           <div className="success-check"><Icon name="check" size={36} strokeWidth={3} /></div>
           <div>
             <h1>Order placed successfully!</h1>
-            <p>Thank you for shopping with Veyra. Expected delivery by <strong>{deliveryDate(4)}</strong>.</p>
+            <p>Thank you for shopping with Arvixa. Expected delivery by <strong>{deliveryDate(4)}</strong>.</p>
           </div>
         </div>
       )}

@@ -18,6 +18,7 @@ import OrderDetail from './pages/OrderDetail';
 import Orders from './pages/Orders';
 import ProductDetail from './pages/ProductDetail';
 import Products from './pages/Products';
+import Sell from './pages/Sell';
 import Wishlist from './pages/Wishlist';
 
 // Seller hub pages load on demand, so shoppers never download the charting library
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Login mode="register" />} />
             <Route path="/help" element={<Help />} />
+            <Route path="/sell" element={<Sell />} />
 
             {/* Logged-in users only */}
             <Route path="/cart" element={privateRoute(<Cart />)} />

@@ -1,7 +1,7 @@
 [project]
-name = "veyra-api"
+name = "arvixa-api"
 version = "2.0.0"
-description = "Veyra marketplace API: FastAPI + PostgreSQL + MongoDB, with analytics and ML"
+description = "Arvixa marketplace API: FastAPI + PostgreSQL + MongoDB, with analytics and ML"
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CATEGORIES } from '../../constants/catalog';
+import { AUDIENCES, CATEGORY_GROUPS, categoryLabel } from '../../constants/catalog';
 import Icon from '../common/Icon';
 
 const PRICE_PRESETS = [
@@ -29,18 +29,49 @@ export default function FilterSidebar({ filters, facets, onChange, onClear, open
       </div>
 
       <div className="filter-group">
-        <h4>Categories</h4>
+        <h4>Shop by need</h4>
         <label className="radio-row">
-          <input type="radio" name="category" checked={!filters.category} onChange={() => onChange({ category: '', brand: '' })} />
-          All categories
+          <input type="radio" name="use" checked={!filters.use && !filters.category} onChange={() => onChange({ use: '', category: '', audience: '', brand: '' })} />
+          All products
         </label>
-        {CATEGORIES.map((c) => (
-          <label key={c.id} className="radio-row">
-            <input type="radio" name="category" checked={filters.category === c.id} onChange={() => onChange({ category: c.id, brand: '' })} />
-            {c.label}
+        {CATEGORY_GROUPS.map((g) => (
+          <label key={g.id} className="radio-row">
+            <input type="radio" name="use" checked={filters.use === g.id && !filters.category} onChange={() => onChange({ use: g.id, category: '', audience: '', brand: '' })} />
+            {g.label}
           </label>
         ))}
       </div>
+
+      <div className="filter-group">
+        <h4>Categories</h4>
+        {CATEGORY_GROUPS.filter((g) => !filters.use || g.id === filters.use).map((g) => (
+          <div key={g.id} className="filter-subgroup">
+            <p className="filter-subhead">{g.label}</p>
+            {g.categories.map((id) => (
+              <label key={id} className="radio-row">
+                <input type="radio" name="category" checked={filters.category === id} onChange={() => onChange({ use: g.id, category: id, audience: '', brand: '' })} />
+                {categoryLabel(id)}
+              </label>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {filters.category === 'fashion' && (
+        <div className="filter-group">
+          <h4>Shop for</h4>
+          <label className="radio-row">
+            <input type="radio" name="audience" checked={!filters.audience} onChange={() => onChange({ audience: '', brand: '' })} />
+            Everyone
+          </label>
+          {AUDIENCES.map((a) => (
+            <label key={a.id} className="radio-row">
+              <input type="radio" name="audience" checked={filters.audience === a.id} onChange={() => onChange({ audience: a.id, brand: '' })} />
+              {a.label}
+            </label>
+          ))}
+        </div>
+      )}
 
       <div className="filter-group">
         <h4>Price</h4>

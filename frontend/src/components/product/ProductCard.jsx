@@ -30,6 +30,7 @@ export default function ProductCard({ product, variant = 'grid' }) {
         <div className="product-img">
           <img src={product.image} alt={product.name} loading="lazy" />
           {outOfStock && <span className="stock-flag">Sold out</span>}
+          {product.images360?.length >= 4 && <span className="badge-360"><Icon name="rotate" size={11} /> 360°</span>}
         </div>
         <div className="product-info">
           {product.brand && <p className="product-brand">{product.brand}</p>}

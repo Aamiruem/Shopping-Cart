@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_pass: str = ""
-    mail_from: str = "Veyra <no-reply@veyra.example>"
+    mail_from: str = "Arvixa <no-reply@arvixa.example>"
     otp_ttl_minutes: int = 5
 
     # Product image storage: S3 when S3_BUCKET is set, else the local uploads/ folder

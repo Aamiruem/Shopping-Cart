@@ -6,12 +6,16 @@ import Icon from '../components/common/Icon';
 import Price from '../components/common/Price';
 import Rating from '../components/common/Rating';
 import ProductRail from '../components/product/ProductRail';
-import { categoryLabel } from '../constants/catalog';
+import Spin360 from '../components/product/Spin360';
+import { categoryLabel, groupOf } from '../constants/catalog';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import useShopActions from '../hooks/useShopActions';
 import { deliveryDate } from '../utils/format';
 import { addRecentlyViewed } from '../utils/recentlyViewed';
+
+// activeImage value that shows the 360° viewer instead of a photo
+const SPIN_VIEW = -1;
 
 const OFFERS = [
   'Bank Offer: 10% instant discount on credit & debit cards, up to ₹1,500',
@@ -61,6 +65,7 @@ export default function ProductDetail() {
       .then((p) => {
         if (cancelled) return;
         setProduct(p);
+        if (p.images360?.length >= 4) setActiveImage(SPIN_VIEW);
         addRecentlyViewed(p);
         // AI recommendations first; fall back to the same category if the AI service is down
         return api.recommend(id)
@@ -79,6 +84,8 @@ export default function ProductDetail() {
   if (!product) return <Spinner />;
 
   const images = product.images?.length ? product.images : [product.image];
+  const frames360 = product.images360?.length >= 4 ? product.images360 : null;
+  const show360 = frames360 && activeImage === SPIN_VIEW;
   const outOfStock = product.stock === 0;
   const wished = inWishlist(product._id);
 
@@ -87,6 +94,12 @@ export default function ProductDetail() {
       <div className="detail panel">
         <div className="detail-gallery">
           <div className="thumbs">
+            {frames360 && (
+              <button type="button" className={`thumb-360 ${show360 ? 'active' : ''}`} onClick={() => setActiveImage(SPIN_VIEW)} aria-label="360° view">
+                <Icon name="rotate" size={18} />
+                <span>360°</span>
+              </button>
+            )}
             {images.map((src, i) => (
               <button key={src} type="button" className={i === activeImage ? 'active' : ''} onMouseEnter={() => setActiveImage(i)} onClick={() => setActiveImage(i)} aria-label={`Image ${i + 1}`}>
                 <img src={src} alt="" />
@@ -94,7 +107,12 @@ export default function ProductDetail() {
             ))}
           </div>
           <div className="main-image">
-            <img src={images[activeImage]} alt={product.name} />
+            {show360 ? <Spin360 frames={frames360} alt={product.name} /> : <img src={images[activeImage]} alt={product.name} />}
+            {frames360 && !show360 && (
+              <button type="button" className="view-360-btn" onClick={() => setActiveImage(SPIN_VIEW)}>
+                <Icon name="rotate" size={14} /> View in 360°
+              </button>
+            )}
             <button type="button" className={`wish-btn large ${wished ? 'active' : ''}`} onClick={() => toggleWishlist(product)} aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}>
               <Icon name="heart" size={20} filled={wished} />
             </button>
@@ -116,6 +134,7 @@ export default function ProductDetail() {
         <div className="detail-info">
           <nav className="breadcrumbs" aria-label="Breadcrumb">
             <Link to="/">Home</Link> <Icon name="chevronRight" size={12} />
+            {groupOf(product.category) && <><Link to={`/products?use=${groupOf(product.category).id}`}>{groupOf(product.category).label}</Link> <Icon name="chevronRight" size={12} /></>}
             <Link to={`/products?category=${product.category}`}>{categoryLabel(product.category)}</Link> <Icon name="chevronRight" size={12} />
             <span>{product.brand}</span>
           </nav>
@@ -124,7 +143,7 @@ export default function ProductDetail() {
           <div className="detail-rating">
             <Rating value={product.rating} />
             <span className="muted">{product.ratingCount?.toLocaleString('en-IN')} ratings</span>
-            {product.featured && <span className="assured"><Icon name="shield" size={12} /> Veyra Assured</span>}
+            {product.featured && <span className="assured"><Icon name="shield" size={12} /> Arvixa Assured</span>}
           </div>
           {product.discount > 0 && <p className="text-success special">Special price</p>}
           <Price price={product.price} mrp={product.mrp} size="lg" />

@@ -78,7 +78,7 @@ def test_login_and_profile(client):
 def test_seller_crud_and_checkout_flow(client):
     seller = _seller(client)
     other_seller = _seller(client)
-    product = {"name": "Pytest Speaker", "category": "electronics", "brand": "Veyra", "price": 1999, "mrp": 2499, "stock": 5}
+    product = {"name": "Pytest Speaker", "category": "electronics", "brand": "Arvixa", "price": 1999, "mrp": 2499, "stock": 5}
 
     # Create (seller) -> visible in the public catalog
     r = client.post("/api/seller/products", json=product, headers=seller)
@@ -143,3 +143,34 @@ def test_support_ticket_is_triaged(client):
 def test_recommendations_work_for_guests(client):
     r = client.get("/api/recommendations/for-you")
     assert r.status_code == 200 and r.json()["strategy"] in ("trending", "personalised")
+
+
+def test_fashion_audience_filter_and_360_view(client):
+    seller = _seller(client)
+    frames = [f"https://example.com/dress/{i}.webp" for i in range(1, 5)]
+    dress = {"name": f"Pytest Dress {time.time_ns()}", "category": "fashion", "audience": "women", "price": 999, "stock": 3}
+    dress["images"] = frames[:1]
+
+    # A 360° view needs at least 4 frames; unknown audiences are rejected
+    assert client.post("/api/seller/products", json={**dress, "images360": frames[:3]}, headers=seller).status_code == 400
+    assert client.post("/api/seller/products", json={**dress, "audience": "kids"}, headers=seller).status_code == 400
+
+    r = client.post("/api/seller/products", json={**dress, "images360": frames}, headers=seller)
+    assert r.status_code == 201, r.text
+    pid = r.json()["_id"]
+    assert client.get(f"/api/products/{pid}").json()["images360"] == frames
+
+    in_women = {p["_id"] for p in client.get("/api/products", params={"category": "fashion", "audience": "women"}).json()}
+    in_men = {p["_id"] for p in client.get("/api/products", params={"category": "fashion", "audience": "men"}).json()}
+    assert pid in in_women and pid not in in_men
+    assert client.delete(f"/api/seller/products/{pid}", headers=seller).status_code == 204
+
+
+def test_daily_and_general_use_groups(client):
+    daily = client.get("/api/products", params={"use": "daily"}).json()
+    general = client.get("/api/products", params={"use": "general"}).json()
+    assert daily and general
+    assert {p["category"] for p in daily} <= {"grocery", "kitchen", "beauty"}
+    assert not {p["category"] for p in general} & {"grocery", "kitchen", "beauty"}
+    # An explicit category wins over the group
+    assert {p["category"] for p in client.get("/api/products", params={"use": "daily", "category": "mobiles"}).json()} == {"mobiles"}

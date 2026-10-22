@@ -188,3 +188,62 @@ a.insight-name:hover { color: var(--brand); }
   .rank-bar, .rank-list li > .num:not(strong) { display: none; }
   .ticket-list li { grid-template-columns: 1fr; }
 }
+
+/* ---------- Public "Sell on Arvixa" page ---------- */
+.page-sell { margin-top: calc(-1 * var(--gap)); }
+.sell-hero { background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%); color: #fff; }
+.sell-hero-inner { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 40px; align-items: center; padding-top: 56px; padding-bottom: 56px; }
+.sell-eyebrow { display: inline-block; padding: 4px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.16); font-size: var(--fs-sm); font-weight: 600; }
+.sell-hero h1 { font-size: 40px; line-height: 1.15; margin: 14px 0 12px; }
+.sell-lead { font-size: var(--fs-lg); line-height: 1.6; color: #dfe9fb; max-width: 560px; }
+.sell-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.sell-actions .btn { display: inline-flex; align-items: center; gap: 8px; }
+.sell-btn-ghost { border: 1px solid rgba(255, 255, 255, 0.6); color: #fff; }
+.sell-btn-ghost:hover { background: rgba(255, 255, 255, 0.1); }
+.sell-note { margin-top: 16px; font-size: var(--fs-sm); color: #dfe9fb; }
+.sell-note a { color: #fff; font-weight: 600; text-decoration: underline; }
+.sell-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; list-style: none; }
+.sell-stats li { display: flex; flex-direction: column; gap: 4px; padding: 20px; border-radius: var(--radius); background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.18); }
+.sell-stats strong { font-size: var(--fs-2xl); }
+.sell-stats span { color: #dfe9fb; font-size: var(--fs-sm); }
+
+.sell-body { display: flex; flex-direction: column; gap: var(--gap); margin-top: var(--gap); }
+.sell-section { padding: 28px; }
+.sell-section h2 { font-size: var(--fs-xl); margin-bottom: 20px; }
+.sell-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; list-style: none; }
+.sell-steps li { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 20px; border: 1px solid var(--border-light); border-radius: var(--radius); color: var(--brand); }
+.sell-steps strong { color: var(--text); }
+.sell-steps p { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.5; }
+.sell-step-num { position: absolute; top: 14px; right: 16px; font-size: var(--fs-2xl); font-weight: 700; color: var(--brand-light); }
+.sell-features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px 28px; }
+.sell-feature { display: flex; gap: 14px; }
+.sell-feature-icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--brand-light); color: var(--brand); }
+.sell-feature p { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.5; margin-top: 4px; }
+.sell-faq details { border-bottom: 1px solid var(--border-light); }
+.sell-faq summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; font-weight: 600; cursor: pointer; list-style: none; }
+.sell-faq summary::-webkit-details-marker { display: none; }
+.sell-faq details[open] summary .icon { transform: rotate(180deg); }
+.sell-faq details p { padding: 0 0 16px; color: var(--text-muted); line-height: 1.6; }
+.sell-cta { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 28px; background: var(--brand-light); }
+.sell-cta h2 { font-size: var(--fs-xl); }
+.sell-cta p { color: var(--text-muted); margin-top: 4px; }
+
+@media (max-width: 900px) {
+  .sell-hero-inner { grid-template-columns: 1fr; padding-top: 36px; padding-bottom: 36px; }
+  .sell-hero h1 { font-size: 30px; }
+  .sell-steps { grid-template-columns: repeat(2, 1fr); }
+  .sell-features { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .sell-steps, .sell-features, .sell-stats { grid-template-columns: 1fr; }
+  .sell-section, .sell-cta { padding: 20px; }
+}
+
+/* 360° frames in the product form */
+.spin-editor { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+.spin-preview { position: relative; width: 180px; aspect-ratio: 1; border: 1px solid var(--border-light); border-radius: var(--radius-sm); }
+.spin-preview .spin360 { padding: 8px 8px 4px; }
+.spin-preview .spin360-badge { top: 8px; left: 8px; }
+.spin-preview .spin360-hint, .spin-preview .spin360-dots { display: none; }
+.spin-preview .spin360-controls button { width: 26px; height: 26px; }
+@media (max-width: 560px) { .spin-editor { grid-template-columns: 1fr; } }

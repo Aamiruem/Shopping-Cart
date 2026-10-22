@@ -17,7 +17,7 @@ async function request(path, { method = 'GET', body } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new Error('Cannot reach the server. Check your connection and try again.');
+    throw new Error('Cannot reach the server. Make sure it is running, then reload the page (Ctrl+F5) and try again.');
   }
 
   const text = res.status === 204 ? '' : await res.text();

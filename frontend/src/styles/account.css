@@ -8,6 +8,7 @@
 .auth-art .icon:nth-child(2) { color: #ff8a80; transform: translateY(-24px); }
 .auth-art .icon:nth-child(3) { color: #fff; }
 .auth-form { display: flex; flex-direction: column; gap: 20px; padding: 40px 36px 28px; }
+.auth-logo { align-self: center; width: 240px; height: auto; margin: -16px 0 -4px; }
 .strength { display: flex; flex-direction: column; gap: 4px; margin-top: -8px; }
 .strength-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .strength-bar span { height: 4px; border-radius: 2px; background: var(--border); transition: background var(--transition); }

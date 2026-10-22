@@ -12,7 +12,7 @@ const COPY = {
     title: 'Login',
     blurb: 'Get access to your Orders, Wishlist and Recommendations',
     submit: 'Login',
-    switchText: 'New to Veyra?',
+    switchText: 'New to Arvixa?',
     switchLink: { to: '/register', label: 'Create an account' },
   },
   register: {
@@ -67,7 +67,7 @@ export default function Login({ mode = 'login' }) {
 
   const finish = useCallback((signedIn, isNew) => {
     playSound('success');
-    toast.show(isNew ? `Welcome to Veyra, ${signedIn.name}!` : `Welcome back, ${signedIn.name}!`);
+    toast.show(isNew ? `Welcome to Arvixa, ${signedIn.name}!` : `Welcome back, ${signedIn.name}!`);
     navigate(redirectTo, { replace: true });
   }, [toast, navigate, redirectTo]);
 
@@ -137,6 +137,7 @@ export default function Login({ mode = 'login' }) {
         </div>
 
         <form className="auth-form" onSubmit={onSubmit} noValidate>
+          <img className="auth-logo" src="/brand/arvixa-logo.webp" alt="Arvixa — Shop Beyond Limits" width="240" height="96" />
           {isRegister && (
             <Field name="name" label="Full name" error={shown('name')}>
               <input {...inputProps('name')} autoComplete="name" />
@@ -174,7 +175,7 @@ export default function Login({ mode = 'login' }) {
             </div>
           )}
 
-          <p className="auth-terms">By continuing, you agree to Veyra’s <Link to="/help">Terms of Use</Link> and <Link to="/help">Privacy Policy</Link>.</p>
+          <p className="auth-terms">By continuing, you agree to Arvixa’s <Link to="/help">Terms of Use</Link> and <Link to="/help">Privacy Policy</Link>.</p>
           {error && <p className="alert alert-error" role="alert">{error}</p>}
           <button type="submit" className="btn btn-buy btn-lg btn-block" disabled={busy}>{busy ? 'Please wait…' : copy.submit}</button>
 

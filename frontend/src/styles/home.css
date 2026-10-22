@@ -61,3 +61,45 @@
   .hero-arrow { display: none; }
   .deal-timer { margin-left: 0; }
 }
+
+/* ---------- Quick links (account shortcuts at the top of the home page) ---------- */
+.quick-links { display: flex; align-items: center; gap: 16px 24px; flex-wrap: wrap; padding: 14px 20px; }
+.quick-hello { display: flex; flex-direction: column; gap: 2px; min-width: 200px; }
+.quick-hello strong { font-size: var(--fs-lg); }
+.quick-hello span { color: var(--text-muted); font-size: var(--fs-sm); }
+.quick-list { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; justify-content: flex-end; }
+.quick-link { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 20px; font-size: var(--fs-sm); font-weight: 600; transition: border-color var(--transition), color var(--transition), background var(--transition); }
+.quick-link .icon { color: var(--brand); }
+.quick-link:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+.quick-link.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.quick-link.primary .icon { color: #fff; }
+
+/* ---------- Shop by need (Daily Use / General Use) ---------- */
+.shop-by-need { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); gap: var(--gap); }
+.need-card { display: flex; flex-direction: column; gap: 16px; padding: 18px 20px 20px; }
+.need-card header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
+.need-card header > div { flex: 1; min-width: 0; }
+.need-card h2 { font-size: var(--fs-xl); }
+.need-card header p { color: var(--text-muted); font-size: var(--fs-sm); margin-top: 2px; }
+.need-card header .btn { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.need-icon { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; }
+.need-daily .need-icon { background: var(--success-bg); color: var(--success); }
+.need-general .need-icon { background: var(--brand-light); color: var(--brand); }
+.need-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
+.need-tile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; border: 1px solid var(--border-light); border-radius: var(--radius); text-align: center; transition: border-color var(--transition), box-shadow var(--transition); }
+.need-tile:hover { border-color: var(--brand); box-shadow: var(--shadow); }
+.need-img { width: 72px; height: 72px; display: grid; place-items: center; }
+.need-img img { width: 100%; height: 100%; object-fit: contain; }
+.need-tile strong { font-size: var(--fs-sm); }
+.need-tile small { color: var(--text-muted); font-size: var(--fs-xs); }
+
+@media (max-width: 900px) {
+  .shop-by-need { grid-template-columns: 1fr; }
+  .quick-list { justify-content: flex-start; }
+}
+@media (max-width: 560px) {
+  .need-card header { flex-wrap: wrap; }
+  .need-grid { grid-template-columns: repeat(3, 1fr); }
+  .quick-list { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .quick-link { flex-shrink: 0; }
+}

@@ -1,15 +1,18 @@
 import { useRef, useState } from 'react';
 import { api } from '../../api/client';
-import { CATEGORIES } from '../../constants/catalog';
+import { AUDIENCES, CATEGORIES } from '../../constants/catalog';
 import { discountPercent } from '../../utils/format';
 import Icon from '../common/Icon';
+import Spin360 from '../product/Spin360';
 
-const EMPTY = { name: '', brand: '', category: 'electronics', description: '', price: '', mrp: '', stock: '10', tags: '', images: [], active: true };
+const EMPTY = { name: '', brand: '', category: 'electronics', audience: '', description: '', price: '', mrp: '', stock: '10', tags: '', images: [], images360: [], active: true };
+const MAX_IMAGES = { images: 8, images360: 36 };
 
 const fromProduct = (p) => ({
   name: p.name, brand: p.brand || '', category: p.category, description: p.description || '',
   price: String(p.price), mrp: p.mrp ? String(p.mrp) : '', stock: String(p.stock ?? 0),
   tags: (p.tags || []).join(', '), images: p.images?.length ? p.images : p.image ? [p.image] : [], active: p.active !== false,
+  audience: p.audience || '', images360: p.images360 || [],
 });
 
 function validate(f) {
@@ -18,6 +21,8 @@ function validate(f) {
   if (f.mrp && Number(f.mrp) < Number(f.price)) return 'MRP cannot be lower than the selling price';
   if (!(Number(f.stock) >= 0) || !Number.isInteger(Number(f.stock))) return 'Stock must be a whole number';
   if (!f.images.length) return 'Add at least one product image';
+  if (f.category === 'fashion' && !f.audience) return 'Choose who this fashion item is for (Women, Men or Unisex)';
+  if (f.images360.length > 0 && f.images360.length < 4) return 'A 360° view needs at least 4 frames (or remove them)';
   return '';
 }
 
@@ -29,21 +34,24 @@ export default function ProductForm({ product, onSaved, onClose }) {
   const [uploading, setUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const fileRef = useRef(null);
+  const spinFileRef = useRef(null);
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   const off = discountPercent(Number(form.price), Number(form.mrp));
 
-  const addImages = async (files) => {
+  // key = 'images' (gallery) or 'images360' (turntable frames, uploaded in name order = rotation order)
+  const addImages = async (files, key = 'images') => {
     setUploading(true);
     setError('');
     try {
       const urls = [];
-      for (const file of [...files].slice(0, 8 - form.images.length)) urls.push((await api.uploadImage(file)).url);
-      setForm((f) => ({ ...f, images: [...f.images, ...urls] }));
+      const ordered = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      for (const file of ordered.slice(0, MAX_IMAGES[key] - form[key].length)) urls.push((await api.uploadImage(file)).url);
+      setForm((f) => ({ ...f, [key]: [...f[key], ...urls] }));
     } catch (err) {
       setError(err.message);
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
+      [fileRef, spinFileRef].forEach((r) => r.current && (r.current.value = ''));
     }
   };
 
@@ -62,6 +70,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
     setError('');
     const body = {
       name: form.name, brand: form.brand, category: form.category, description: form.description,
+      audience: form.category === 'fashion' ? form.audience : '', images360: form.images360,
       price: Number(form.price), mrp: form.mrp ? Number(form.mrp) : null, stock: Number(form.stock),
       tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean), images: form.images, image: form.images[0], active: form.active,
     };
@@ -88,6 +97,15 @@ export default function ProductForm({ product, onSaved, onClose }) {
             <label className="field">Category
               <select value={form.category} onChange={set('category')}>{CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
             </label>
+            {form.category === 'fashion' && (
+              <label className="field">Shop for
+                <select value={form.audience} onChange={set('audience')} required>
+                  <option value="">Choose…</option>
+                  {AUDIENCES.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+                  <option value="unisex">Unisex</option>
+                </select>
+              </label>
+            )}
             <label className="field">Selling price (₹)<input type="number" min="1" step="1" value={form.price} onChange={set('price')} required /></label>
             <label className="field">MRP (₹) <span className="muted">{off > 0 ? `· ${off}% off` : ''}</span><input type="number" min="1" step="1" value={form.mrp} onChange={set('mrp')} /></label>
             <label className="field">Stock<input type="number" min="0" step="1" value={form.stock} onChange={set('stock')} required /></label>
@@ -116,6 +134,35 @@ export default function ProductForm({ product, onSaved, onClose }) {
               <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="…or paste an image URL" aria-label="Image URL" />
               <button type="button" className="btn btn-outline btn-sm" onClick={addUrl}>Add</button>
             </div>
+          </div>
+
+          <div className="image-manager">
+            <p className="field-label">360° view <span className="muted small">(optional · 4–36 photos taken while turning the product, uploaded in rotation order)</span></p>
+            <div className="spin-editor">
+              <div className="image-grid">
+                {form.images360.map((src, i) => (
+                  <figure key={src}>
+                    <img src={src} alt="" />
+                    <span className="cover">{i + 1}</span>
+                    <button type="button" onClick={() => setForm({ ...form, images360: form.images360.filter((x) => x !== src) })} aria-label={`Remove frame ${i + 1}`}><Icon name="x" size={14} /></button>
+                  </figure>
+                ))}
+                {form.images360.length < MAX_IMAGES.images360 && (
+                  <button type="button" className="image-add" onClick={() => spinFileRef.current?.click()} disabled={uploading}>
+                    <Icon name="rotate" size={22} /> {uploading ? 'Uploading…' : 'Add frames'}
+                  </button>
+                )}
+              </div>
+              {form.images360.length >= 4 && (
+                <div className="spin-preview" aria-label="360° preview"><Spin360 frames={form.images360} alt={form.name || 'your product'} /></div>
+              )}
+            </div>
+            <input ref={spinFileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => addImages(e.target.files, 'images360')} />
+            {!form.images360.length && form.images.length >= 4 && (
+              <button type="button" className="btn-link small" onClick={() => setForm({ ...form, images360: form.images.slice(0, MAX_IMAGES.images360) })}>
+                My photos above already go all the way around the product, so use them as the 360° view
+              </button>
+            )}
           </div>
 
           <label className="check-row"><input type="checkbox" checked={form.active} onChange={set('active')} /> Listed in the store</label>

@@ -13,6 +13,19 @@ export const CATEGORIES = [
 
 export const categoryLabel = (id) => CATEGORIES.find((c) => c.id === id)?.label || id;
 
+// The catalog in two groups, by how often shoppers need things (backend: CATEGORY_GROUPS, `use` filter)
+export const CATEGORY_GROUPS = [
+  { id: 'daily', label: 'Daily Use', icon: 'home', note: 'Grocery, kitchen & personal care', categories: ['grocery', 'kitchen', 'beauty'] },
+  { id: 'general', label: 'General Use', icon: 'package', note: 'Mobiles, electronics, fashion, home & sports', categories: ['mobiles', 'electronics', 'fashion', 'accessories', 'home', 'sports'] },
+];
+export const groupOf = (categoryId) => CATEGORY_GROUPS.find((g) => g.categories.includes(categoryId));
+
+// Fashion is split by who it is for (`audience` on the product)
+export const AUDIENCES = [
+  { id: 'women', label: 'Women', heading: "Women's Fashion" },
+  { id: 'men', label: 'Men', heading: "Men's Fashion" },
+];
+
 export const SORT_OPTIONS = [
   { id: 'relevance', label: 'Relevance' },
   { id: 'popularity', label: 'Popularity' },

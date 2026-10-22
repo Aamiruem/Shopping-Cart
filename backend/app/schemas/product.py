@@ -1,5 +1,7 @@
 """Validated product input for seller / admin create and update."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ..services.catalog import CATEGORIES
@@ -17,6 +19,10 @@ class ProductIn(BaseModel):
     stock: int = Field(default=0, ge=0, le=1_000_000)
     image: str = Field(default="", max_length=1000)
     images: list[str] = Field(default_factory=list, max_length=8)
+    # Frames of a turntable shot in rotation order; 4+ frames enable the 360° viewer
+    images360: list[str] = Field(default_factory=list, max_length=72)
+    # Who a fashion item is for (drives the Women / Men filters); empty for everything else
+    audience: Literal["", "women", "men", "unisex"] = ""
     active: bool = True
     featured: bool = False  # only admins may set this
 
@@ -43,6 +49,8 @@ class ProductIn(BaseModel):
             raise ValueError("MRP cannot be lower than the selling price")
         if not self.image and self.images:
             self.image = self.images[0]
+        if 0 < len(self.images360) < 4:
+            raise ValueError("A 360° view needs at least 4 frames")
         return self
 
 

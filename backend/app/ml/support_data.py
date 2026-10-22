@@ -84,7 +84,7 @@ TRAINING_TICKETS = [
     ("Someone else is using my account", "account"),
     ("Unable to update my phone number in profile", "account"),
     ("My account got locked after many attempts", "account"),
-    ("How do I become a seller on Veyra", "account"),
+    ("How do I become a seller on Arvixa", "account"),
     ("I want to unsubscribe from promotional emails", "account"),
     ("Saved addresses disappeared from my account", "account"),
     ("Not able to verify my email", "account"),

@@ -6,6 +6,11 @@ from bson import ObjectId
 from bson.errors import InvalidId
 
 CATEGORIES = ["mobiles", "electronics", "fashion", "accessories", "beauty", "home", "kitchen", "sports", "grocery"]
+# The storefront splits the catalog by how often shoppers need things (frontend: CATEGORY_GROUPS)
+CATEGORY_GROUPS = {
+    "daily": ["grocery", "kitchen", "beauty"],
+    "general": ["mobiles", "electronics", "fashion", "accessories", "home", "sports"],
+}
 
 
 def to_object_id(value) -> ObjectId | None:

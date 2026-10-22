@@ -1,4 +1,4 @@
-"""Veyra marketplace API (FastAPI).
+"""Arvixa marketplace API (FastAPI).
 
 Run locally:   uvicorn app.main:app --reload --port 5000
 API docs:      http://localhost:5000/docs
@@ -34,7 +34,7 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title="Veyra Marketplace API",
+        title="Arvixa Marketplace API",
         version="2.0.0",
         description="Store, seller, analytics and ML endpoints. PostgreSQL for transactional data, MongoDB for catalog and events.",
         lifespan=lifespan,

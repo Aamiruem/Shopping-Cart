@@ -1,10 +1,10 @@
-# Veyra: full-stack marketplace with analytics and machine learning
+# Arvixa: full-stack marketplace with analytics and machine learning
 
-Veyra is a multi-seller marketplace in the style of the big Indian e-commerce sites: a React storefront,
+Arvixa is a multi-seller marketplace in the style of the big Indian e-commerce sites: a React storefront,
 a Python (FastAPI) API on PostgreSQL + MongoDB, a seller hub with product management, and a layer of
 analytics and machine learning that helps sellers sell more and helps shoppers get faster support.
 
-**Veyra is a working name**; check trademark, company-name and domain availability before launch.
+**Arvixa is a working name**; check trademark, company-name and domain availability before launch.
 
 | Layer | Tech | Folder |
 |---|---|---|
@@ -19,13 +19,14 @@ analytics and machine learning that helps sellers sell more and helps shoppers g
 
 ## Features
 
-**Shoppers:** search with suggestions, filters and sorting, product pages with gallery, cart, wishlist,
+**Shoppers:** search with suggestions, filters and sorting, Women / Men fashion sections, product pages with
+gallery and a drag-to-rotate 360° view, cart, wishlist,
 saved addresses, 4-step checkout (UPI and card payments confirmed with an emailed OTP, or cash on
 delivery), orders and cancellation, Google sign-in, AI chat assistant, and a help centre where support
 tickets are triaged by ML.
 
-**Sellers (Seller Hub at `/seller`):** onboarding (store name, GSTIN), product CRUD with image upload
-(S3 or local), inline price/stock edits, list/unlist, orders containing their products, CSV exports,
+**Sellers (Seller Hub at `/seller`, public intro page at `/sell`):** onboarding (store name, GSTIN), product CRUD
+with image upload (S3 or local) and optional 360° frame sets, inline price/stock edits, list/unlist, orders containing their products, CSV exports,
 and the analytics & AI dashboard. **Admins** see the whole marketplace and can filter by store.
 
 ## Analytics and machine learning
@@ -115,7 +116,9 @@ own windows. If the storefront says "Our server is not responding", the API on p
 
 The seed also creates 650 simulated shoppers, ~2,800 orders, ~30,000 behaviour events and 320 support
 tickets over 180 days. Simulated data is marked and is replaced on every re-run; real orders are never touched.
-`python -m scripts.seed --no-history` gives a clean store.
+`python -m scripts.seed --no-history` gives a clean store. After editing `app/data/products.json`, run
+`python -m scripts.sync_catalog` to add new products and fill in new fields without re-seeding
+(keeps product ids, carts, wishlists and orders).
 
 ## Tests
 

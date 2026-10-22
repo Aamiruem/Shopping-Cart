@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { CATEGORIES } from '../../constants/catalog';
 import Icon from '../common/Icon';
+import { isSellerRole } from './Navbar';
 
 const COLUMNS = [
   { title: 'Shop', links: CATEGORIES.slice(0, 6).map((c) => ({ label: c.label, to: `/products?category=${c.id}` })) },
@@ -11,6 +13,15 @@ const COLUMNS = [
       { label: 'Orders', to: '/orders' },
       { label: 'Wishlist', to: '/wishlist' },
       { label: 'Cart', to: '/cart' },
+    ],
+  },
+  {
+    title: 'Seller Hub',
+    sellersOnly: true, // shoppers never see the seller side of the store
+    links: [
+      { label: 'Dashboard', to: '/seller/dashboard' },
+      { label: 'List products', to: '/seller/products' },
+      { label: 'Seller orders', to: '/seller/orders' },
     ],
   },
   {
@@ -32,6 +43,8 @@ const PROMISES = [
 ];
 
 export default function Footer() {
+  const { user } = useAuth();
+  const columns = COLUMNS.filter((c) => !c.sellersOnly || isSellerRole(user));
   return (
     <footer className="footer">
       <div className="footer-promises container">
@@ -44,7 +57,7 @@ export default function Footer() {
       </div>
 
       <div className="footer-main container">
-        {COLUMNS.map((col) => (
+        {columns.map((col) => (
           <div key={col.title} className="footer-col">
             <h4>{col.title}</h4>
             {col.links.map((l) => <Link key={l.label} to={l.to}>{l.label}</Link>)}
@@ -52,8 +65,8 @@ export default function Footer() {
         ))}
         <div className="footer-col footer-contact">
           <h4>Contact Us</h4>
-          <p>Veyra Retail Pvt. Ltd.<br />Outer Ring Road, Bengaluru,<br />Karnataka 560103, India</p>
-          <a href="mailto:support@veyra.example"><Icon name="mail" size={14} /> support@veyra.example</a>
+          <p>Arvixa Retail Pvt. Ltd.<br />Outer Ring Road, Bengaluru,<br />Karnataka 560103, India</p>
+          <a href="mailto:support@arvixa.example"><Icon name="mail" size={14} /> support@arvixa.example</a>
         </div>
       </div>
 
@@ -61,7 +74,7 @@ export default function Footer() {
         <div className="container footer-bottom-inner">
           <span><Icon name="gift" size={14} /> Gift Cards</span>
           <span><Icon name="headphones" size={14} /> Help Center</span>
-          <span>© {new Date().getFullYear()} Veyra. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} Arvixa. All rights reserved.</span>
           <span className="pay-methods">UPI · VISA · Mastercard · RuPay · COD</span>
         </div>
       </div>

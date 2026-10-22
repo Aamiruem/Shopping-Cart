@@ -5,6 +5,8 @@ import DealTimer from '../components/home/DealTimer';
 import HeroCarousel from '../components/home/HeroCarousel';
 import OfferBanners from '../components/home/OfferBanners';
 import PromoVideo from '../components/home/PromoVideo';
+import QuickLinks from '../components/home/QuickLinks';
+import ShopByNeed from '../components/home/ShopByNeed';
 import ProductRail from '../components/product/ProductRail';
 import { useAuth } from '../context/AuthContext';
 import { getRecentlyViewed } from '../utils/recentlyViewed';
@@ -13,7 +15,8 @@ import { getRecentlyViewed } from '../utils/recentlyViewed';
 const RAILS = [
   { key: 'mobiles', title: 'Best of Mobiles', subtitle: 'Top picks from popular brands', params: { category: 'mobiles', sort: 'popularity', limit: 12 } },
   { key: 'electronics', title: 'Electronics & Accessories', subtitle: 'Laptops, tablets & more', params: { category: 'electronics', sort: 'rating', limit: 12 } },
-  { key: 'fashion', title: 'Fashion Top Deals', subtitle: 'Shirts, dresses & shoes', params: { category: 'fashion', sort: 'popularity', limit: 12 } },
+  { key: 'women', title: "Women's Fashion", subtitle: 'Dresses, tops, jackets & heels · Many in 360° view', params: { category: 'fashion', audience: 'women', sort: 'popularity', limit: 12 } },
+  { key: 'men', title: "Men's Fashion", subtitle: 'Shirts, tees, jackets & sneakers · Many in 360° view', params: { category: 'fashion', audience: 'men', sort: 'popularity', limit: 12 } },
   { key: 'beauty', title: 'Beauty & Fragrances', params: { category: 'beauty', sort: 'rating', limit: 12 } },
   { key: 'kitchen', title: 'Home & Kitchen Essentials', params: { category: 'kitchen', sort: 'popularity', limit: 12 } },
 ];
@@ -47,7 +50,7 @@ function mixCategories(products, max) {
 
 function Rail({ title, subtitle, params }) {
   const { products, loading } = useProducts(params);
-  return <ProductRail title={title} subtitle={subtitle} products={products} loading={loading} viewAll={`/products?category=${params.category}&sort=${params.sort}`} />;
+  return <ProductRail title={title} subtitle={subtitle} products={products} loading={loading} viewAll={`/products?${new URLSearchParams({ category: params.category, ...(params.audience && { audience: params.audience }), sort: params.sort })}`} />;
 }
 
 // Collaborative-filtering picks for logged-in shoppers, trending products for everyone else
@@ -80,7 +83,9 @@ export default function Home() {
 
   return (
     <div className="page-home container">
+      <QuickLinks />
       <HeroCarousel />
+      <ShopByNeed />
       <ErrorMessage message={deals.error && `Couldn't load products: ${deals.error}`} />
 
       <ProductRail
@@ -94,9 +99,9 @@ export default function Home() {
       <ForYou />
       <OfferBanners />
 
-      {RAILS.slice(0, 2).map((r) => <Rail key={r.key} {...r} />)}
+      {RAILS.slice(0, 3).map((r) => <Rail key={r.key} {...r} />)}
       <PromoVideo />
-      {RAILS.slice(2).map((r) => <Rail key={r.key} {...r} />)}
+      {RAILS.slice(3).map((r) => <Rail key={r.key} {...r} />)}
 
       {recent.length > 0 && <ProductRail title="Recently Viewed" products={recent} />}
     </div>
