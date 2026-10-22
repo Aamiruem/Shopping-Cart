@@ -4,7 +4,11 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
+    // IPv4 so both http://localhost:5173 and http://127.0.0.1:5173 work; fail loudly instead of moving to 5174
+    host: '127.0.0.1',
     port: 5173,
-    proxy: { '/api': process.env.VITE_API_PROXY || 'http://localhost:5000' },
+    strictPort: true,
+    // 127.0.0.1, not localhost: Node may resolve localhost to ::1 while uvicorn only listens on IPv4
+    proxy: { '/api': process.env.VITE_API_PROXY || 'http://127.0.0.1:5000' },
   },
 });

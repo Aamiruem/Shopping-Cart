@@ -101,6 +101,9 @@ cd ai-service && python -m venv .venv && .venv\Scripts\activate && pip install -
 uvicorn app.main:app --port 8100                         # 8100: port 8000 is often used by other local apps
 ```
 
+After the first setup, `powershell -ExecutionPolicy Bypass -File .\start-dev.ps1` starts all three in their
+own windows. If the storefront says "Our server is not responding", the API on port 5000 is not running.
+
 ### Demo accounts (created by the seed)
 
 | Role | Email | Password |

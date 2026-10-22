@@ -42,9 +42,14 @@ export default function ChatWidget() {
         reply = (await api.ask(text)).answer;
       } else {
         // Skip the local greeting - the agent only needs the real conversation
-        const result = await api.agent(history.slice(1).map(({ role, content }) => ({ role, content })));
-        reply = result.reply;
-        if (result.actions?.some((a) => a.tool === 'add_to_cart')) refresh();
+        const result = await api.agent(history.slice(1).map(({ role, content }) => ({ role, content }))).catch(() => null);
+        if (result) {
+          reply = result.reply;
+          if (result.actions?.some((a) => a.tool === 'add_to_cart')) refresh();
+        } else {
+          // Agent unavailable (e.g. no LLM key configured): answer from the store knowledge base instead
+          reply = (await api.ask(text)).answer;
+        }
       }
       setMessages([...history, { role: 'assistant', content: reply }]);
       playSound('click');
