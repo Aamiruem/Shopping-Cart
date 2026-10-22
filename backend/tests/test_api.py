@@ -20,6 +20,14 @@ pytestmark = pytest.mark.skipif(
 PASSWORD = "secret123"
 
 
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    """Each test starts with clean rate-limit counters (the suite signs up more users than one IP may in 15 min)."""
+    from app.core.rate_limit import reset_all
+
+    reset_all()
+
+
 @pytest.fixture(scope="module")
 def client():
     os.environ.update(
@@ -43,6 +51,8 @@ def client():
 def _register(client, name="Test Shopper"):
     email = f"pytest{time.time_ns()}@gmail.com"
     r = client.post("/api/auth/register", json={"name": name, "email": email, "password": PASSWORD})
+    assert r.status_code == 202, r.text  # signup waits for the emailed code (returned as devCode without SMTP)
+    r = client.post("/api/auth/register/verify", json={"email": email, "code": r.json()["devCode"]})
     assert r.status_code == 201, r.text
     return {"Authorization": f"Bearer {r.json()['token']}"}, email
 
@@ -219,7 +229,12 @@ def test_seller_profile_and_payout_details(client):
         "bankAccountNumber": "123456789012",
         "bankIfsc": "hdfc0001234",
     }
-    r = client.put("/api/seller/profile", json=ok, headers=seller)
+    # Payout details are protected: the account password is required to change them
+    no_password = client.put("/api/seller/profile", json=ok, headers=seller)
+    assert no_password.status_code == 403 and "password" in no_password.json()["error"]
+    wrong = client.put("/api/seller/profile", json={**ok, "currentPassword": "wrong-pass1"}, headers=seller)
+    assert wrong.status_code == 403
+    r = client.put("/api/seller/profile", json={**ok, "currentPassword": PASSWORD}, headers=seller)
     assert r.status_code == 200, r.text
     saved = r.json()
     assert saved["bank_account_number"].endswith("9012") and "1234567" not in saved["bank_account_number"]  # masked
@@ -325,3 +340,37 @@ def test_razorpay_flow_with_mocked_gateway(client, monkeypatch):
     assert cancelled["refund"] == "refunded" and refunds == ["pay_456"]
     history = client.get("/api/payments/mine", headers=customer).json()
     assert [p["status"] for p in history][:2] == ["refunded", "failed"]
+
+
+def test_signup_needs_email_code(client):
+    email = f"pytest{time.time_ns()}@gmail.com"
+    body = {"name": "Verify Me", "email": email, "password": PASSWORD}
+    assert client.post("/api/auth/register", json={**body, "email": "someone@mailinator.com"}).status_code == 400  # disposable inbox
+    start = client.post("/api/auth/register", json=body)
+    assert start.status_code == 202 and start.json()["verify"] == "email" and "*" in start.json()["sentTo"]
+    # No account until the code is confirmed
+    assert client.post("/api/auth/login", json={"email": email, "password": PASSWORD}).status_code == 401
+    wrong = "000000" if start.json()["devCode"] != "000000" else "111111"
+    bad = client.post("/api/auth/register/verify", json={"email": email, "code": wrong})
+    assert bad.status_code == 400 and "attempt" in bad.json()["error"]
+    ok = client.post("/api/auth/register/verify", json={"email": email, "code": start.json()["devCode"]})
+    assert ok.status_code == 201 and ok.json()["user"]["emailVerified"] is True
+    # The code is single-use and the email is now taken
+    assert client.post("/api/auth/register/verify", json={"email": email, "code": start.json()["devCode"]}).status_code == 400
+    assert client.post("/api/auth/register", json=body).status_code == 409
+
+
+def test_phone_verification_by_sms_and_whatsapp(client):
+    headers, _ = _register(client)
+    phone = f"9{time.time_ns() % 1_000_000_000:09d}"
+    assert client.post("/api/auth/phone/otp", json={"phone": "12345"}, headers=headers).status_code == 400
+    sent = client.post("/api/auth/phone/otp", json={"phone": phone, "channel": "whatsapp"}, headers=headers).json()
+    assert sent["channel"] == "whatsapp" and sent["sentTo"].endswith(phone[-4:])
+    user = client.post("/api/auth/phone/verify", json={"phone": phone, "code": sent["devCode"]}, headers=headers).json()
+    assert user["phone"] == phone and user["phoneVerified"] is True
+    # Another account can't claim a verified number
+    other, _ = _register(client)
+    assert client.post("/api/auth/phone/otp", json={"phone": phone, "channel": "sms"}, headers=other).status_code == 409
+    # Changing the number on the profile resets verification
+    changed = client.put("/api/auth/me", json={"name": "Test Shopper", "phone": "9876500000"}, headers=headers).json()
+    assert changed["phoneVerified"] is False

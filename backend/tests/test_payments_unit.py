@@ -76,3 +76,13 @@ def test_media_too_big():
     with pytest.raises(ApiError) as err:
         _validate(b"\x89PNG\r\n\x1a\n" + b"0" * (5 * 1024 * 1024), "image/png", "image")
     assert "5 MB" in err.value.message
+
+
+def test_bank_details_encrypted_at_rest():
+    from app.services.crypto import decrypt, encrypt
+
+    stored = encrypt("123456789012")
+    assert stored.startswith("enc:") and "123456789012" not in stored
+    assert decrypt(stored) == "123456789012"
+    assert decrypt("987654321") == "987654321"  # rows saved before encryption still read
+    assert encrypt(None) is None and decrypt(None) is None

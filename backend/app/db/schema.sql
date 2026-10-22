@@ -137,3 +137,25 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 CREATE INDEX IF NOT EXISTS payments_user_idx  ON payments (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS payments_order_idx ON payments (order_id);
+
+-- ---------- Verification codes: signup email, phone (SMS / WhatsApp), payout changes ----------
+-- Codes are stored only as an HMAC. A signup is held here (payload) until its email code is confirmed.
+CREATE TABLE IF NOT EXISTS verification_codes (
+  id         SERIAL PRIMARY KEY,
+  purpose    VARCHAR(20)  NOT NULL,          -- signup | phone | payout
+  target     VARCHAR(255) NOT NULL,          -- email address or phone number
+  channel    VARCHAR(10)  NOT NULL,          -- email | sms | whatsapp
+  user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  payload    JSONB,
+  code_hash  VARCHAR(64)  NOT NULL,
+  attempts   INTEGER      NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ  NOT NULL,
+  used_at    TIMESTAMPTZ,
+  created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS verification_codes_lookup_idx ON verification_codes (purpose, target, created_at DESC);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Payout bank account numbers are encrypted at rest; the last 4 digits are kept separately for display
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS bank_account_last4 VARCHAR(4);
+ALTER TABLE sellers ALTER COLUMN bank_account_number TYPE TEXT;

@@ -53,6 +53,18 @@ class Settings(BaseSettings):
     razorpay_key_secret: str = ""
     razorpay_webhook_secret: str = ""
 
+    # Mobile OTPs by SMS and WhatsApp through Twilio (https://console.twilio.com). Without them, development
+    # shows the code on screen instead of sending it.
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_sms_from: str = ""  # an SMS-capable Twilio number, e.g. +1415...
+    twilio_whatsapp_from: str = ""  # e.g. whatsapp:+14155238886 (Twilio sandbox) or your approved sender
+
+    # Key that encrypts sensitive data at rest (seller bank account numbers). Generate one with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Development falls back to a key derived from JWT_SECRET; production refuses to start without one.
+    data_encryption_key: str = ""
+
     # Product media storage (images, videos, audio): S3 when S3_BUCKET is set, else the local uploads/ folder
     aws_region: str = "ap-south-1"
     s3_bucket: str = ""
@@ -94,4 +106,6 @@ def get_settings() -> Settings:
     settings = Settings()
     if settings.is_production and settings.jwt_secret in ("dev-secret", "change-me"):
         raise RuntimeError("Set a strong JWT_SECRET before running in production")
+    if settings.is_production and not settings.data_encryption_key:
+        raise RuntimeError("Set DATA_ENCRYPTION_KEY before running in production (it encrypts seller bank details)")
     return settings

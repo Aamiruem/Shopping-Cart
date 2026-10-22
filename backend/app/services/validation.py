@@ -20,11 +20,52 @@ def normalize_email(email: str | None) -> str:
     return str(email or "").strip().lower()
 
 
+# Throwaway inbox services: accounts made with these can't be reached for orders, OTPs or refunds
+DISPOSABLE_DOMAINS = {
+    "mailinator.com",
+    "guerrillamail.com",
+    "guerrillamail.info",
+    "sharklasers.com",
+    "10minutemail.com",
+    "10minutemail.net",
+    "tempmail.com",
+    "temp-mail.org",
+    "temp-mail.io",
+    "tempmail.net",
+    "throwawaymail.com",
+    "yopmail.com",
+    "yopmail.net",
+    "getnada.com",
+    "nada.email",
+    "trashmail.com",
+    "dispostable.com",
+    "maildrop.cc",
+    "mintemail.com",
+    "fakeinbox.com",
+    "mailnesia.com",
+    "emailondeck.com",
+    "moakt.com",
+    "tempail.com",
+    "burnermail.io",
+    "mohmal.com",
+    "spamgourmet.com",
+    "mytemp.email",
+    "tmpmail.org",
+    "tmpmail.net",
+    "discard.email",
+    "inboxkitten.com",
+    "mailpoof.com",
+    "33mail.com",
+}
+
+
 def email_error(email: str) -> str | None:
     if not email:
         return "Please enter your email address"
     if len(email) > 254 or not EMAIL_RE.match(email) or ".." in email:
         return "Please enter a valid email address"
+    if email.split("@")[1] in DISPOSABLE_DOMAINS:
+        return "Temporary email addresses aren't allowed. Please use your own email."
     return None
 
 

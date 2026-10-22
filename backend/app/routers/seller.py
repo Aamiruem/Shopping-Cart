@@ -1,6 +1,7 @@
 """/api/seller - onboarding, store profile & payout details, product CRUD (+ bulk actions), media uploads,
 order fulfilment and earnings."""
 
+import asyncio
 import re
 from datetime import UTC, datetime
 from typing import Literal
@@ -9,15 +10,18 @@ from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from ..core.errors import ApiError
+from ..core.security import verify_password
 from ..db.mongo import get_db
 from ..db.postgres import get_pool, rows
 from ..deps import CurrentUser, get_current_user, require_seller
 from ..schemas.product import ProductIn, ProductPatch
 from ..services import products as product_service
 from ..services.catalog import serialize_product
+from ..services.crypto import decrypt, encrypt
 from ..services.orders import FULFILMENT_STEPS
 from ..services.storage import MEDIA, save_media
 from ..services.validation import phone_error
+from ..services.verification import check_code, send_code
 from .auth import session
 
 router = APIRouter(prefix="/api/seller", tags=["seller"])
@@ -61,14 +65,22 @@ async def register_seller(body: SellerIn, user: CurrentUser = Depends(get_curren
     return await session(dict(u))
 
 
-def _mask(number: str | None) -> str | None:
-    return f"{'•' * 4}{number[-4:]}" if number else None
+def _mask(last4: str | None) -> str | None:
+    return f"{'•' * 4}{last4}" if last4 else None
+
+
+def _last4(record) -> str | None:
+    if record["bank_account_last4"]:
+        return record["bank_account_last4"]
+    number = decrypt(record["bank_account_number"])  # rows saved before encryption
+    return number[-4:] if number else None
 
 
 def _public_profile(record) -> dict:
-    """Store profile for the Seller Hub; the bank account number never leaves the server unmasked."""
+    """Store profile for the Seller Hub; the bank account number is encrypted and never leaves the server."""
     data = dict(record)
-    data["bank_account_number"] = _mask(data.get("bank_account_number"))
+    data["bank_account_number"] = _mask(_last4(record))
+    data.pop("bank_account_last4", None)
     return data
 
 
@@ -88,6 +100,26 @@ class ProfileIn(BaseModel):
     bankAccountName: str | None = Field(default=None, max_length=120)
     bankAccountNumber: str | None = None  # omit (or send the masked value) to keep the saved one
     bankIfsc: str | None = None
+    # Changing payout details needs the account password, or (Google-only accounts) an emailed code
+    currentPassword: str | None = None
+    otp: str | None = None
+
+
+@router.post("/profile/otp")
+async def payout_otp(user: CurrentUser = Depends(require_seller)):
+    """Emails a code that confirms a payout change (for accounts that sign in with Google only)."""
+    return await send_code("payout", user.email, "email", user_id=user.id)
+
+
+async def _confirm_payout_change(body: ProfileIn, user: CurrentUser) -> None:
+    account = await get_pool().fetchrow("SELECT password_hash FROM users WHERE id = $1", user.id)
+    if account and account["password_hash"]:
+        if not body.currentPassword or not await asyncio.to_thread(verify_password, body.currentPassword, account["password_hash"]):
+            raise ApiError(403, "Enter your account password to change payout details")
+        return
+    if not body.otp:
+        raise ApiError(403, "Enter the code we emailed you to change payout details")
+    await check_code("payout", user.email, body.otp)
 
 
 @router.put("/profile")
@@ -102,8 +134,9 @@ async def update_profile(body: ProfileIn, user: CurrentUser = Depends(require_se
     phone = (body.phone or "").strip() or None
     upi = (body.payoutUpi or "").strip() or None
     ifsc = (body.bankIfsc or "").strip().upper() or None
+    saved_number = decrypt(current["bank_account_number"])
     number = (body.bankAccountNumber or "").replace(" ", "")
-    number = current["bank_account_number"] if not number or "•" in number else number
+    number = saved_number if not number or "•" in number else number
     if gstin and not GSTIN_RE.match(gstin):
         raise ApiError(400, "Please enter a valid 15-character GSTIN, e.g. 29ABCDE1234F1Z5")
     if error := phone_error(phone):
@@ -116,15 +149,25 @@ async def update_profile(body: ProfileIn, user: CurrentUser = Depends(require_se
         raise ApiError(400, "Please enter a valid 11-character IFSC code, e.g. HDFC0001234")
     if number and not ifsc:
         raise ApiError(400, "Add the IFSC code of your bank branch")
-    if body.logo and not re.match(r"^(https?://\S+|/api/uploads/[\w.-]+)$", body.logo):
+    if body.logo and not re.match(r"^(https?://\S+|/api/uploads/[\w.-]+|/catalog/[\w.-]+)$", body.logo):
         raise ApiError(400, "Logo must be an uploaded image or an https link")
+    account_name = (body.bankAccountName or "").strip() or None
+    payout_changed = (upi, account_name, number or None, ifsc) != (
+        current["payout_upi"],
+        current["bank_account_name"],
+        saved_number,
+        current["bank_ifsc"],
+    )
+    if payout_changed:
+        await _confirm_payout_change(body, user)
     if store.lower() != current["store_name"].lower() and await pool.fetchval(
         "SELECT 1 FROM sellers WHERE lower(store_name) = lower($1) AND user_id <> $2", store, user.id
     ):
         raise ApiError(409, "That store name is taken. Please choose another.")
     record = await pool.fetchrow(
         """UPDATE sellers SET store_name = $2, description = $3, logo = $4, gstin = $5, phone = $6, payout_upi = $7,
-                  bank_account_name = $8, bank_account_number = $9, bank_ifsc = $10, updated_at = NOW()
+                  bank_account_name = $8, bank_account_number = $9, bank_ifsc = $10, bank_account_last4 = $11,
+                  updated_at = NOW()
             WHERE user_id = $1 RETURNING *""",
         user.id,
         store,
@@ -133,9 +176,10 @@ async def update_profile(body: ProfileIn, user: CurrentUser = Depends(require_se
         gstin,
         phone,
         upi,
-        (body.bankAccountName or "").strip() or None,
-        number or None,
+        account_name,
+        encrypt(number) if number else None,
         ifsc,
+        number[-4:] if number else None,
     )
     return _public_profile(record)
 
@@ -324,13 +368,15 @@ async def earnings(user: CurrentUser = Depends(require_seller)):
              WHERE {owner} GROUP BY p.id ORDER BY p.created_at DESC LIMIT 25""",
         *args,
     )
-    payout = await pool.fetchrow("SELECT payout_upi, bank_account_number, bank_ifsc FROM sellers WHERE user_id = $1", user.id)
+    payout = await pool.fetchrow(
+        "SELECT payout_upi, bank_account_number, bank_account_last4, bank_ifsc FROM sellers WHERE user_id = $1", user.id
+    )
     return {
         "totals": dict(totals),
         "byMethod": rows(by_method),
         "recentPayments": rows(recent),
         "payout": {
             "upi": payout and payout["payout_upi"],
-            "bank": payout and payout["bank_account_number"] and f"{_mask(payout['bank_account_number'])} · {payout['bank_ifsc']}",
+            "bank": payout and _last4(payout) and f"{_mask(_last4(payout))} · {payout['bank_ifsc']}",
         },
     }

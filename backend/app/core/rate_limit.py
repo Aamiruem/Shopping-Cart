@@ -10,9 +10,18 @@ from fastapi import Request
 
 from .errors import ApiError
 
+_ALL_COUNTERS: list[dict] = []
+
+
+def reset_all() -> None:
+    """Forget every counter (used by the test suite between tests)."""
+    for hits in _ALL_COUNTERS:
+        hits.clear()
+
 
 def rate_limit(max_hits: int = 20, window_seconds: int = 15 * 60, message: str = "Too many attempts. Please try again later."):
     hits: dict[str, tuple[int, float]] = {}
+    _ALL_COUNTERS.append(hits)
 
     async def dependency(request: Request) -> None:
         ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (request.client.host if request.client else "?")

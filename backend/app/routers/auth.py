@@ -1,6 +1,8 @@
-"""/api/auth - email + password accounts, Google sign-in, profile and password."""
+"""/api/auth - verified-email signup, email + password login, Google sign-in, phone OTP (SMS / WhatsApp),
+profile and password."""
 
 import asyncio
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel
@@ -12,9 +14,11 @@ from ..core.security import create_token, hash_password, verify_password
 from ..db.postgres import get_pool
 from ..deps import CurrentUser, get_current_user
 from ..services import validation as v
+from ..services.verification import check_code, send_code
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 auth_limiter = rate_limit(20, message="Too many login attempts. Please try again in 15 minutes.")
+otp_limiter = rate_limit(8, message="Too many code requests. Please try again in 15 minutes.")
 
 
 class RegisterIn(BaseModel):
@@ -22,6 +26,25 @@ class RegisterIn(BaseModel):
     email: str = ""
     password: str = ""
     phone: str | None = None
+
+
+class VerifyIn(BaseModel):
+    email: str = ""
+    code: str = ""
+
+
+class ResendIn(BaseModel):
+    email: str = ""
+
+
+class PhoneOtpIn(BaseModel):
+    phone: str = ""
+    channel: Literal["sms", "whatsapp"] = "sms"
+
+
+class PhoneVerifyIn(BaseModel):
+    phone: str = ""
+    code: str = ""
 
 
 class LoginIn(BaseModel):
@@ -55,6 +78,7 @@ async def public_user(u: dict) -> dict:
         "phone": u["phone"],
         "role": u["role"],
         "emailVerified": u["email_verified"],
+        "phoneVerified": u.get("phone_verified", False),
         "hasPassword": bool(u["password_hash"]),
         "googleLinked": bool(u["google_id"]),
         "storeName": await _store_name(u["id"]) if u["role"] in ("seller", "admin") else None,
@@ -79,8 +103,10 @@ async def config():
     return {"googleClientId": get_settings().google_client_id or None}
 
 
-@router.post("/register", status_code=201, dependencies=[Depends(auth_limiter)])
+@router.post("/register", status_code=202, dependencies=[Depends(auth_limiter)])
 async def register(body: RegisterIn):
+    """Step 1 of signup: checks the details and emails a 6-digit code. The account is created only
+    after the code is confirmed (POST /register/verify), so every account has a working email."""
     name = body.name.strip()
     email = v.normalize_email(body.email)
     phone = body.phone.strip() if body.phone else None
@@ -88,9 +114,44 @@ async def register(body: RegisterIn):
     error = error or await v.email_domain_error(email)
     if error:
         raise ApiError(400, error)
+    await _ensure_email_free(email)
+    payload = {"name": name, "phone": phone, "password_hash": await asyncio.to_thread(hash_password, body.password)}
+    return {"verify": "email", **await send_code("signup", email, "email", payload=payload)}
 
-    pool = get_pool()
-    existing = await pool.fetchrow("SELECT google_id FROM users WHERE email = $1", email)
+
+@router.post("/register/resend", dependencies=[Depends(otp_limiter)])
+async def resend_signup_code(body: ResendIn):
+    email = v.normalize_email(body.email)
+    pending = await get_pool().fetchrow(
+        "SELECT payload FROM verification_codes WHERE purpose = 'signup' AND target = $1 ORDER BY created_at DESC LIMIT 1", email
+    )
+    if not pending:
+        raise ApiError(404, "Please start signing up again")
+    await _ensure_email_free(email)
+    payload = pending["payload"]
+    return {"verify": "email", **await send_code("signup", email, "email", payload=payload if isinstance(payload, dict) else None)}
+
+
+@router.post("/register/verify", status_code=201, dependencies=[Depends(auth_limiter)])
+async def verify_signup(body: VerifyIn):
+    """Step 2 of signup: the emailed code proves the address is real; the account is created verified."""
+    email = v.normalize_email(body.email)
+    row = await check_code("signup", email, body.code)
+    data = row["payload"] or {}
+    await _ensure_email_free(email)
+    u = await get_pool().fetchrow(
+        """INSERT INTO users (name, email, phone, password_hash, email_verified, last_login)
+           VALUES ($1, $2, $3, $4, TRUE, NOW()) RETURNING *""",
+        data["name"],
+        email,
+        data.get("phone"),
+        data["password_hash"],
+    )
+    return await session(dict(u))
+
+
+async def _ensure_email_free(email: str) -> None:
+    existing = await get_pool().fetchrow("SELECT google_id FROM users WHERE email = $1", email)
     if existing:
         raise ApiError(
             409,
@@ -99,14 +160,27 @@ async def register(body: RegisterIn):
             else "An account with this email already exists. Please log in.",
         )
 
-    u = await pool.fetchrow(
-        "INSERT INTO users (name, email, phone, password_hash, last_login) VALUES ($1, $2, $3, $4, NOW()) RETURNING *",
-        name,
-        email,
-        phone,
-        await asyncio.to_thread(hash_password, body.password),
-    )
-    return await session(dict(u))
+
+@router.post("/phone/otp", dependencies=[Depends(otp_limiter)])
+async def phone_otp(body: PhoneOtpIn, user: CurrentUser = Depends(get_current_user)):
+    """Sends a code to the mobile number by SMS or WhatsApp."""
+    phone = body.phone.strip()
+    if not phone or (error := v.phone_error(phone)):
+        raise ApiError(400, error or "Please enter your mobile number")
+    taken = await get_pool().fetchval("SELECT 1 FROM users WHERE phone = $1 AND phone_verified AND id <> $2", phone, user.id)
+    if taken:
+        raise ApiError(409, "This mobile number is already verified on another account")
+    return await send_code("phone", phone, body.channel, user_id=user.id)
+
+
+@router.post("/phone/verify")
+async def phone_verify(body: PhoneVerifyIn, user: CurrentUser = Depends(get_current_user)):
+    phone = body.phone.strip()
+    row = await check_code("phone", phone, body.code)
+    if row["user_id"] != user.id:
+        raise ApiError(400, "This code was sent for another account")
+    u = await get_pool().fetchrow("UPDATE users SET phone = $1, phone_verified = TRUE WHERE id = $2 RETURNING *", phone, user.id)
+    return await public_user(dict(u))
 
 
 @router.post("/login", dependencies=[Depends(auth_limiter)])
@@ -179,7 +253,15 @@ async def update_profile(body: ProfileIn, user: CurrentUser = Depends(get_curren
     error = v.first_error(v.name_error(name), v.phone_error(phone))
     if error:
         raise ApiError(400, error)
-    u = await get_pool().fetchrow("UPDATE users SET name = $1, phone = $2 WHERE id = $3 RETURNING *", name, phone, user.id)
+    # Changing the number means it has to be verified again
+    u = await get_pool().fetchrow(
+        """UPDATE users SET name = $1, phone = $2::varchar,
+                  phone_verified = CASE WHEN phone IS DISTINCT FROM $2::varchar THEN FALSE ELSE phone_verified END
+            WHERE id = $3 RETURNING *""",
+        name,
+        phone,
+        user.id,
+    )
     if not u:
         raise ApiError(404, "User not found")
     return await public_user(dict(u))
