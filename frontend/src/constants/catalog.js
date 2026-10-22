@@ -20,6 +20,23 @@ export const CATEGORY_GROUPS = [
 ];
 export const groupOf = (categoryId) => CATEGORY_GROUPS.find((g) => g.categories.includes(categoryId));
 
+// Grocery store aisles = `subCategory` of grocery products, in the order shoppers walk them
+export const GROCERY_AISLES = [
+  { id: 'fruits-vegetables', label: 'Fruits & Vegetables' },
+  { id: 'dairy-bread-eggs', label: 'Dairy, Bread & Eggs' },
+  { id: 'atta-rice-dal', label: 'Atta, Rice & Dal' },
+  { id: 'oil-ghee-masala', label: 'Oil, Ghee & Masala' },
+  { id: 'snacks', label: 'Snacks & Biscuits' },
+  { id: 'tea-coffee-drinks', label: 'Tea, Coffee & Drinks' },
+  { id: 'breakfast-spreads', label: 'Breakfast & Spreads' },
+  { id: 'dry-fruits-health', label: 'Dry Fruits & Health' },
+  { id: 'meat-fish', label: 'Meat & Fish' },
+  { id: 'frozen-desserts', label: 'Frozen & Desserts' },
+  { id: 'cleaning-household', label: 'Cleaning & Household' },
+  { id: 'pet-care', label: 'Pet Care' },
+];
+export const aisleLabel = (id) => GROCERY_AISLES.find((a) => a.id === id)?.label || id;
+
 // Fashion is split by who it is for (`audience` on the product)
 export const AUDIENCES = [
   { id: 'women', label: 'Women', heading: "Women's Fashion" },
@@ -73,6 +90,24 @@ export const HERO_SLIDES = [
     image: `${IMG}/furniture/annibale-colombo-sofa/thumbnail.webp`,
     to: '/products?category=home',
     theme: 'green',
+  },
+  {
+    id: 'grocery',
+    eyebrow: 'Arvixa Fresh',
+    title: 'Groceries & daily needs',
+    subtitle: 'Fruits, atta, dal, snacks & more',
+    image: `${IMG}/groceries/strawberry/thumbnail.webp`,
+    to: '/grocery',
+    theme: 'teal',
+  },
+  {
+    id: 'women',
+    eyebrow: 'New Arrivals',
+    title: "Women's fashion",
+    subtitle: 'Dresses, tops & heels · 360° view',
+    image: `${IMG}/womens-dresses/black-women's-gown/thumbnail.webp`,
+    to: '/products?category=fashion&audience=women',
+    theme: 'rose',
   },
 ];
 

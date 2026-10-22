@@ -1,11 +1,9 @@
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import { CATEGORIES } from '../../constants/catalog';
 import Icon from '../common/Icon';
-import { isSellerRole } from './Navbar';
 
 const COLUMNS = [
-  { title: 'Shop', links: CATEGORIES.slice(0, 6).map((c) => ({ label: c.label, to: `/products?category=${c.id}` })) },
+  { title: 'Shop', links: [...CATEGORIES.slice(0, 5).map((c) => ({ label: c.label, to: `/products?category=${c.id}` })), { label: 'Grocery Store', to: '/grocery' }] },
   {
     title: 'Your Account',
     links: [
@@ -13,15 +11,6 @@ const COLUMNS = [
       { label: 'Orders', to: '/orders' },
       { label: 'Wishlist', to: '/wishlist' },
       { label: 'Cart', to: '/cart' },
-    ],
-  },
-  {
-    title: 'Seller Hub',
-    sellersOnly: true, // shoppers never see the seller side of the store
-    links: [
-      { label: 'Dashboard', to: '/seller/dashboard' },
-      { label: 'List products', to: '/seller/products' },
-      { label: 'Seller orders', to: '/seller/orders' },
     ],
   },
   {
@@ -43,8 +32,6 @@ const PROMISES = [
 ];
 
 export default function Footer() {
-  const { user } = useAuth();
-  const columns = COLUMNS.filter((c) => !c.sellersOnly || isSellerRole(user));
   return (
     <footer className="footer">
       <div className="footer-promises container">
@@ -57,7 +44,7 @@ export default function Footer() {
       </div>
 
       <div className="footer-main container">
-        {columns.map((col) => (
+        {COLUMNS.map((col) => (
           <div key={col.title} className="footer-col">
             <h4>{col.title}</h4>
             {col.links.map((l) => <Link key={l.label} to={l.to}>{l.label}</Link>)}

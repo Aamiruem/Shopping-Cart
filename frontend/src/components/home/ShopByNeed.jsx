@@ -14,8 +14,18 @@ export default function ShopByNeed() {
       .catch(() => setCategories({}));
   }, []);
 
+  const allCount = Object.values(categories).reduce((sum, c) => sum + c.count, 0);
+
   return (
     <section className="shop-by-need" aria-label="Shop by need">
+      <Link to="/products" className="shop-all-banner panel">
+        <span className="need-icon"><Icon name="grid" size={22} /></span>
+        <span className="shop-all-text">
+          <strong>Shop all products</strong>
+          <span>Browse the whole store{allCount ? ` · ${allCount} products across ${Object.keys(categories).length} categories` : ''}</span>
+        </span>
+        <span className="btn btn-buy">Shop now <Icon name="arrowRight" size={16} /></span>
+      </Link>
       {CATEGORY_GROUPS.map((g) => {
         const total = g.categories.reduce((sum, id) => sum + (categories[id]?.count || 0), 0);
         return (
@@ -32,7 +42,7 @@ export default function ShopByNeed() {
             </header>
             <div className="need-grid">
               {g.categories.map((id) => (
-                <Link key={id} to={`/products?category=${id}`} className="need-tile">
+                <Link key={id} to={id === 'grocery' ? '/grocery' : `/products?category=${id}`} className="need-tile">
                   <span className="need-img">{categories[id]?.image && <img src={categories[id].image} alt="" loading="lazy" />}</span>
                   <strong>{categoryLabel(id)}</strong>
                   {categories[id] && <small>{categories[id].count} items</small>}

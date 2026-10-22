@@ -9,6 +9,9 @@ const GREETING = { role: 'assistant', content: 'Hi! Ask me about products, deliv
 
 // Two modes: "Ask" = RAG Q&A over products and store policies,
 // "Assistant" = agent that can search, recommend and add to your cart.
+// Other parts of the page (e.g. the More menu) open the chat with: window.dispatchEvent(new Event(OPEN_CHAT_EVENT))
+export const OPEN_CHAT_EVENT = 'chat:open';
+
 export default function ChatWidget() {
   const { user } = useAuth();
   const { refresh } = useCart();
@@ -18,6 +21,12 @@ export default function ChatWidget() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const bodyRef = useRef(null);
+
+  useEffect(() => {
+    const openChat = () => setOpen(true);
+    window.addEventListener(OPEN_CHAT_EVENT, openChat);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, openChat);
+  }, []);
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: 'smooth' });

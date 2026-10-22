@@ -20,8 +20,8 @@
 .product-card:hover { box-shadow: var(--shadow-lg); z-index: 1; }
 .product-card:hover .product-name { color: var(--brand); }
 .product-link { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.product-img { position: relative; aspect-ratio: 1; display: grid; place-items: center; }
-.product-img img { width: 100%; height: 100%; object-fit: contain; transition: transform 0.3s ease; }
+.product-img { position: relative; aspect-ratio: 1; overflow: hidden; }
+.product-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: transform 0.3s ease; }
 .product-card:hover .product-img img { transform: scale(1.04); }
 .stock-flag { position: absolute; inset: auto 0 8px; margin: auto; width: fit-content; padding: 2px 10px; background: rgba(33, 33, 33, 0.8); color: #fff; font-size: 11px; font-weight: 600; border-radius: 10px; }
 .product-info { display: flex; flex-direction: column; gap: 4px; }
@@ -179,3 +179,39 @@
 .filter-subhead { margin: 8px 0 2px; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
 .filter-subgroup { display: flex; flex-direction: column; gap: 8px; }
 .filter-subgroup:first-child .filter-subhead { margin-top: 0; }
+
+/* Grocery pack size + photo credit */
+.product-unit { color: var(--text-muted); font-size: var(--fs-xs); }
+.detail-unit { color: var(--text-muted); font-size: var(--fs-sm); }
+.detail-unit strong { color: var(--text); }
+.image-credit { grid-column: 1 / -1; color: var(--text-muted); font-size: 11px; line-height: 1.4; }
+.image-credit a { color: inherit; text-decoration: underline; }
+
+/* ---------- Grocery store page ---------- */
+.page-grocery { display: flex; flex-direction: column; gap: var(--gap); }
+.grocery-hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; align-items: center; padding: 28px 32px; border-radius: var(--radius-sm); background: linear-gradient(120deg, #1b7a3a 0%, #2e9e4f 100%); color: #fff; }
+.grocery-eyebrow { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.18); font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.grocery-hero h1 { font-size: var(--fs-2xl); margin: 10px 0 6px; }
+.grocery-hero p { color: #e3f4e8; }
+.grocery-promises { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; margin-top: 14px; font-size: var(--fs-sm); font-weight: 600; }
+.grocery-promises li { display: inline-flex; align-items: center; gap: 6px; }
+.grocery-search { display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: var(--radius); background: #fff; color: var(--text-muted); box-shadow: var(--shadow); }
+.grocery-search input { flex: 1; min-width: 0; border: 0; outline: none; padding: 14px 0; font-size: var(--fs-lg); color: var(--text); }
+.grocery-search:focus-within { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5), var(--shadow); }
+.grocery-aisles { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; padding: 16px; }
+.aisle-tile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border: 1px solid var(--border-light); border-radius: var(--radius); text-align: center; transition: border-color var(--transition), box-shadow var(--transition); }
+.aisle-tile:hover { border-color: var(--success); box-shadow: var(--shadow-sm); }
+.aisle-tile.active { border-color: var(--success); background: var(--success-bg); }
+.aisle-img { width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background: var(--bg); display: grid; place-items: center; }
+.aisle-img img { width: 100%; height: 100%; object-fit: cover; }
+.aisle-all { background: var(--success-bg); color: var(--success); }
+.aisle-tile strong { font-size: var(--fs-sm); line-height: 1.3; }
+.aisle-tile small { color: var(--text-muted); font-size: var(--fs-xs); }
+.grocery-listing-head { padding: 16px 20px; }
+.grocery-listing-head h2 { font-size: var(--fs-xl); }
+.grocery-listing-head small { color: var(--text-muted); font-weight: 400; font-size: var(--fs-md); }
+.grocery-sort { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--text-muted); }
+.grocery-credit { text-align: center; }
+.grocery-credit a { color: var(--brand); }
+@media (max-width: 900px) { .grocery-hero { grid-template-columns: 1fr; padding: 22px; } }
+@media (max-width: 560px) { .grocery-aisles { grid-template-columns: repeat(3, 1fr); padding: 12px; } .aisle-img { width: 56px; height: 56px; } }

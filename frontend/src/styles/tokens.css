@@ -4,6 +4,8 @@
   --brand: #2874f0;
   --brand-dark: #1a5dc9;
   --brand-light: #e8f0fe;
+  --brand-faint: #f0f5ff;       /* search box, menu hover */
+  --brand-ink: #0b3a8c;         /* logo wordmark navy */
   --accent: #ffe500;            /* logo highlight */
   --cart: #ff9f00;              /* "Add to cart" */
   --buy: #fb641b;               /* "Buy now" / primary CTA */

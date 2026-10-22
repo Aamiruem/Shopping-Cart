@@ -1,58 +1,53 @@
-import { Fragment, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { api } from '../../api/client';
+import { Fragment } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { AUDIENCES, CATEGORY_GROUPS, categoryLabel } from '../../constants/catalog';
-import Icon from '../common/Icon';
 
-const IMG = 'https://cdn.dummyjson.com/product-images';
-// Women / Men fashion tiles sit right after "Fashion"
-const AUDIENCE_IMAGES = {
-  women: `${IMG}/womens-dresses/black-women's-gown/thumbnail.webp`,
-  men: `${IMG}/mens-shirts/man-plaid-shirt/thumbnail.webp`,
-};
-const tilesFor = (group) => group.categories.flatMap((id) => [
-  { key: id, label: categoryLabel(id), category: id, audience: '' },
-  ...(id === 'fashion' ? AUDIENCES.map((a) => ({ key: a.id, label: a.label, category: 'fashion', audience: a.id, image: AUDIENCE_IMAGES[a.id] })) : []),
-]);
+// Tab row under the header. Each tab knows its link and how to tell it is the current page.
+const TABS = [
+  { key: 'for-you', label: 'For You', to: '/', match: (l) => l.pathname === '/' },
+  { key: 'all', label: 'All Products', to: '/products', match: (l, p) => l.pathname === '/products' && !['q', 'use', 'category', 'audience'].some((k) => p.get(k)) },
+  ...CATEGORY_GROUPS.map((g) => ({
+    key: g.id,
+    group: g,
+    tabs: g.categories.flatMap((id) => [
+      id === 'grocery'
+        ? { key: id, label: 'Grocery', to: '/grocery', match: (l) => l.pathname === '/grocery' }
+        : { key: id, label: categoryLabel(id), to: `/products?category=${id}`, match: (l, p) => p.get('category') === id && !p.get('audience') },
+      ...(id === 'fashion'
+        ? AUDIENCES.map((a) => ({ key: a.id, label: a.label, to: `/products?category=fashion&audience=${a.id}`, match: (l, p) => p.get('audience') === a.id }))
+        : []),
+    ]),
+  })),
+];
 
-// White strip under the navbar: the two category groups (Daily Use / General Use) and their categories
 export default function CategoryBar() {
-  const [images, setImages] = useState({});
+  const location = useLocation();
   const [params] = useSearchParams();
-  const active = { category: params.get('category') || '', audience: params.get('audience') || '', use: params.get('use') || '' };
-
-  useEffect(() => {
-    api.categories()
-      .then((rows) => setImages(Object.fromEntries(rows.map((r) => [r.id, r.image]))))
-      .catch(() => setImages({}));
-  }, []);
+  const tab = (t) => {
+    const active = t.match(location, params);
+    return (
+      <Link key={t.key} to={t.to} className={`cat-tab ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined}>
+        {t.label}
+      </Link>
+    );
+  };
 
   return (
     <nav className="category-bar" aria-label="Shop by category">
-      <div className="container category-bar-inner">
-        {CATEGORY_GROUPS.map((g, i) => (
-          <Fragment key={g.id}>
-            {i > 0 && <span className="category-divider" aria-hidden="true" />}
-            <Link to={`/products?use=${g.id}`} className={`category-group ${active.use === g.id && !active.category ? 'active' : ''}`}>
-              <span className="category-group-icon"><Icon name={g.icon} size={20} /></span>
-              <span>{g.label}</span>
+      <div className="container category-tabs">
+        {TABS.map((t) => (t.group ? (
+          <Fragment key={t.key}>
+            <span className="cat-divider" aria-hidden="true" />
+            <Link
+              to={`/products?use=${t.group.id}`}
+              className={`cat-tab cat-group ${params.get('use') === t.group.id && !params.get('category') ? 'active' : ''}`}
+              title={t.group.note}
+            >
+              {t.group.label}
             </Link>
-            {tilesFor(g).map((t) => {
-              const src = t.image || images[t.category];
-              const isActive = active.category === t.category && active.audience === t.audience;
-              return (
-                <Link
-                  key={t.key}
-                  to={`/products?category=${t.category}${t.audience ? `&audience=${t.audience}` : ''}`}
-                  className={`category-tile ${isActive ? 'active' : ''}`}
-                >
-                  <span className="category-img">{src ? <img src={src} alt="" loading="lazy" /> : null}</span>
-                  <span>{t.label}</span>
-                </Link>
-              );
-            })}
+            {t.tabs.map(tab)}
           </Fragment>
-        ))}
+        ) : tab(t)))}
       </div>
     </nav>
   );

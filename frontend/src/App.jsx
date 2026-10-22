@@ -10,6 +10,7 @@ import ScrollToTop from './components/routing/ScrollToTop';
 import Account from './pages/Account';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import Grocery from './pages/Grocery';
 import Help from './pages/Help';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -29,7 +30,7 @@ const SellerProducts = lazy(() => import('./pages/seller/SellerProducts'));
 const SellerOrders = lazy(() => import('./pages/seller/SellerOrders'));
 
 // Pages that show the category strip under the navbar
-const WITH_CATEGORY_BAR = ['/', '/products'];
+const WITH_CATEGORY_BAR = ['/', '/products', '/grocery'];
 
 const privateRoute = (element) => <ProtectedRoute>{element}</ProtectedRoute>;
 
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/products" element={<Products />} />
             <Route path="/products/:id" element={<ProductDetail />} />
+            <Route path="/grocery" element={<Grocery />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Login mode="register" />} />
             <Route path="/help" element={<Help />} />

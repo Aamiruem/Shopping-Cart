@@ -49,15 +49,15 @@ export default function SearchBar() {
 
   return (
     <form className="searchbar" onSubmit={submit} ref={boxRef} role="search">
+      <button type="submit" aria-label="Search"><Icon name="search" size={20} /></button>
       <input
         value={q}
         onChange={(e) => { setQ(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
-        placeholder="Search for products, brands and more"
+        placeholder="Search for Products, Brands and More"
         aria-label="Search products"
       />
-      <button type="submit" aria-label="Search"><Icon name="search" size={18} /></button>
 
       {open && suggestions.length > 0 && (
         <ul className="search-suggestions">

@@ -7,7 +7,8 @@ import { useAccountLinks } from '../layout/Navbar';
 export default function QuickLinks() {
   const { user } = useAuth();
   const location = useLocation();
-  const links = useAccountLinks().filter((l) => l.to !== '/login' && l.to !== '/register');
+  // Guests get the essentials only; account pages are one hover away in the Login menu
+  const links = useAccountLinks().filter((l) => (user ? true : ['/products', '/help'].includes(l.to)));
 
   return (
     <section className="quick-links panel" aria-label="Your shortcuts">
@@ -23,7 +24,7 @@ export default function QuickLinks() {
           </>
         )}
         {links.map((l) => (
-          <Link key={l.to} to={l.to} className="quick-link"><Icon name={l.icon} size={18} /> {l.label}</Link>
+          <Link key={l.to} to={l.to} className={`quick-link ${l.to === '/products' ? 'shop-all' : ''}`}><Icon name={l.icon} size={18} /> {l.label}</Link>
         ))}
       </nav>
     </section>

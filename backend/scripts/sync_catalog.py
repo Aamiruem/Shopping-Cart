@@ -2,8 +2,9 @@
 
 Unlike scripts.seed this keeps product ids, so carts, wishlists and orders stay intact:
   - products missing from the database are inserted (owned by the seller for their category)
-  - existing products (matched by name) only get catalog fields they lack, such as `audience`
-    and `images360`; prices, stock and seller edits are never overwritten
+  - existing products (matched by name) only get catalog fields they lack, such as `audience`,
+    `images360` or `unit`, and lose first-seed placeholders (LEGACY_VALUES); prices, stock and seller
+    edits are never overwritten
 
     python -m scripts.sync_catalog
 """
@@ -17,7 +18,10 @@ from app.db.postgres import close_postgres, connect_postgres
 from scripts.seed import PRODUCTS_FILE, SELLERS
 
 # Fields added to the catalog after the first seed; filled in on existing products when missing
-NEW_FIELDS = ("audience", "images360")
+NEW_FIELDS = ("audience", "images360", "unit", "imageCredit")
+# Placeholder values from the first seed that products.json has since replaced (e.g. one "groceries"
+# sub-category before grocery was split into aisles); these are overwritten, real seller edits are not
+LEGACY_VALUES = {"subCategory": {"groceries"}}
 
 
 async def seller_ids_by_category(pool) -> dict[str, int]:
@@ -32,7 +36,8 @@ async def main() -> None:
     try:
         sellers = await seller_ids_by_category(pool)
         catalog = json.loads(PRODUCTS_FILE.read_text(encoding="utf-8"))
-        existing = {p["name"]: p async for p in db.products.find({}, {"name": 1, **dict.fromkeys(NEW_FIELDS, 1)})}
+        fields = dict.fromkeys([*NEW_FIELDS, *LEGACY_VALUES], 1)
+        existing = {p["name"]: p async for p in db.products.find({}, {"name": 1, **fields})}
         now = datetime.now(UTC)
         inserted = updated = 0
         for item in catalog:
@@ -46,6 +51,7 @@ async def main() -> None:
                 inserted += 1
                 continue
             missing = {f: item[f] for f in NEW_FIELDS if f in item and not current.get(f)}
+            missing |= {f: item[f] for f, old in LEGACY_VALUES.items() if current.get(f) in old and item.get(f) not in old}
             if missing:
                 await db.products.update_one({"_id": current["_id"]}, {"$set": missing})
                 updated += 1

@@ -52,6 +52,7 @@ async def list_products(
     category: str | None = None,
     audience: str | None = None,
     use: str | None = None,
+    subCategory: str | None = None,
     brand: str | None = None,
     minPrice: str | None = None,
     maxPrice: str | None = None,
@@ -62,6 +63,8 @@ async def list_products(
 ):
     """Returns a plain array - the AI service depends on this shape."""
     query = _base_filter(q, category, audience, use)
+    if subCategory:
+        query["subCategory"] = subCategory
     if brand:
         query["brand"] = {"$in": brand.split(",")}
     low, high = _number(minPrice), _number(maxPrice)
@@ -86,6 +89,19 @@ async def categories():
         {"$sort": {"_id": 1}},
     ]
     return [{"id": r["_id"], "count": r["count"], "image": r["image"]} async for r in await get_db().products.aggregate(pipeline)]
+
+
+@router.get("/subcategories")
+async def subcategories(category: str):
+    """Sub-categories (e.g. grocery aisles) of one category, with product counts and a cover image."""
+    pipeline = [
+        {"$match": {"active": {"$ne": False}, "category": category}},
+        {"$sort": {"ratingCount": -1}},
+        {"$group": {"_id": "$subCategory", "count": {"$sum": 1}, "image": {"$first": "$image"}}},
+        {"$sort": {"_id": 1}},
+    ]
+    rows = await get_db().products.aggregate(pipeline)
+    return [{"id": r["_id"], "count": r["count"], "image": r["image"]} async for r in rows if r["_id"]]
 
 
 @router.get("/facets")

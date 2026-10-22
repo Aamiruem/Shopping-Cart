@@ -85,6 +85,7 @@ export const api = {
   products: (params = {}) => request(`/products?${query(params)}`),
   product: (id) => request(`/products/${id}`),
   categories: () => request('/products/categories'),
+  subcategories: (category) => request(`/products/subcategories?category=${category}`),
   facets: (params = {}) => request(`/products/facets?${query(params)}`),
 
   // Cart

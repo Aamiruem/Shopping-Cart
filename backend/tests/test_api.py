@@ -174,3 +174,13 @@ def test_daily_and_general_use_groups(client):
     assert not {p["category"] for p in general} & {"grocery", "kitchen", "beauty"}
     # An explicit category wins over the group
     assert {p["category"] for p in client.get("/api/products", params={"use": "daily", "category": "mobiles"}).json()} == {"mobiles"}
+
+
+def test_subcategories_and_aisle_filter(client):
+    rows = client.get("/api/products/subcategories", params={"category": "fashion"}).json()
+    assert rows and all(r["id"] and r["count"] > 0 for r in rows)
+    total = len(client.get("/api/products", params={"category": "fashion"}).json())
+    assert sum(r["count"] for r in rows) <= total
+    first = rows[0]
+    in_aisle = client.get("/api/products", params={"category": "fashion", "subCategory": first["id"]}).json()
+    assert len(in_aisle) == first["count"] and {p["subCategory"] for p in in_aisle} == {first["id"]}

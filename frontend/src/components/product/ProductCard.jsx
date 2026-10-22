@@ -35,6 +35,7 @@ export default function ProductCard({ product, variant = 'grid' }) {
         <div className="product-info">
           {product.brand && <p className="product-brand">{product.brand}</p>}
           <h3 className="product-name">{product.name}</h3>
+          {product.unit && <p className="product-unit">{product.unit}</p>}
           {product.rating > 0 && <Rating value={product.rating} count={product.ratingCount} size="sm" />}
           <Price price={product.price} mrp={product.mrp} size="sm" />
           {variant === 'grid' && product.price >= 499 && <p className="product-perk">Free delivery</p>}

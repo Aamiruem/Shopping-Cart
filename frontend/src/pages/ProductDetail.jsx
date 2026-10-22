@@ -7,7 +7,7 @@ import Price from '../components/common/Price';
 import Rating from '../components/common/Rating';
 import ProductRail from '../components/product/ProductRail';
 import Spin360 from '../components/product/Spin360';
-import { categoryLabel, groupOf } from '../constants/catalog';
+import { aisleLabel, categoryLabel, groupOf } from '../constants/catalog';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import useShopActions from '../hooks/useShopActions';
@@ -129,17 +129,27 @@ export default function ProductDetail() {
               <Icon name="zap" size={18} filled /> Buy now
             </button>
           </div>
+          {product.imageCredit && (
+            <p className="image-credit">
+              Photo: {product.imageCredit.author} ·{' '}
+              <a href={product.imageCredit.source} target="_blank" rel="noreferrer">{product.imageCredit.license}, via Wikimedia Commons</a>
+            </p>
+          )}
         </div>
 
         <div className="detail-info">
           <nav className="breadcrumbs" aria-label="Breadcrumb">
             <Link to="/">Home</Link> <Icon name="chevronRight" size={12} />
             {groupOf(product.category) && <><Link to={`/products?use=${groupOf(product.category).id}`}>{groupOf(product.category).label}</Link> <Icon name="chevronRight" size={12} /></>}
-            <Link to={`/products?category=${product.category}`}>{categoryLabel(product.category)}</Link> <Icon name="chevronRight" size={12} />
-            <span>{product.brand}</span>
+            {product.category === 'grocery' ? (
+              <><Link to="/grocery">Grocery</Link> <Icon name="chevronRight" size={12} /> <Link to={`/grocery?aisle=${product.subCategory}`}>{aisleLabel(product.subCategory)}</Link></>
+            ) : (
+              <><Link to={`/products?category=${product.category}`}>{categoryLabel(product.category)}</Link> <Icon name="chevronRight" size={12} /> <span>{product.brand}</span></>
+            )}
           </nav>
           {product.brand && <p className="detail-brand">{product.brand}</p>}
           <h1>{product.name}</h1>
+          {product.unit && <p className="detail-unit">Pack size: <strong>{product.unit}</strong></p>}
           <div className="detail-rating">
             <Rating value={product.rating} />
             <span className="muted">{product.ratingCount?.toLocaleString('en-IN')} ratings</span>
