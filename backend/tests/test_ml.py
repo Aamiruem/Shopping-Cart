@@ -133,3 +133,25 @@ def test_negation_stops_at_the_end_of_a_sentence():
     # Regression: "not" used to flip "disappointed" in the next sentence, scoring this as positive
     assert sentiment("I returned my headphones and the refund is still not credited. Very disappointed!") < -0.4
     assert sentiment("The delivery was not late, but the box was damaged") < 0
+
+
+def test_listing_score_rewards_complete_listings():
+    from app.ml.growth import listing_score
+
+    bare, bare_fixes = listing_score({"name": "Thing", "category": "electronics", "price": 100, "image": "x.jpg"})
+    full, full_fixes = listing_score(
+        {
+            "name": "Thing",
+            "category": "electronics",
+            "price": 100,
+            "mrp": 150,
+            "brand": "Volt",
+            "images": ["a", "b", "c"],
+            "videos": ["v.mp4"],
+            "images360": ["1", "2", "3", "4"],
+            "tags": ["a", "b", "c"],
+            "description": "x" * 200,
+        }
+    )
+    assert full == 100 and not full_fixes
+    assert bare < 40 and any("photo" in f for f in bare_fixes) and any("video" in f for f in bare_fixes)

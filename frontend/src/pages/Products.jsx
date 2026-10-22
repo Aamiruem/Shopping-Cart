@@ -6,6 +6,7 @@ import Icon from '../components/common/Icon';
 import FilterSidebar from '../components/product/FilterSidebar';
 import ProductCard from '../components/product/ProductCard';
 import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, FASHION_TYPES, SORT_OPTIONS } from '../constants/catalog';
+import useSeo, { breadcrumbLd, itemListLd } from '../hooks/useSeo';
 
 const FILTER_KEYS = ['q', 'use', 'category', 'audience', 'subCategory', 'brand', 'minPrice', 'maxPrice', 'minRating', 'sort'];
 const EMPTY_FACETS = { brands: [], minPrice: 0, maxPrice: 0 };
@@ -48,6 +49,17 @@ export default function Products() {
     : audience && filters.category === 'fashion'
       ? audience.heading
       : filters.category ? categoryLabel(filters.category) : group ? group.label : 'All Products';
+
+  // Filtered / sorted variants point search engines at the clean category URL
+  const canonical = filters.q ? `/products?q=${encodeURIComponent(filters.q)}`
+    : `/products${filters.category ? `?category=${filters.category}${filters.audience ? `&audience=${filters.audience}` : ''}` : filters.use ? `?use=${filters.use}` : ''}`;
+  useSeo({
+    title: filters.q ? `${filters.q} - Buy online at best price` : `${heading} - Buy ${heading} online at best prices`,
+    description: `Shop ${heading.replace(/[“”]/g, '')} online at Arvixa. ${products.length || 'Hundreds of'} products with top brands, great discounts, free delivery over ₹499 and easy returns.`,
+    path: canonical,
+    noindex: Boolean(filters.brand || filters.minPrice || filters.maxPrice || filters.minRating),
+    jsonLd: [breadcrumbLd([{ name: 'Home', path: '/' }, { name: heading.replace(/[“”]/g, ''), path: canonical }]), ...(products.length ? [itemListLd(products)] : [])],
+  });
 
   return (
     <div className="page-listing container">

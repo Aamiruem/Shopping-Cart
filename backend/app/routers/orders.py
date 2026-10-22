@@ -6,6 +6,7 @@ import re
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from ..core.cache import invalidate
 from ..core.config import get_settings
 from ..core.errors import ApiError
 from ..core.rate_limit import rate_limit
@@ -127,6 +128,7 @@ async def cancel(order_id: int, user: CurrentUser = Depends(get_current_user)):
         if oid := to_object_id(item["product_id"]):
             await db.products.update_one({"_id": oid}, {"$inc": {"stock": item["qty"]}})
 
+    invalidate("catalog:")  # stock returned
     refund_status = None
     payment = await pool.fetchrow("SELECT * FROM payments WHERE order_id = $1 AND status = 'paid'", order_id)
     if payment:

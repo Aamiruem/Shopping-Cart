@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import AddressForm from '../components/account/AddressForm';
+import CodeVerify from '../components/account/CodeVerify';
 import { Spinner } from '../components/common/Feedback';
 import Icon from '../components/common/Icon';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +10,7 @@ import { useToast } from '../context/ToastContext';
 import useApi from '../hooks/useApi';
 import { formatDate } from '../utils/format';
 import { PASSWORD_MIN, validatePassword } from '../utils/validation';
+import useSeo from '../hooks/useSeo';
 
 const TABS = [
   { id: 'profile', label: 'Profile information', icon: 'user' },
@@ -36,6 +38,54 @@ function SupportTab() {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+// Mobile number verification by SMS or WhatsApp (OTP)
+function PhoneVerification({ phone }) {
+  const { user, setUser } = useAuth();
+  const toast = useToast();
+  const [sent, setSent] = useState(null);
+  const [channel, setChannel] = useState('sms');
+  const [error, setError] = useState('');
+
+  if (!phone) return <p className="muted small phone-hint"><Icon name="phone" size={14} /> Add your mobile number to get order updates by SMS and WhatsApp.</p>;
+  if (user.phoneVerified && user.phone === phone) return null;
+
+  const send = async (via) => {
+    setError('');
+    setChannel(via);
+    try {
+      setSent(await api.phoneOtp(phone, via));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <div className="phone-verify">
+      {sent ? (
+        <CodeVerify
+          title="Verify your mobile number"
+          info={sent}
+          onVerify={async (code) => {
+            setUser(await api.phoneVerify(phone, code));
+            toast.show('Mobile number verified');
+          }}
+          onResend={() => api.phoneOtp(phone, channel)}
+          onBack={() => setSent(null)}
+        />
+      ) : (
+        <>
+          <p><Icon name="shield" size={16} /> Verify <strong>{phone}</strong> to secure your account and get order updates.</p>
+          <div className="phone-verify-actions">
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => send('sms')}><Icon name="phone" size={14} /> Send code by SMS</button>
+            <button type="button" className="btn btn-outline btn-sm whatsapp" onClick={() => send('whatsapp')}><Icon name="message" size={14} /> Send code on WhatsApp</button>
+          </div>
+          {error && <p className="alert alert-error" role="alert">{error}</p>}
+        </>
+      )}
     </div>
   );
 }
@@ -71,7 +121,13 @@ function ProfileTab() {
       </div>
       <div className="form-grid">
         <label className="field">Full name<input value={form.name} disabled={!editing} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
-        <label className="field">Mobile number<input value={form.phone} disabled={!editing} inputMode="numeric" placeholder="Not added" onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} /></label>
+        <label className="field">
+          <span className="label-row">
+            Mobile number
+            {user.phone && (user.phoneVerified ? <span className="verified"><Icon name="check" size={12} /> Verified</span> : <span className="unverified">Not verified</span>)}
+          </span>
+          <input value={form.phone} disabled={!editing} inputMode="numeric" placeholder="Not added" onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} />
+        </label>
         <label className="field span-2">
           <span className="label-row">
             Email address
@@ -87,6 +143,7 @@ function ProfileTab() {
           <button type="button" className="btn-text" onClick={() => { setEditing(false); setForm({ name: user.name, phone: user.phone || '' }); }}>Cancel</button>
         </div>
       )}
+      {!editing && <PhoneVerification phone={user.phone} />}
       {user.createdAt && <p className="muted small">Member since {formatDate(user.createdAt, { month: 'long', year: 'numeric' })}</p>}
     </form>
   );
@@ -179,6 +236,7 @@ function SecurityTab() {
 }
 
 export default function Account() {
+  useSeo({ title: 'My Account', noindex: true });
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();

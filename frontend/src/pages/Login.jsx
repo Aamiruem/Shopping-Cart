@@ -1,11 +1,14 @@
 import { useCallback, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
+import CodeVerify from '../components/account/CodeVerify';
 import GoogleButton from '../components/account/GoogleButton';
 import Icon from '../components/common/Icon';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { playSound } from '../utils/sound';
 import { passwordStrength, PASSWORD_MIN, validateEmail, validateName, validatePassword, validatePhone } from '../utils/validation';
+import useSeo from '../hooks/useSeo';
 
 const COPY = {
   login: {
@@ -49,7 +52,8 @@ function Field({ name, label, error, children }) {
 }
 
 export default function Login({ mode = 'login' }) {
-  const { user, ready, login, register, googleLogin } = useAuth();
+  useSeo({ title: 'Login', noindex: true });
+  const { user, ready, login, register, verifySignup, googleLogin } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -59,6 +63,7 @@ export default function Login({ mode = 'login' }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState(null); // signup waiting for its email code
 
   const isRegister = mode === 'register';
   const copy = COPY[mode];
@@ -102,10 +107,13 @@ export default function Login({ mode = 'login' }) {
     }
     setBusy(true);
     try {
-      const signedIn = isRegister
-        ? await register({ name: form.name.trim(), email: form.email.trim(), password: form.password, ...(form.phone ? { phone: form.phone } : {}) })
-        : await login(form.email.trim(), form.password);
-      finish(signedIn, isRegister);
+      if (isRegister) {
+        const sent = await register({ name: form.name.trim(), email: form.email.trim(), password: form.password, ...(form.phone ? { phone: form.phone } : {}) });
+        setPending({ email: form.email.trim().toLowerCase(), ...sent });
+        setBusy(false);
+        return;
+      }
+      finish(await login(form.email.trim(), form.password), false);
     } catch (err) {
       playSound('error');
       setError(err.message);
@@ -136,6 +144,18 @@ export default function Login({ mode = 'login' }) {
           </div>
         </div>
 
+        {pending ? (
+          <div className="auth-form">
+            <CodeVerify
+              title="Verify your email"
+              info={pending}
+              verifyLabel="Verify & create account"
+              onVerify={async (code) => finish(await verifySignup(pending.email, code), true)}
+              onResend={() => api.resendSignup(pending.email)}
+              onBack={() => setPending(null)}
+            />
+          </div>
+        ) : (
         <form className="auth-form" onSubmit={onSubmit} noValidate>
           <img className="auth-logo" src="/brand/arvixa-logo.webp" alt="Arvixa — Shop Beyond Limits" width="240" height="96" />
           {isRegister && (
@@ -191,6 +211,7 @@ export default function Login({ mode = 'login' }) {
             {copy.switchText} <Link to={copy.switchLink.to} state={location.state}>{copy.switchLink.label}</Link>
           </p>
         </form>
+        )}
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext';
 import useShopActions from '../hooks/useShopActions';
 import { deliveryDate } from '../utils/format';
 import { playSound } from '../utils/sound';
+import useSeo from '../hooks/useSeo';
 
 const MAX_QTY = 10;
 
@@ -60,6 +61,7 @@ function CartItem({ item }) {
 }
 
 export default function Cart() {
+  useSeo({ title: 'Cart', noindex: true });
   const { cart, loading } = useCart();
   const navigate = useNavigate();
 

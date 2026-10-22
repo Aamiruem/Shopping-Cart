@@ -11,6 +11,7 @@ import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { formatPrice } from '../utils/format';
 import { playSound } from '../utils/sound';
+import useSeo from '../hooks/useSeo';
 
 const COD = { id: 'cod', icon: 'truck', label: 'Cash on Delivery', note: 'Pay when your order arrives' };
 // Real payments through Razorpay (RBI-authorised payment aggregator) when the store has Razorpay keys
@@ -61,6 +62,7 @@ function Step({ number, title, done, summary, active, onChange, children }) {
 }
 
 export default function Checkout() {
+  useSeo({ title: 'Checkout', noindex: true });
   const { user } = useAuth();
   const { cart, loading, refresh } = useCart();
   const toast = useToast();

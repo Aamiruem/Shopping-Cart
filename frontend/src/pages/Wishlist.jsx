@@ -5,8 +5,10 @@ import Price from '../components/common/Price';
 import Rating from '../components/common/Rating';
 import { useWishlist } from '../context/WishlistContext';
 import useShopActions from '../hooks/useShopActions';
+import useSeo from '../hooks/useSeo';
 
 export default function Wishlist() {
+  useSeo({ title: 'Wishlist', noindex: true });
   const { items } = useWishlist();
   const { addToCart, toggleWishlist } = useShopActions();
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, downloadFile } from '../../api/client';
 import CustomersTab from '../../components/analytics/CustomersTab';
 import ForecastTab from '../../components/analytics/ForecastTab';
+import GrowthTab from '../../components/analytics/GrowthTab';
 import OverviewTab from '../../components/analytics/OverviewTab';
 import ProductsTab from '../../components/analytics/ProductsTab';
 import SupportTab from '../../components/analytics/SupportTab';
@@ -13,6 +14,7 @@ import useApi from '../../hooks/useApi';
 
 const TABS = [
   { id: 'overview', label: 'Overview', load: (p) => api.analyticsOverview(p), Component: OverviewTab },
+  { id: 'growth', label: 'Growth advisor', load: (p) => api.analyticsGrowth(p), Component: GrowthTab },
   { id: 'forecast', label: 'Sales forecast', load: (p) => api.analyticsForecast(p), Component: ForecastTab },
   { id: 'products', label: 'Best-seller prediction', load: (p) => api.analyticsBestsellers(p), Component: ProductsTab },
   { id: 'customers', label: 'Customers & churn', load: (p) => api.analyticsCustomers(p), Component: CustomersTab },

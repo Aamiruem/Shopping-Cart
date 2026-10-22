@@ -19,4 +19,5 @@ USER arvixa
 
 EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health')"
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "2", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# WEB_CONCURRENCY = worker processes (default 2; roughly 2 x vCPUs on bigger tasks)
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 5000 --workers ${WEB_CONCURRENCY:-2} --proxy-headers --forwarded-allow-ips '*'"]

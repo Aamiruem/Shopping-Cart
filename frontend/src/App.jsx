@@ -52,6 +52,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/products" element={<Products />} />
             <Route path="/products/:id" element={<ProductDetail />} />
+            <Route path="/products/:id/:slug" element={<ProductDetail />} />
             <Route path="/grocery" element={<Grocery />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Login mode="register" />} />
@@ -75,7 +76,7 @@ export default function App() {
               <Route path="orders" element={<SellerOrders />} />
               <Route path="earnings" element={<SellerEarnings />} />
               <Route path="settings" element={<SellerSettings />} />
-            </Route>
+             </Route>
 
             <Route path="*" element={<NotFound />} />
           </Routes>

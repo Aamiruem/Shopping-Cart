@@ -374,3 +374,18 @@ def test_phone_verification_by_sms_and_whatsapp(client):
     # Changing the number on the profile resets verification
     changed = client.put("/api/auth/me", json={"name": "Test Shopper", "phone": "9876500000"}, headers=headers).json()
     assert changed["phoneVerified"] is False
+
+
+def test_growth_advisor_reports_each_product(client):
+    seller = _seller(client)
+    product = _seller_product(client, seller)
+    customer, address = _customer_with_cart(client, product["_id"])
+    client.get(f"/api/products/{product['_id']}", headers=customer)  # a view
+    client.post("/api/orders", json={"addressId": address["id"], "paymentMethod": "cod"}, headers=customer)
+    report = client.get("/api/analytics/growth", headers=seller).json()
+    row = next(r for r in report["products"] if r["productId"] == product["_id"])
+    assert row["views"] >= 1 and row["purchases"] == 1 and row["revenue30"] == 500
+    assert 0 <= row["listingScore"] <= 100 and isinstance(row["tips"], list)
+    assert report["summary"]["products"] == 1 and report["summary"]["revenue30"] == 500
+    customer_only, _ = _register(client)
+    assert client.get("/api/analytics/growth", headers=customer_only).status_code == 403

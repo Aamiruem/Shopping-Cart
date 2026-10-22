@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # Other services
     ai_service_url: str = "http://localhost:8100"  # 8000 is often taken by other local FastAPI apps
     cors_origin: str = "http://localhost:5173"  # comma-separated list
+    site_url: str = ""  # public storefront URL for sitemap / canonical links (default: first CORS origin)
 
     # Email (payment OTPs, support replies). Without SMTP_HOST emails are logged instead.
     smtp_host: str = ""

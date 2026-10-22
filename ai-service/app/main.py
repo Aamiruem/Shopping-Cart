@@ -2,7 +2,7 @@
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from . import llm
+from . import listing, llm
 from .agent import ShoppingAgent
 from .catalog import get_products
 from .rag import RagIndex
@@ -37,6 +37,26 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
+
+
+class ListingRequest(BaseModel):
+    name: str
+    brand: str = ""
+    category: str = ""
+    audience: str = ""
+    unit: str = ""
+    price: float | None = None
+    mrp: float | None = None
+    description: str = ""
+    tags: list[str] = []
+
+
+@app.post("/listing/generate")
+def generate_listing(body: ListingRequest):
+    """SEO title, description, highlights, tags and meta description from a seller's notes."""
+    if len(body.name.strip()) < 2:
+        raise HTTPException(400, "Enter the product name first")
+    return listing.generate(body.model_dump())
 
 
 @app.get("/health")

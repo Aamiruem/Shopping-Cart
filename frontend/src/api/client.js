@@ -74,7 +74,11 @@ const query = (params) => {
 export const api = {
   // Auth
   authConfig: () => request('/auth/config'),
-  register: (body) => request('/auth/register', { method: 'POST', body }),
+  register: (body) => request('/auth/register', { method: 'POST', body }), // emails a code; no account yet
+  verifySignup: (body) => request('/auth/register/verify', { method: 'POST', body }),
+  resendSignup: (email) => request('/auth/register/resend', { method: 'POST', body: { email } }),
+  phoneOtp: (phone, channel) => request('/auth/phone/otp', { method: 'POST', body: { phone, channel } }),
+  phoneVerify: (phone, code) => request('/auth/phone/verify', { method: 'POST', body: { phone, code } }),
   login: (body) => request('/auth/login', { method: 'POST', body }),
   googleLogin: (credential) => request('/auth/google', { method: 'POST', body: { credential } }),
   me: () => request('/auth/me'),
@@ -128,17 +132,20 @@ export const api = {
   sellerOrders: (params = {}) => request(`/seller/orders?${query(params)}`),
   sellerUpdateFulfilment: (orderId, fulfilment) => request(`/seller/orders/${orderId}`, { method: 'PATCH', body: { fulfilment } }),
   sellerUpdateProfile: (body) => request('/seller/profile', { method: 'PUT', body }),
+  sellerPayoutOtp: () => request('/seller/profile/otp', { method: 'POST' }),
   sellerBulk: (ids, action, extra = {}) => request('/seller/products/bulk', { method: 'POST', body: { ids, action, ...extra } }),
   sellerDuplicateProduct: (id) => request(`/seller/products/${id}/duplicate`, { method: 'POST' }),
   sellerEarnings: () => request('/seller/earnings'),
   uploadImage: (file) => upload('/seller/uploads?kind=image', file),
   uploadMedia: (file, kind) => upload(`/seller/uploads?kind=${kind}`, file),
+  aiListing: (body) => request('/ai/listing', { method: 'POST', body }),
 
   // Analytics & ML (sellers see their own store; admins can pass sellerId)
   analyticsSellers: () => request('/analytics/sellers'),
   analyticsOverview: (params) => request(`/analytics/overview?${query(params)}`),
   analyticsForecast: (params) => request(`/analytics/forecast?${query(params)}`),
   analyticsBestsellers: (params) => request(`/analytics/bestsellers?${query(params)}`),
+  analyticsGrowth: (params) => request(`/analytics/growth?${query(params)}`),
   analyticsCustomers: (params) => request(`/analytics/customers?${query(params)}`),
   analyticsSupport: () => request('/analytics/support'),
   analyticsRetrain: () => request('/analytics/retrain', { method: 'POST' }),

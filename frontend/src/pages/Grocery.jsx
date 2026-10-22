@@ -6,6 +6,7 @@ import Icon from '../components/common/Icon';
 import ProductCard from '../components/product/ProductCard';
 import ProductRail from '../components/product/ProductRail';
 import { aisleLabel, GROCERY_AISLES, SORT_OPTIONS } from '../constants/catalog';
+import useSeo, { breadcrumbLd } from '../hooks/useSeo';
 
 const PROMISES = [
   { icon: 'truck', text: 'Free delivery over ₹499' },
@@ -49,6 +50,12 @@ export default function Grocery() {
     [items, aisle, term],
   );
   const showAisleRails = !aisle && !term;
+  useSeo({
+    title: aisle ? `${aisleLabel(aisle)} - Online Grocery` : 'Online Grocery Store - Fruits, Vegetables, Atta, Dal & Daily Essentials',
+    description: `Order ${aisle ? aisleLabel(aisle).toLowerCase() : 'groceries'} online at Arvixa Fresh: Amul, Britannia, Parle, Maggi, Haldiram's and more. Best prices and free delivery over ₹499.`,
+    path: aisle ? `/grocery?aisle=${aisle}` : '/grocery',
+    jsonLd: breadcrumbLd([{ name: 'Home', path: '/' }, { name: 'Grocery', path: '/grocery' }, ...(aisle ? [{ name: aisleLabel(aisle), path: `/grocery?aisle=${aisle}` }] : [])]),
+  });
   const byAisle = (id) => items.filter((p) => p.subCategory === id);
 
   return (

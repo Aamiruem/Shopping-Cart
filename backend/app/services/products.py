@@ -5,6 +5,7 @@ Sellers manage only their own products; admins manage everything.
 
 from datetime import UTC, datetime
 
+from ..core.cache import invalidate
 from ..core.errors import ApiError
 from ..db.mongo import get_db
 from ..deps import CurrentUser
@@ -23,6 +24,7 @@ async def get_owned(product_id: str, actor: CurrentUser) -> dict:
 
 
 async def create(data: ProductIn, actor: CurrentUser) -> dict:
+    invalidate("catalog:")
     now = datetime.now(UTC)
     doc = data.model_dump()
     if not actor.is_admin:
@@ -41,6 +43,7 @@ async def create(data: ProductIn, actor: CurrentUser) -> dict:
 
 
 async def update(product_id: str, data: ProductIn, actor: CurrentUser) -> dict:
+    invalidate("catalog:")
     product = await get_owned(product_id, actor)
     changes = data.model_dump()
     if not actor.is_admin:
@@ -52,6 +55,7 @@ async def update(product_id: str, data: ProductIn, actor: CurrentUser) -> dict:
 
 
 async def patch(product_id: str, data: ProductPatch, actor: CurrentUser) -> dict:
+    invalidate("catalog:")
     product = await get_owned(product_id, actor)
     changes = data.model_dump(exclude_none=True)
     price, mrp = changes.get("price", product["price"]), changes.get("mrp", product.get("mrp"))
@@ -63,6 +67,7 @@ async def patch(product_id: str, data: ProductPatch, actor: CurrentUser) -> dict
 
 
 async def delete(product_id: str, actor: CurrentUser) -> None:
+    invalidate("catalog:")
     product = await get_owned(product_id, actor)
     db = get_db()
     await db.products.delete_one({"_id": product["_id"]})

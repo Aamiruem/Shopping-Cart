@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import Icon from '../components/common/Icon';
 import { useAuth } from '../context/AuthContext';
+import useSeo from '../hooks/useSeo';
 
 const STEPS = [
   { icon: 'user', title: 'Create an account', text: 'Sign up with your email or Google in under a minute.' },
@@ -38,6 +39,7 @@ export default function Sell() {
       .catch(() => setStats(null));
   }, []);
 
+  useSeo({ title: 'Sell Online on Arvixa - Become a Seller', description: 'Open your online store on Arvixa in minutes. List products with photos, videos and 360° views, get paid by UPI and bank transfer, and grow with AI sales insights.', path: '/sell' });
   const isSeller = ['seller', 'admin'].includes(user?.role);
   const cta = isSeller
     ? { to: '/seller/dashboard', label: 'Go to Seller Hub' }

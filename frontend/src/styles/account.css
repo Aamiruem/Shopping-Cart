@@ -72,3 +72,17 @@
 .verified, .unverified { display: inline-flex; align-items: center; gap: 2px; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
 .verified { background: var(--success-bg); color: var(--success); }
 .unverified { background: var(--bg); color: var(--text-muted); }
+
+/* 6-digit code verification (signup, phone, payout) */
+.code-verify { display: flex; flex-direction: column; align-items: stretch; gap: 14px; text-align: center; }
+.code-verify h2 { font-size: var(--fs-xl); }
+.code-icon { align-self: center; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--brand-light); color: var(--brand); }
+.code-actions { display: flex; justify-content: center; gap: 16px; }
+
+.phone-verify { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--brand-faint); }
+.phone-verify p { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.phone-verify .code-verify { background: #fff; padding: 16px; border-radius: var(--radius); }
+.phone-verify-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.phone-verify-actions .btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; }
+.phone-verify-actions .whatsapp { color: #128c7e; border-color: #9fd8cf; }
+.phone-hint { display: flex; align-items: center; gap: 6px; }

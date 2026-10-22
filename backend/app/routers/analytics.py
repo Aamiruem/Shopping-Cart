@@ -7,19 +7,22 @@ Results are cached (settings.analytics_cache_minutes); POST /retrain clears the 
 import asyncio
 import io
 
+import pandas as pd
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from ..core.config import get_settings
 from ..core.errors import ApiError
+from ..db.mongo import get_db
 from ..db.postgres import get_pool, rows
 from ..deps import CurrentUser, require_admin, require_seller
 from ..ml import cache
 from ..ml import support as support_ml
 from ..ml.bestsellers import predict_bestsellers
 from ..ml.customers import cohort_retention, predict_churn, segment_customers
-from ..ml.data import completed, load_dataset, local_today
+from ..ml.data import completed, load_dataset, load_events, local_today
 from ..ml.forecasting import forecast_revenue
+from ..ml.growth import growth_report
 from ..ml.overview import overview as build_overview
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
@@ -77,6 +80,41 @@ async def bestsellers(horizon: int = 30, sellerId: int | None = None, user: Curr
         return await asyncio.to_thread(predict_bestsellers, data.sales, data.products, data.events, data.today, horizon)
 
     return await cache.cached(f"bestsellers:{scope}:{horizon}", _ttl(), compute)
+
+
+@router.get("/growth")
+async def growth(sellerId: int | None = None, user: CurrentUser = Depends(require_seller)):
+    """Growth advisor: per-product demand, conversion, pricing vs similar items, listing quality and ranked tips."""
+    scope = _scope(user, sellerId)
+
+    async def compute():
+        db = get_db()
+        query = {} if scope is None else {"sellerId": scope}
+        fields = {
+            "name": 1,
+            "image": 1,
+            "images": 1,
+            "videos": 1,
+            "images360": 1,
+            "description": 1,
+            "tags": 1,
+            "brand": 1,
+            "price": 1,
+            "mrp": 1,
+            "stock": 1,
+            "unit": 1,
+            "category": 1,
+            "subCategory": 1,
+            "active": 1,
+        }
+        products = [d async for d in db.products.find(query, fields).limit(1000)]
+        peers = pd.DataFrame([d async for d in db.products.find({"active": {"$ne": False}}, {"category": 1, "subCategory": 1, "price": 1})])
+        data = await load_dataset(scope)
+        if scope is not None:  # market conversion benchmark uses every seller's events
+            data.events = pd.concat([data.events, await load_events(None, days=60)]).drop_duplicates()
+        return await asyncio.to_thread(growth_report, products, peers, data.sales, data.events, data.today)
+
+    return await cache.cached(f"growth:{scope}", _ttl(5), compute)
 
 
 @router.get("/customers")

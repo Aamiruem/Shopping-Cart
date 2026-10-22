@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Spinner } from '../../components/common/Feedback';
 import Icon from '../../components/common/Icon';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useSellerProfile } from './SellerLayout';
 
@@ -32,6 +33,9 @@ function validate(f) {
 
 export default function SellerSettings() {
   const { profile, reload } = useSellerProfile();
+  const { user } = useAuth();
+  const [confirm, setConfirm] = useState({ currentPassword: '', otp: '' });
+  const [otpSent, setOtpSent] = useState(null);
   const toast = useToast();
   const [form, setForm] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -54,6 +58,18 @@ export default function SellerSettings() {
     }
   };
 
+  // Changing where money goes needs the account password (or an emailed code for Google-only accounts)
+  const saved = profile ? fromProfile(profile) : null;
+  const PAYOUT_FIELDS = ['payoutUpi', 'bankAccountName', 'bankAccountNumber', 'bankIfsc'];
+  const payoutChanged = saved && PAYOUT_FIELDS.some((k) => (form[k] || '') !== (saved[k] || ''));
+  const sendPayoutCode = async () => {
+    try {
+      setOtpSent(await api.sellerPayoutOtp());
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const save = async (e) => {
     e.preventDefault();
     const problem = validate(form);
@@ -61,7 +77,9 @@ export default function SellerSettings() {
     if (problem) return;
     setBusy(true);
     try {
-      await api.sellerUpdateProfile(form);
+      await api.sellerUpdateProfile(payoutChanged ? { ...form, ...confirm } : form);
+      setConfirm({ currentPassword: '', otp: '' });
+      setOtpSent(null);
       reload();
       toast.show('Store settings saved');
     } catch (err) {
@@ -112,7 +130,28 @@ export default function SellerSettings() {
             <label className="field">IFSC code<input value={form.bankIfsc} onChange={set('bankIfsc', (v) => v.toUpperCase().slice(0, 11))} placeholder="HDFC0001234" /></label>
           </div>
         </div>
-        <p className="secure-note"><Icon name="lock" size={14} /> Only the last 4 digits of your account number are ever shown, here or anywhere else in the app.</p>
+        {payoutChanged && (
+          <div className="payout-confirm">
+            <p className="payout-title"><Icon name="lock" size={16} /> Confirm it's you</p>
+            {user.hasPassword ? (
+              <label className="field">Account password
+                <input type="password" autoComplete="current-password" value={confirm.currentPassword} onChange={(e) => setConfirm({ ...confirm, currentPassword: e.target.value })} />
+              </label>
+            ) : (
+              <>
+                <button type="button" className="btn btn-outline btn-sm" onClick={sendPayoutCode}><Icon name="mail" size={14} /> {otpSent ? 'Resend code' : 'Email me a code'}</button>
+                {otpSent && (
+                  <>
+                    <p className="muted small">Code sent to {otpSent.sentTo}.{otpSent.devCode && <> Dev mode: <code>{otpSent.devCode}</code></>}</p>
+                    <label className="field">6-digit code<input inputMode="numeric" value={confirm.otp} onChange={(e) => setConfirm({ ...confirm, otp: e.target.value.replace(/\D/g, '').slice(0, 6) })} /></label>
+                  </>
+                )}
+              </>
+            )}
+            <p className="muted small">We ask every time payout details change, so nobody else can redirect your earnings.</p>
+          </div>
+        )}
+        <p className="secure-note"><Icon name="lock" size={14} /> Account numbers are encrypted in our database. Only the last 4 digits are ever shown.</p>
       </section>
 
       {error && <p className="alert alert-error" role="alert">{error}</p>}

@@ -12,6 +12,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import useShopActions from '../hooks/useShopActions';
 import { deliveryDate } from '../utils/format';
+import useSeo, { breadcrumbLd, productLd, productPath } from '../hooks/useSeo';
 import { addRecentlyViewed } from '../utils/recentlyViewed';
 
 // activeImage value that shows the 360° viewer instead of a photo
@@ -79,6 +80,15 @@ export default function ProductDetail() {
       cancelled = true;
     };
   }, [id]);
+
+  useSeo(product ? {
+    title: `${product.name}${product.unit ? ` (${product.unit})` : ''} - Buy online at ₹${Math.round(product.price)}`,
+    description: `${product.name} by ${product.brand || 'Arvixa'} at ₹${Math.round(product.price)}${product.discount ? ` (${product.discount}% off)` : ''}. ${(product.description || '').slice(0, 110)} Free delivery over ₹499, easy returns.`,
+    path: productPath(product),
+    image: product.image,
+    type: 'product',
+    jsonLd: [productLd(product), breadcrumbLd([{ name: 'Home', path: '/' }, { name: categoryLabel(product.category), path: `/products?category=${product.category}` }, { name: product.name, path: productPath(product) }])],
+  } : { title: 'Product', noindex: true });
 
   if (error) return <div className="container"><EmptyState title="Product not found" message={error} action={{ to: '/products', label: 'Continue shopping' }} /></div>;
   if (!product) return <Spinner />;

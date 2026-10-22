@@ -9,6 +9,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from pydantic import BaseModel, Field
 
+from ..core.cache import invalidate
 from ..core.errors import ApiError
 from ..core.security import verify_password
 from ..db.mongo import get_db
@@ -264,6 +265,7 @@ async def duplicate_product(product_id: str, user: CurrentUser = Depends(require
     if not user.is_admin:
         copy["sellerId"] = user.id
     result = await get_db().products.insert_one(copy)
+    invalidate("catalog:")
     copy["_id"] = result.inserted_id
     return serialize_product(copy)
 

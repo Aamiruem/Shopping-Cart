@@ -4,6 +4,7 @@ import re
 
 from fastapi import APIRouter, Depends, Response
 
+from ..core.cache import cached, invalidate
 from ..core.errors import ApiError
 from ..db.mongo import get_db
 from ..deps import CurrentUser, get_optional_user, require_seller
@@ -75,13 +76,46 @@ async def list_products(
     if featured == "true":
         query["featured"] = True
 
-    cursor = get_db().products.find(query).sort(SORTS.get(sort, SORTS["relevance"])).limit(max(1, min(limit, 200)))
+    limit = max(1, min(limit, 200))
+    key = f"catalog:list:{q}|{category}|{audience}|{use}|{subCategory}|{brand}|{minPrice}|{maxPrice}|{minRating}|{sort}|{featured}|{limit}"
+    return await cached(key, CATALOG_TTL, lambda: _search(query, q, sort, limit))
+
+
+CATALOG_TTL = 30  # seconds; any product write clears it (see invalidate_catalog)
+
+
+def invalidate_catalog() -> None:
+    invalidate("catalog:")
+
+
+async def _search(query: dict, q: str | None, sort: str, limit: int) -> list[dict]:
+    """Relevance search: full-text matches ranked by score first, then partial-word matches (e.g. "lay" -> Lay's)."""
+    db = get_db()
+    if q and q.strip() and sort == "relevance":
+        text_query = {k: v for k, v in query.items() if k != "$or"} | {"$text": {"$search": q.strip()}}
+        ranked = [
+            p
+            async for p in db.products.find(text_query, {"score": {"$meta": "textScore"}})
+            .sort([("score", {"$meta": "textScore"}), ("ratingCount", -1)])
+            .limit(limit)
+        ]
+        seen = {p["_id"] for p in ranked}
+        if len(ranked) < limit:
+            async for p in db.products.find(query).sort(SORTS["popularity"]).limit(limit):
+                if p["_id"] not in seen and len(ranked) < limit:
+                    ranked.append(p)
+        return [serialize_product({k: v for k, v in p.items() if k != "score"}) for p in ranked]
+    cursor = db.products.find(query).sort(SORTS.get(sort, SORTS["relevance"])).limit(limit)
     return [serialize_product(p) async for p in cursor]
 
 
 @router.get("/categories")
 async def categories():
     """Category list with product counts and a cover image (the best-rated product)."""
+    return await cached("catalog:categories", CATALOG_TTL, _categories)
+
+
+async def _categories():
     pipeline = [
         {"$match": {"active": {"$ne": False}}},
         {"$sort": {"rating": -1}},
@@ -94,6 +128,10 @@ async def categories():
 @router.get("/subcategories")
 async def subcategories(category: str):
     """Sub-categories (e.g. grocery aisles) of one category, with product counts and a cover image."""
+    return await cached(f"catalog:subcategories:{category}", CATALOG_TTL, lambda: _subcategories(category))
+
+
+async def _subcategories(category: str):
     pipeline = [
         {"$match": {"active": {"$ne": False}, "category": category}},
         {"$sort": {"ratingCount": -1}},
@@ -107,6 +145,11 @@ async def subcategories(category: str):
 @router.get("/facets")
 async def facets(q: str | None = None, category: str | None = None, audience: str | None = None, use: str | None = None):
     """Brands and price range for the filter sidebar."""
+    key = f"catalog:facets:{q}|{category}|{audience}|{use}"
+    return await cached(key, CATALOG_TTL, lambda: _facets(q, category, audience, use))
+
+
+async def _facets(q, category, audience, use):
     db = get_db()
     query = _base_filter(q, category, audience, use)
     brands = await db.products.distinct("brand", query)

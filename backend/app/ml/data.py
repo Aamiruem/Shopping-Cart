@@ -90,7 +90,7 @@ async def load_products(seller_id: int | None = None) -> pd.DataFrame:
     for col, default in (("mrp", None), ("rating", 0.0), ("ratingCount", 0), ("stock", 0), ("active", True)):
         if col not in df:
             df[col] = default
-    df["mrp"] = df["mrp"].fillna(df["price"])
+    df["mrp"] = pd.to_numeric(df["mrp"], errors="coerce").fillna(df["price"])
     df["active"] = df["active"].fillna(True).astype(bool)
     return df
 

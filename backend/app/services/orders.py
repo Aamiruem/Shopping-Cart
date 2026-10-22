@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+from ..core.cache import invalidate
 from ..core.errors import ApiError
 from ..db.mongo import get_db
 from ..db.postgres import get_pool
@@ -72,6 +73,7 @@ async def place_order(
     for line in lines:
         await db.products.update_one({"_id": line["product"]["_id"]}, {"$inc": {"stock": -line["qty"]}})
     await save_cart(user_id, [])
+    invalidate("catalog:")  # stock changed
     now = datetime.now(UTC)
     await events.track_many(
         [

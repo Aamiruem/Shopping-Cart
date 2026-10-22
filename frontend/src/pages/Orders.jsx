@@ -4,12 +4,14 @@ import { api } from '../api/client';
 import { EmptyState, ErrorMessage, Spinner } from '../components/common/Feedback';
 import Icon from '../components/common/Icon';
 import { formatDate, formatPrice } from '../utils/format';
+import useSeo from '../hooks/useSeo';
 
 export function StatusBadge({ status }) {
   return <span className={`status status-${status}`}><span className="dot" />{status === 'placed' ? 'Order placed' : status[0].toUpperCase() + status.slice(1)}</span>;
 }
 
 export default function Orders() {
+  useSeo({ title: 'My Orders', noindex: true });
   const [orders, setOrders] = useState(null);
   const [error, setError] = useState('');
 

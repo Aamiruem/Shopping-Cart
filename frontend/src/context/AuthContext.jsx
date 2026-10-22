@@ -33,7 +33,9 @@ export function AuthProvider({ children }) {
     user,
     ready,
     login: async (email, password) => saveSession(await api.login({ email, password })),
-    register: async (form) => saveSession(await api.register(form)),
+    // Signup is two steps: register() emails a code, verifySignup() creates the account and signs in
+    register: (form) => api.register(form),
+    verifySignup: async (email, code) => saveSession(await api.verifySignup({ email, code })),
     googleLogin: async (credential) => saveSession(await api.googleLogin(credential)),
     setUser,
     updateProfile: async (form) => setUser(await api.updateProfile(form)),

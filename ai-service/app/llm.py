@@ -1,4 +1,6 @@
-"""Thin wrapper around the Claude API used by RAG and the agent."""
+"""Thin wrapper around the Claude API used by RAG, the agent and the listing writer."""
+import json
+
 import anthropic
 
 from .config import CLAUDE_MODEL, LLM_ENABLED
@@ -33,3 +35,24 @@ def text_of(response) -> str:
 
 def complete(system: str, prompt: str) -> str:
     return text_of(create(system=system, messages=[{"role": "user", "content": prompt}]))
+
+
+class Declined(Exception):
+    """Claude (and its fallback) declined the request."""
+
+
+def structured(system: str, prompt: str, schema: dict, effort: str = "low") -> dict:
+    """One request whose answer is guaranteed to be JSON matching `schema` (structured outputs)."""
+    response = _client.beta.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=4096,
+        thinking={"type": "adaptive"},
+        output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}},
+        betas=[FALLBACK_BETA],
+        fallbacks="default",
+        system=system,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    if response.stop_reason == "refusal":
+        raise Declined()
+    return json.loads(next(b.text for b in response.content if b.type == "text"))

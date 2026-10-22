@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
+import { productPath } from '../../hooks/useSeo';
 import useShopActions from '../../hooks/useShopActions';
 import Icon from '../common/Icon';
 import Price from '../common/Price';
@@ -26,7 +27,7 @@ export default function ProductCard({ product, variant = 'grid' }) {
         <Icon name="heart" size={16} filled={wished} />
       </button>
 
-      <Link to={`/products/${product._id}`} className="product-link">
+      <Link to={productPath(product)} className="product-link">
         <div className="product-img">
           <img src={product.image} alt={product.name} loading="lazy" />
           {outOfStock && <span className="stock-flag">Sold out</span>}

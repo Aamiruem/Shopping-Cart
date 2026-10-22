@@ -10,6 +10,7 @@ import SeasonCollections from '../components/home/SeasonCollections';
 import ShopByNeed from '../components/home/ShopByNeed';
 import ProductRail from '../components/product/ProductRail';
 import { useAuth } from '../context/AuthContext';
+import useSeo from '../hooks/useSeo';
 import { getRecentlyViewed } from '../utils/recentlyViewed';
 
 // Each rail is one API call; they load independently so one failure doesn't blank the page
@@ -78,7 +79,23 @@ function ForYou() {
   );
 }
 
+const HOME_LD = [
+  { '@type': 'Organization', name: 'Arvixa', url: '/', logo: '/brand/arvixa-mark-192.png', slogan: 'Shop Beyond Limits' },
+  {
+    '@type': 'WebSite',
+    name: 'Arvixa',
+    url: '/',
+    potentialAction: { '@type': 'SearchAction', target: '/products?q={search_term_string}', 'query-input': 'required name=search_term_string' },
+  },
+];
+
 export default function Home() {
+  useSeo({
+    description: 'Shop online at Arvixa: mobiles, electronics, fashion for women and men, groceries, beauty, home and kitchen. Best prices, free delivery over ₹499, UPI, cards and cash on delivery.',
+    path: '/',
+    jsonLd: HOME_LD.map((x) => ({ ...x, url: window.location.origin + x.url, ...(x.logo ? { logo: window.location.origin + x.logo } : {}),
+      ...(x.potentialAction ? { potentialAction: { ...x.potentialAction, target: window.location.origin + x.potentialAction.target } } : {}) })),
+  });
   const deals = useProducts({ featured: 'true', sort: 'popularity', limit: 100 });
   const [recent] = useState(getRecentlyViewed);
 

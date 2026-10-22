@@ -59,6 +59,31 @@ export default function ProductForm({ product, onSaved, onClose }) {
     }
   };
 
+  // AI listing writer: drafts a search-friendly title, description and tags from what the seller typed
+  const [ai, setAi] = useState({ busy: false, draft: null });
+  const writeWithAi = async () => {
+    if (form.name.trim().length < 2) return setError('Enter the product name first, then let AI write the rest');
+    setAi({ busy: true, draft: null });
+    setError('');
+    try {
+      const draft = await api.aiListing({
+        name: form.name, brand: form.brand, category: form.category, audience: form.audience, unit: form.unit,
+        price: form.price ? Number(form.price) : null, mrp: form.mrp ? Number(form.mrp) : null,
+        description: form.description, tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+      });
+      setAi({ busy: false, draft });
+    } catch (err) {
+      setError(err.message);
+      setAi({ busy: false, draft: null });
+    }
+  };
+  const applyDraft = () => {
+    const d = ai.draft;
+    const highlights = d.highlights?.length ? `\n\nHighlights:\n${d.highlights.map((h) => `• ${h}`).join('\n')}` : '';
+    setForm((f) => ({ ...f, name: d.title.slice(0, 200), description: `${d.description}${highlights}`.slice(0, 5000), tags: d.tags.join(', ') }));
+    setAi({ busy: false, draft: null });
+  };
+
   const addAudio = async (file) => {
     if (!file) return;
     setUploading(true);
@@ -118,6 +143,30 @@ export default function ProductForm({ product, onSaved, onClose }) {
         </header>
 
         <div className="product-form-body">
+          <div className="ai-writer">
+            <div>
+              <strong><Icon name="zap" size={15} /> AI listing writer</strong>
+              <span className="muted small">Type the product name (and any notes), then get a search-friendly title, description and tags.</span>
+            </div>
+            <button type="button" className="btn btn-primary btn-sm" onClick={writeWithAi} disabled={ai.busy}>
+              {ai.busy ? 'Writing…' : '✨ Write with AI'}
+            </button>
+          </div>
+          {ai.draft && (
+            <div className="ai-draft">
+              <p className="ai-draft-label">Suggested listing {ai.draft.source === 'template' ? '(quick template: add an Anthropic API key for full AI writing)' : '(written by Claude)'}</p>
+              <h3>{ai.draft.title}</h3>
+              <p>{ai.draft.description}</p>
+              {ai.draft.highlights?.length > 0 && <ul>{ai.draft.highlights.map((h) => <li key={h}>{h}</li>)}</ul>}
+              <p className="ai-tags">{ai.draft.tags.map((t) => <span key={t}>{t}</span>)}</p>
+              <p className="muted small">Search snippet: {ai.draft.metaDescription}</p>
+              <div className="ai-draft-actions">
+                <button type="button" className="btn btn-buy btn-sm" onClick={applyDraft}>Use this</button>
+                <button type="button" className="btn-link small" onClick={writeWithAi}>Try again</button>
+                <button type="button" className="btn-link small" onClick={() => setAi({ busy: false, draft: null })}>Dismiss</button>
+              </div>
+            </div>
+          )}
           <div className="form-grid">
             <label className="field span-2">Product name<input value={form.name} onChange={set('name')} maxLength={200} required /></label>
             <label className="field">Brand<input value={form.brand} onChange={set('brand')} maxLength={80} /></label>

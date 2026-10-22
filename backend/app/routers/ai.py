@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from ..core.config import get_settings
-from ..deps import get_current_user
+from ..deps import get_current_user, require_seller
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -37,3 +37,9 @@ async def ask(request: Request):
 @router.post("/agent", dependencies=[Depends(get_current_user)])
 async def agent(request: Request):
     return await _forward(request, "/agent/chat", "POST", await request.body())
+
+
+@router.post("/listing", dependencies=[Depends(require_seller)])
+async def listing(request: Request):
+    """AI listing writer for sellers: SEO title, description, highlights, tags and meta description."""
+    return await _forward(request, "/listing/generate", "POST", await request.body())
