@@ -57,6 +57,24 @@ Parameters:
     Type: String
     Default: ""
     NoEcho: true
+  TwilioAccountSid:
+    Type: String
+    Default: ""
+  TwilioAuthToken:
+    Type: String
+    Default: ""
+    NoEcho: true
+  TwilioSmsFrom:
+    Type: String
+    Default: ""
+  TwilioWhatsappFrom:
+    Type: String
+    Default: ""
+  DataEncryptionKey:
+    Type: String
+    NoEcho: true
+    MinLength: 44
+    Description: Fernet key that encrypts seller bank details (python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
   MailFrom:
     Type: String
     Default: "Veyra <no-reply@example.com>"
@@ -93,7 +111,7 @@ Resources:
     Type: AWS::SecretsManager::Secret
     Properties:
       Name: !Sub veyra/${Environment}/app
-      SecretString: !Sub '{"MONGO_URI": "${MongoUri}", "ANTHROPIC_API_KEY": "${AnthropicApiKey}", "SMTP_PASS": "${SmtpPass}", "RAZORPAY_KEY_SECRET": "${RazorpayKeySecret}", "RAZORPAY_WEBHOOK_SECRET": "${RazorpayWebhookSecret}"}'
+      SecretString: !Sub '{"MONGO_URI": "${MongoUri}", "ANTHROPIC_API_KEY": "${AnthropicApiKey}", "SMTP_PASS": "${SmtpPass}", "RAZORPAY_KEY_SECRET": "${RazorpayKeySecret}", "RAZORPAY_WEBHOOK_SECRET": "${RazorpayWebhookSecret}", "TWILIO_AUTH_TOKEN": "${TwilioAuthToken}", "DATA_ENCRYPTION_KEY": "${DataEncryptionKey}"}'
 
   # ---------------------------------------------------------------- Networking
   AlbSecurityGroup:
@@ -292,6 +310,10 @@ Resources:
             - { Name: SMTP_USER, Value: !Ref SmtpUser }
             - { Name: MAIL_FROM, Value: !Ref MailFrom }
             - { Name: RAZORPAY_KEY_ID, Value: !Ref RazorpayKeyId }
+            - { Name: TWILIO_ACCOUNT_SID, Value: !Ref TwilioAccountSid }
+            - { Name: TWILIO_SMS_FROM, Value: !Ref TwilioSmsFrom }
+            - { Name: TWILIO_WHATSAPP_FROM, Value: !Ref TwilioWhatsappFrom }
+            - { Name: SITE_URL, Value: !Sub "https://${Distribution.DomainName}" }
           Secrets:
             - { Name: DB_PASSWORD, ValueFrom: !Sub "${DbSecret}:password::" }
             - { Name: JWT_SECRET, ValueFrom: !Ref JwtSecret }
@@ -299,6 +321,8 @@ Resources:
             - { Name: SMTP_PASS, ValueFrom: !Sub "${AppSecrets}:SMTP_PASS::" }
             - { Name: RAZORPAY_KEY_SECRET, ValueFrom: !Sub "${AppSecrets}:RAZORPAY_KEY_SECRET::" }
             - { Name: RAZORPAY_WEBHOOK_SECRET, ValueFrom: !Sub "${AppSecrets}:RAZORPAY_WEBHOOK_SECRET::" }
+            - { Name: TWILIO_AUTH_TOKEN, ValueFrom: !Sub "${AppSecrets}:TWILIO_AUTH_TOKEN::" }
+            - { Name: DATA_ENCRYPTION_KEY, ValueFrom: !Sub "${AppSecrets}:DATA_ENCRYPTION_KEY::" }
           LogConfiguration:
             LogDriver: awslogs
             Options:

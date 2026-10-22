@@ -114,6 +114,7 @@ function ProfileTab() {
   };
 
   return (
+    <>
     <form onSubmit={save} className="account-form">
       <div className="tab-head">
         <h2>Personal information</h2>
@@ -143,9 +144,10 @@ function ProfileTab() {
           <button type="button" className="btn-text" onClick={() => { setEditing(false); setForm({ name: user.name, phone: user.phone || '' }); }}>Cancel</button>
         </div>
       )}
-      {!editing && <PhoneVerification phone={user.phone} />}
       {user.createdAt && <p className="muted small">Member since {formatDate(user.createdAt, { month: 'long', year: 'numeric' })}</p>}
     </form>
+    {!editing && <PhoneVerification phone={user.phone} />}
+    </>
   );
 }
 

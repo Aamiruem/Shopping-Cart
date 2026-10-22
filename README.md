@@ -124,6 +124,44 @@ tickets over 180 days. Simulated data is marked and is replaced on every re-run;
 `python -m scripts.sync_catalog` to add new products and fill in new fields without re-seeding
 (keeps product ids, carts, wishlists and orders).
 
+## Connect your own accounts (MongoDB Atlas, PostgreSQL / AWS RDS, AWS S3)
+
+Put your connection details in `backend/.env` (never commit it, never paste secrets into chats or tickets), then run
+`python -m scripts.check_connections` from `backend/` - it reports each service as OK / NOT SET / FAILED without
+printing any secret.
+
+| Service | Setting(s) in `backend/.env` |
+|---|---|
+| PostgreSQL (local, AWS RDS, Neon, ...) | `DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require` (URL-encode special characters in the password, e.g. `@` -> `%40`) |
+| MongoDB (local or Atlas) | `MONGO_URI=mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/shop` (allow your server's IP in Atlas -> Network Access) |
+| AWS S3 for product media | `S3_BUCKET`, `AWS_REGION`, optional `S3_PUBLIC_URL`; credentials from the standard AWS chain (`aws configure` locally, the ECS task role on AWS) |
+| Email OTPs | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (Gmail app password, Amazon SES SMTP, ...) |
+| SMS / WhatsApp OTPs | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_SMS_FROM`, `TWILIO_WHATSAPP_FROM` |
+| Payments | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` |
+| Encryption at rest | `DATA_ENCRYPTION_KEY` (required in production) |
+
+After pointing at an empty database, run `python -m scripts.seed` once (or `python -m scripts.sync_catalog` to add
+the catalog without demo history). On AWS the same values go into the CloudFormation parameters; secrets are stored
+in Secrets Manager.
+
+## Security, speed and SEO
+
+- **Accounts:** signup creates the account only after a 6-digit email code is confirmed; disposable inboxes and
+  domains that can't receive mail are rejected; mobile numbers are verified by SMS or WhatsApp OTP; codes are stored
+  as HMACs, expire in 5 minutes, allow 5 attempts and are rate limited.
+- **Seller payouts:** bank account numbers are encrypted at rest (Fernet) and only the last 4 digits are ever shown;
+  changing payout details needs the account password (or an emailed code for Google-only accounts).
+- **Speed:** gzip responses, orjson encoding, a 30-second catalog cache cleared on every product or stock change,
+  browser/CDN cache headers on public catalog reads, a weighted MongoDB text index for ranked search, configurable
+  worker processes (`WEB_CONCURRENCY`).
+- **SEO:** readable product URLs (`/products/<id>/<slug>`), per-page titles, descriptions, canonical links,
+  Open Graph / Twitter cards, schema.org `Product` (price, stock, rating), `BreadcrumbList`, `ItemList`,
+  `Organization` and `WebSite` search box data, a live `/sitemap.xml` and `/robots.txt`. The storefront is a
+  single-page app: Google renders it, but for other crawlers add prerendering (or move to SSR) before launch.
+- **Seller growth tools:** the Growth advisor (Seller Hub -> Analytics) ranks products by the sales each fix could
+  unlock (pricing vs similar items, listing quality, stock, demand trends, cart drop-off); the AI listing writer
+  drafts SEO titles, descriptions and tags (Claude with `ANTHROPIC_API_KEY`, a template otherwise).
+
 ## Catalog images
 
 Product photos come from free sources and are credited on each product page (`imageCredit`):

@@ -79,7 +79,7 @@
 .code-icon { align-self: center; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--brand-light); color: var(--brand); }
 .code-actions { display: flex; justify-content: center; gap: 16px; }
 
-.phone-verify { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--brand-faint); }
+.phone-verify { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--brand-faint); }
 .phone-verify p { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .phone-verify .code-verify { background: #fff; padding: 16px; border-radius: var(--radius); }
 .phone-verify-actions { display: flex; gap: 8px; flex-wrap: wrap; }

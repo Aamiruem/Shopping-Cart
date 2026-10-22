@@ -25,6 +25,7 @@ export default function CodeVerify({ title, info, onVerify, onResend, onBack, ve
 
   const submit = async (e) => {
     e.preventDefault();
+    e.stopPropagation(); // never also submit a surrounding form (e.g. the profile form)
     if (!/^\d{6}$/.test(code)) return setError('Please enter the 6-digit code');
     setBusy(true);
     setError('');

@@ -11,6 +11,11 @@
   { "ParameterKey": "RazorpayKeyId", "ParameterValue": "" },
   { "ParameterKey": "RazorpayKeySecret", "ParameterValue": "" },
   { "ParameterKey": "RazorpayWebhookSecret", "ParameterValue": "" },
+  { "ParameterKey": "TwilioAccountSid", "ParameterValue": "" },
+  { "ParameterKey": "TwilioAuthToken", "ParameterValue": "" },
+  { "ParameterKey": "TwilioSmsFrom", "ParameterValue": "" },
+  { "ParameterKey": "TwilioWhatsappFrom", "ParameterValue": "" },
+  { "ParameterKey": "DataEncryptionKey", "ParameterValue": "REPLACE-with-a-generated-Fernet-key" },
   { "ParameterKey": "MailFrom", "ParameterValue": "Veyra <no-reply@yourdomain.com>" },
   { "ParameterKey": "DesiredCount", "ParameterValue": "1" }
 ]
