@@ -5,9 +5,9 @@ import { EmptyState, ErrorMessage, SkeletonGrid } from '../components/common/Fee
 import Icon from '../components/common/Icon';
 import FilterSidebar from '../components/product/FilterSidebar';
 import ProductCard from '../components/product/ProductCard';
-import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, SORT_OPTIONS } from '../constants/catalog';
+import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, FASHION_TYPES, SORT_OPTIONS } from '../constants/catalog';
 
-const FILTER_KEYS = ['q', 'use', 'category', 'audience', 'brand', 'minPrice', 'maxPrice', 'minRating', 'sort'];
+const FILTER_KEYS = ['q', 'use', 'category', 'audience', 'subCategory', 'brand', 'minPrice', 'maxPrice', 'minRating', 'sort'];
 const EMPTY_FACETS = { brands: [], minPrice: 0, maxPrice: 0 };
 
 // Search results + category listing. All filter state lives in the URL so it is shareable.
@@ -72,6 +72,25 @@ export default function Products() {
             <Icon name="filter" size={14} /> Filters
           </button>
         </div>
+
+        {filters.category === 'fashion' && (
+          <nav className="type-chips" aria-label="Shop by type">
+            {FASHION_TYPES.map((t) => {
+              const active = Object.entries(t.params).every(([k, v]) => filters[k] === v);
+              return (
+                <button
+                  key={t.label}
+                  type="button"
+                  className={active ? 'active' : ''}
+                  aria-pressed={active}
+                  onClick={() => update(active ? { q: '', subCategory: '' } : { q: '', subCategory: '', brand: '', ...t.params })}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </nav>
+        )}
 
         <div className="sort-tabs" role="tablist" aria-label="Sort by">
           <span>Sort By</span>

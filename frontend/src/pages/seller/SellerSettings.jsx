@@ -37,7 +37,9 @@ export default function SellerSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const logoRef = useRef(null);
-  useEffect(() => profile && setForm(fromProfile(profile)), [profile]);
+  useEffect(() => {
+    if (profile) setForm(fromProfile(profile));
+  }, [profile]);
 
   if (!form) return <div className="panel"><Spinner /></div>;
   const set = (key, transform = (v) => v) => (e) => setForm({ ...form, [key]: transform(e.target.value) });
@@ -110,7 +112,7 @@ export default function SellerSettings() {
             <label className="field">IFSC code<input value={form.bankIfsc} onChange={set('bankIfsc', (v) => v.toUpperCase().slice(0, 11))} placeholder="HDFC0001234" /></label>
           </div>
         </div>
-        <p className="secure-note"><Icon name="lock" size={14} /> Your full account number is stored securely and only the last 4 digits are ever shown.</p>
+        <p className="secure-note"><Icon name="lock" size={14} /> Only the last 4 digits of your account number are ever shown, here or anywhere else in the app.</p>
       </section>
 
       {error && <p className="alert alert-error" role="alert">{error}</p>}

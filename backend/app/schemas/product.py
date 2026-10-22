@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from ..services.catalog import CATEGORIES
 
 # Media must be an https link or a file uploaded to this store
-MEDIA_URL = re.compile(r"^(https?://\S+|/api/uploads/[\w.-]+)$")
+MEDIA_URL = re.compile(r"^(https?://\S+|/api/uploads/[\w.-]+|/catalog/[\w.-]+)$")  # /catalog/ = images shipped with the store
 
 
 class ProductIn(BaseModel):

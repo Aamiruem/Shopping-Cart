@@ -34,8 +34,31 @@ export const GROCERY_AISLES = [
   { id: 'frozen-desserts', label: 'Frozen & Desserts' },
   { id: 'cleaning-household', label: 'Cleaning & Household' },
   { id: 'pet-care', label: 'Pet Care' },
+  { id: 'instant-food', label: 'Noodles & Instant Food' },
 ];
 export const aisleLabel = (id) => GROCERY_AISLES.find((a) => a.id === id)?.label || id;
+
+// Quick "shop by type" chips on the fashion listing: a sub-category or a search word
+export const FASHION_TYPES = [
+  { label: 'T-Shirts', params: { subCategory: 'mens-tshirts' } },
+  { label: 'Shirts', params: { subCategory: 'mens-shirts' } },
+  { label: 'Jeans', params: { q: 'jeans' } },
+  { label: 'Lowers & Joggers', params: { q: 'lower' } },
+  { label: 'Ethnic Wear', params: { q: 'ethnic' } },
+  { label: 'Dresses & Tops', params: { q: 'dress' } },
+  { label: 'Winterwear', params: { q: 'winter' } },
+  { label: 'Footwear', params: { subCategory: 'footwear' } },
+  { label: 'Slippers', params: { q: 'slippers' } },
+  { label: 'Shoes', params: { q: 'shoes' } },
+];
+
+// Seasonal collections (products are tagged summer / winter / monsoon / festive)
+export const SEASONS = [
+  { id: 'summer', label: 'Summer', note: 'Cotton tees, shorts, flip-flops & sunglasses', theme: 'orange' },
+  { id: 'winter', label: 'Winter', note: 'Jackets, hoodies, sweaters & shawls', theme: 'blue' },
+  { id: 'monsoon', label: 'Monsoon', note: 'Raincoats, umbrellas & waterproof footwear', theme: 'teal' },
+  { id: 'festive', label: 'Festive', note: 'Sarees, lehengas, kurtas & party heels', theme: 'rose' },
+];
 
 // Fashion is split by who it is for (`audience` on the product)
 export const AUDIENCES = [

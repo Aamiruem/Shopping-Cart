@@ -123,3 +123,15 @@
 .quick-link.shop-all .icon { color: var(--buy); }
 .quick-link.shop-all:hover { background: #fff1e8; }
 @media (max-width: 560px) { .shop-all-banner { flex-wrap: wrap; } .shop-all-banner .btn { width: 100%; justify-content: center; } }
+
+/* ---------- Shop by season ---------- */
+.season-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 0 20px 20px; }
+.season-card { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 150px; padding: 18px; border-radius: var(--radius-lg); color: #fff; overflow: hidden; transition: transform var(--transition), box-shadow var(--transition); }
+.season-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.season-card div { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 4px; max-width: 60%; }
+.season-card strong { font-family: 'Poppins', var(--font); font-size: 22px; font-weight: 800; }
+.season-card span { font-size: var(--fs-xs); opacity: 0.92; line-height: 1.4; }
+.season-card .season-cta { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-weight: 700; opacity: 1; }
+.season-card img { position: absolute; right: 8px; bottom: 8px; width: 46%; height: 80%; object-fit: cover; border-radius: var(--radius); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25); }
+@media (max-width: 900px) { .season-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .season-grid { grid-template-columns: 1fr; } }

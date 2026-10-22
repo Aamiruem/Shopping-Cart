@@ -222,3 +222,10 @@
 .product-audio { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 10px 14px; border-radius: var(--radius); background: var(--brand-faint); }
 .product-audio span { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--brand); white-space: nowrap; }
 .product-audio audio { flex: 1; min-width: 0; height: 36px; }
+
+/* Fashion "shop by type" chips */
+.type-chips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 16px 12px; scrollbar-width: none; }
+.type-chips::-webkit-scrollbar { display: none; }
+.type-chips button { flex-shrink: 0; padding: 7px 14px; border: 1px solid var(--border); border-radius: 18px; font-size: var(--fs-sm); font-weight: 600; background: var(--surface); transition: border-color var(--transition), color var(--transition), background var(--transition); }
+.type-chips button:hover { border-color: var(--brand); color: var(--brand); }
+.type-chips button.active { background: var(--brand); border-color: var(--brand); color: #fff; }

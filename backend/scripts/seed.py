@@ -216,6 +216,18 @@ def product_trends(products: list[dict], rng: np.random.Generator) -> np.ndarray
     return np.array([{"steady": 0.0, "rising": 1.0, "fading": -1.0}[k] for k in kind]) * np.log(strength)
 
 
+# Simulated orders move through fulfilment like real ones: older ones are delivered, recent ones still on the way
+FULFILMENT_BY_AGE_SQL = """
+    UPDATE order_items oi
+       SET fulfilment = CASE WHEN o.created_at < NOW() - INTERVAL '7 days' THEN 'delivered'
+                             WHEN o.created_at < NOW() - INTERVAL '3 days' THEN 'shipped'
+                             WHEN o.created_at < NOW() - INTERVAL '1 day'  THEN 'packed'
+                             ELSE 'pending' END,
+           fulfilled_at = CASE WHEN o.created_at < NOW() - INTERVAL '7 days' THEN o.created_at + INTERVAL '4 days' END
+      FROM orders o
+     WHERE o.id = oi.order_id AND o.source = 'seed' AND o.status = 'placed'"""
+
+
 async def seed_history(pool, db, products: list[dict], demo_id: int, n_customers: int, days: int, seed: int) -> None:
     rng = np.random.default_rng(seed)
     pyrng = random.Random(seed)
@@ -371,6 +383,8 @@ async def seed_history(pool, db, products: list[dict], demo_id: int, n_customers
         f"Simulated {len(customers)} customers, {len(orders)} orders, {len(items)} order lines, "
         f"{len(events)} behaviour events over {days} days"
     )
+
+    await pool.execute(FULFILMENT_BY_AGE_SQL)
 
     # Make some fast movers low on stock so restock alerts have something to show
     rising = [i for i in np.argsort(-trend_log)[:25]]

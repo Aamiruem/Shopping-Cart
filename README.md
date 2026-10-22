@@ -21,13 +21,17 @@ analytics and machine learning that helps sellers sell more and helps shoppers g
 
 **Shoppers:** search with suggestions, filters and sorting, Women / Men fashion sections, product pages with
 gallery and a drag-to-rotate 360° view, cart, wishlist,
-saved addresses, 4-step checkout (UPI and card payments confirmed with an emailed OTP, or cash on
-delivery), orders and cancellation, Google sign-in, AI chat assistant, and a help centre where support
-tickets are triaged by ML.
+saved addresses, 4-step checkout with online payment through Razorpay (UPI, net banking with all major banks,
+cards, wallets; verified server-side, refunded automatically on cancellation) or cash on delivery, order tracking
+(packed / shipped / delivered), Google sign-in, AI chat assistant, and a help centre where support tickets are
+triaged by ML. Without Razorpay keys, development falls back to a demo OTP payment.
 
 **Sellers (Seller Hub at `/seller`, public intro page at `/sell`):** onboarding (store name, GSTIN), product CRUD
-with image upload (S3 or local) and optional 360° frame sets, inline price/stock edits, list/unlist, orders containing their products, CSV exports,
-and the analytics & AI dashboard. **Admins** see the whole marketplace and can filter by store.
+with photos, videos (MP4/WebM), an audio clip and optional 360° frame sets (stored in S3 or locally), bulk
+list / unlist / set stock / delete, duplicate product, inline price/stock edits, order fulfilment (pending ->
+packed -> shipped -> delivered), payments & earnings, store settings with logo and payout UPI ID / bank account
+(IFSC-validated, shown masked), CSV exports and the analytics & AI dashboard. **Admins** see the whole
+marketplace and can filter by store.
 
 ## Analytics and machine learning
 
@@ -60,7 +64,7 @@ backend/
     ml/                  data loading, forecasting, bestsellers, customers (RFM, churn, cohorts),
                          recommender, support triage, overview analytics, model cache
     schemas/             request validation (Pydantic)
-    data/products.json   184-product demo catalog
+    data/products.json   demo catalog (~700 products, see "Catalog images" below)
   scripts/seed.py        catalog, demo accounts, sellers and 6 months of simulated history
   tests/                 ML unit tests (no database) + API integration tests
 frontend/src/
@@ -120,6 +124,20 @@ tickets over 180 days. Simulated data is marked and is replaced on every re-run;
 `python -m scripts.sync_catalog` to add new products and fill in new fields without re-seeding
 (keeps product ids, carts, wishlists and orders).
 
+## Catalog images
+
+Product photos come from free sources and are credited on each product page (`imageCredit`):
+
+- [DummyJSON](https://dummyjson.com) and [Fake Store API](https://fakestoreapi.com) demo products (the original catalog)
+- [Open Food Facts](https://world.openfoodfacts.org) / [Open Beauty Facts](https://world.openbeautyfacts.org): real Indian
+  grocery and personal-care packs, CC BY-SA 3.0, "Open Food Facts contributors"
+- [Wikimedia Commons](https://commons.wikimedia.org): fashion, gadgets, home and fresh produce, each under its own
+  CC / public-domain licence with the photographer named
+
+Imported images are stored in `frontend/public/catalog/` and served by the store itself (no hotlinking). Products made
+from generic photos carry store brands (Urban Thread, Volt, HomeNest...) rather than real brand names; prices and
+ratings in the demo catalog are illustrative.
+
 ## Tests
 
 ```bash
@@ -138,7 +156,8 @@ Full interactive docs at `/docs`. Errors always come back as `{"error": "message
 | Auth | `POST /api/auth/register`, `/login`, `/google` · `GET/PUT /api/auth/me` · `PUT /api/auth/password` · `GET /api/auth/config` |
 | Catalog | `GET /api/products` (q, category, brand, minPrice, maxPrice, minRating, sort) · `/categories` · `/facets` · `/{id}` |
 | Shopping | `/api/cart` · `/api/wishlist` · `/api/addresses` · `POST /api/orders/otp` · `/api/orders` · `PATCH /api/orders/{id}/cancel` |
-| Seller | `POST /api/seller/register` · `GET/POST /api/seller/products` · `PUT/PATCH/DELETE /api/seller/products/{id}` · `POST /api/seller/uploads` · `GET /api/seller/orders` |
+| Payments | `GET /api/payments/config` · `POST /api/payments/razorpay/order` · `/razorpay/verify` · `/razorpay/webhook` · `GET /api/payments/mine` |
+| Seller | `POST /api/seller/register` · `GET/PUT /api/seller/profile` · `GET/POST /api/seller/products` · `PUT/PATCH/DELETE /api/seller/products/{id}` · `POST /api/seller/products/bulk` · `POST /api/seller/products/{id}/duplicate` · `POST /api/seller/uploads?kind=image|video|audio` · `GET /api/seller/orders` · `PATCH /api/seller/orders/{id}` · `GET /api/seller/earnings` |
 | Analytics | `GET /api/analytics/overview` · `/forecast` · `/bestsellers` · `/customers` · `/support` · `/export` · `POST /retrain` |
 | Recommendations | `GET /api/recommendations/for-you` · `/together/{productId}` · `/trending` |
 | Support | `POST/GET /api/support/tickets` · `PATCH /api/support/tickets/{id}` |
@@ -151,5 +170,6 @@ See [infra/aws/README.md](infra/aws/README.md): one CloudFormation stack, `deplo
 
 ## Next steps
 
-Real payments (Razorpay or Stripe) for UPI and card; product reviews feeding the rating and sentiment
-models; a Redis cache shared between API replicas; embeddings-based search.
+Automatic seller payouts with Razorpay Route (linked accounts, so bank details live with Razorpay instead of
+our database); product reviews feeding the rating and sentiment models; a Redis cache shared between API
+replicas; embeddings-based search.

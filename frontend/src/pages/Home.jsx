@@ -6,6 +6,7 @@ import HeroCarousel from '../components/home/HeroCarousel';
 import OfferBanners from '../components/home/OfferBanners';
 import PromoVideo from '../components/home/PromoVideo';
 import QuickLinks from '../components/home/QuickLinks';
+import SeasonCollections from '../components/home/SeasonCollections';
 import ShopByNeed from '../components/home/ShopByNeed';
 import ProductRail from '../components/product/ProductRail';
 import { useAuth } from '../context/AuthContext';
@@ -86,6 +87,7 @@ export default function Home() {
       <QuickLinks />
       <HeroCarousel />
       <ShopByNeed />
+      <SeasonCollections />
       <ErrorMessage message={deals.error && `Couldn't load products: ${deals.error}`} />
 
       <ProductRail
