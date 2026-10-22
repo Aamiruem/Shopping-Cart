@@ -185,6 +185,23 @@ export default function ProductDetail() {
             </ul>
           </div>
 
+          {(product.videos?.length > 0 || product.audio) && (
+            <div className="detail-section">
+              <h3>Videos &amp; audio</h3>
+              <div className="product-media">
+                {product.videos?.map((src, i) => (
+                  <video key={src} src={src} controls preload="metadata" playsInline aria-label={`${product.name} video ${i + 1}`} />
+                ))}
+              </div>
+              {product.audio && (
+                <div className="product-audio">
+                  <span><Icon name="music" size={16} /> Listen</span>
+                  <audio src={product.audio} controls preload="none" aria-label={`${product.name} audio`} />
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="detail-section">
             <h3>Product description</h3>
             <p className="description">{product.description}</p>

@@ -1,8 +1,7 @@
-"""/api/orders - checkout (one SQL transaction), payment OTPs, history and cancellation."""
+"""/api/orders - checkout, payment OTPs (dev demo), history and cancellation (with refunds for online payments)."""
 
 import logging
 import re
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -13,17 +12,18 @@ from ..core.rate_limit import rate_limit
 from ..db.mongo import get_db
 from ..db.postgres import get_pool, rows
 from ..deps import CurrentUser, get_current_user
-from ..services import events, mailer
-from ..services.cart import load_cart, save_cart, summarize
+from ..services import mailer, razorpay
+from ..services.cart import load_cart, summarize
 from ..services.catalog import to_object_id
+from ..services.orders import checkout_summary, place_order, resolve_address
 from ..services.otp import create_payment_otp, verify_payment_otp
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 log = logging.getLogger("orders")
 otp_limiter = rate_limit(10, message="Too many code requests. Please try again in 15 minutes.")
 
-PAYMENT_METHODS = ("cod", "upi", "card")
-ONLINE_METHODS = ("upi", "card")  # money moves before delivery, so these need an OTP
+# Dev-only demo of online payment: an emailed OTP stands in for the gateway when Razorpay keys are not set
+OTP_DEMO_METHODS = ("upi", "card")
 
 ORDERS_SQL = """
   SELECT o.*, COALESCE(json_agg(oi.* ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
@@ -36,10 +36,6 @@ class CheckoutIn(BaseModel):
     address: str | None = None
     paymentMethod: str = "cod"
     otp: str | None = None
-
-
-def _format_address(a) -> str:
-    return f"{a['name']}, {a['line1']}, {a['city']}, {a['state']} - {a['pincode']}. Phone: {a['phone']}"
 
 
 def _mask_email(email: str) -> str:
@@ -88,70 +84,18 @@ async def request_otp(user: CurrentUser = Depends(get_current_user)):
 
 @router.post("", status_code=201)
 async def checkout(body: CheckoutIn, user: CurrentUser = Depends(get_current_user)):
-    pool = get_pool()
-    address = body.address
-    if body.addressId:
-        record = await pool.fetchrow("SELECT * FROM addresses WHERE id = $1 AND user_id = $2", body.addressId, user.id)
-        if not record:
-            raise ApiError(404, "Address not found")
-        address = _format_address(record)
-    if not address or not address.strip():
-        raise ApiError(400, "Shipping address is required")
-    if body.paymentMethod not in PAYMENT_METHODS:
-        raise ApiError(400, "Unsupported payment method")
-
-    lines = await load_cart(user.id)
-    summary = summarize(lines)
-    if not summary["items"]:
-        raise ApiError(400, "Your cart is empty")
-    for line in lines:
-        if line["product"].get("stock", 0) < line["qty"]:
-            raise ApiError(409, f"Only {line['product'].get('stock', 0)} left of {line['product']['name']}")
-
-    if body.paymentMethod in ONLINE_METHODS:
+    """Cash on delivery, or (development without Razorpay keys) the OTP payment demo.
+    Real online payments go through /api/payments/razorpay/* instead."""
+    address = await resolve_address(user.id, body.addressId, body.address)
+    if body.paymentMethod != "cod":
+        if body.paymentMethod not in OTP_DEMO_METHODS:
+            raise ApiError(400, "Unsupported payment method")
+        if razorpay.is_configured():
+            raise ApiError(400, "Please pay online with UPI, net banking or a card")
+    lines, summary = await checkout_summary(user.id)
+    if body.paymentMethod in OTP_DEMO_METHODS:
         await verify_payment_otp(user.id, body.otp)
-    # TODO: for 'upi' / 'card', charge via a payment gateway (Razorpay / Stripe) before committing
-
-    async with pool.acquire() as conn, conn.transaction():
-        order = await conn.fetchrow(
-            "INSERT INTO orders (user_id, total, address, payment_method, delivery_fee) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-            user.id,
-            summary["total"],
-            address.strip(),
-            body.paymentMethod,
-            summary["deliveryFee"],
-        )
-        await conn.executemany(
-            """INSERT INTO order_items (order_id, product_id, name, price, qty, image, seller_id, category)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
-            [
-                (order["id"], i["productId"], i["name"], i["price"], i["qty"], i["image"], i["sellerId"], i["category"])
-                for i in summary["items"]
-            ],
-        )
-
-    db = get_db()
-    for line in lines:
-        await db.products.update_one({"_id": line["product"]["_id"]}, {"$inc": {"stock": -line["qty"]}})
-    await save_cart(user.id, [])
-    now = datetime.now(UTC)
-    await events.track_many(
-        [
-            {
-                "type": "purchase",
-                "userId": user.id,
-                "productId": i["productId"],
-                "category": i["category"],
-                "sellerId": i["sellerId"],
-                "price": i["price"],
-                "qty": i["qty"],
-                "orderId": order["id"],
-                "ts": now,
-            }
-            for i in summary["items"]
-        ]
-    )
-    return {**dict(order), "items": summary["items"]}
+    return await place_order(user.id, address, body.paymentMethod, lines, summary)
 
 
 @router.get("")
@@ -169,8 +113,10 @@ async def get_order(order_id: int, user: CurrentUser = Depends(get_current_user)
 
 @router.patch("/{order_id}/cancel")
 async def cancel(order_id: int, user: CurrentUser = Depends(get_current_user)):
-    """Cancels a placed order and puts the stock back."""
+    """Cancels an order that has not shipped yet, puts the stock back and refunds online payments."""
     pool = get_pool()
+    if await pool.fetchval("SELECT 1 FROM order_items WHERE order_id = $1 AND fulfilment IN ('shipped', 'delivered')", order_id):
+        raise ApiError(400, "This order has already shipped, so it can't be cancelled. You can return it after delivery.")
     order = await pool.fetchrow(
         "UPDATE orders SET status = 'cancelled' WHERE id = $1 AND user_id = $2 AND status = 'placed' RETURNING *", order_id, user.id
     )
@@ -180,4 +126,15 @@ async def cancel(order_id: int, user: CurrentUser = Depends(get_current_user)):
     for item in await pool.fetch("SELECT product_id, qty FROM order_items WHERE order_id = $1", order_id):
         if oid := to_object_id(item["product_id"]):
             await db.products.update_one({"_id": oid}, {"$inc": {"stock": item["qty"]}})
-    return dict(order)
+
+    refund_status = None
+    payment = await pool.fetchrow("SELECT * FROM payments WHERE order_id = $1 AND status = 'paid'", order_id)
+    if payment:
+        try:
+            await razorpay.refund(payment["provider_payment_id"])
+            refund_status = "refunded"
+        except ApiError:
+            log.exception("refund failed for payment %s", payment["id"])
+            refund_status = "refund_pending"  # retried from the Razorpay dashboard; the shopper is told it is on its way
+        await pool.execute("UPDATE payments SET status = $1, updated_at = NOW() WHERE id = $2", refund_status, payment["id"])
+    return {**dict(order), "refund": refund_status}

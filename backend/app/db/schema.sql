@@ -103,3 +103,37 @@ CREATE INDEX IF NOT EXISTS support_tickets_user_idx ON support_tickets (user_id,
 
 -- 'web' = placed in the store, 'seed' = demo history from scripts/seed.py (safe to delete and regenerate)
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS source VARCHAR(10) NOT NULL DEFAULT 'web';
+
+-- ---------- Seller store profile & payout details ----------
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS description         TEXT;
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS logo                TEXT;
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS payout_upi          VARCHAR(100);
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS bank_account_name   VARCHAR(120);
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(20);
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS bank_ifsc           VARCHAR(11);
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS updated_at          TIMESTAMPTZ;
+
+-- ---------- Fulfilment: each seller moves their own lines through pending -> packed -> shipped -> delivered ----------
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS fulfilment   VARCHAR(12) NOT NULL DEFAULT 'pending';
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS fulfilled_at TIMESTAMPTZ;
+
+-- ---------- Online payments (Razorpay: UPI, net banking, cards, wallets) ----------
+-- One row per payment attempt. The order is only created after the payment signature is verified.
+CREATE TABLE IF NOT EXISTS payments (
+  id                  SERIAL PRIMARY KEY,
+  user_id             INTEGER NOT NULL REFERENCES users(id),
+  order_id            INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+  provider            VARCHAR(20) NOT NULL DEFAULT 'razorpay',
+  provider_order_id   VARCHAR(64) NOT NULL UNIQUE,
+  provider_payment_id VARCHAR(64),
+  method              VARCHAR(20),                          -- upi | card | netbanking | wallet | emi
+  amount              NUMERIC(12, 2) NOT NULL,              -- rupees (Razorpay itself works in paise)
+  currency            VARCHAR(3) NOT NULL DEFAULT 'INR',
+  status              VARCHAR(20) NOT NULL DEFAULT 'created', -- created | paid | failed | refunded | refund_pending
+  address             TEXT NOT NULL,
+  error               TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS payments_user_idx  ON payments (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS payments_order_idx ON payments (order_id);

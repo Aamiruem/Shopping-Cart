@@ -215,3 +215,10 @@
 .grocery-credit a { color: var(--brand); }
 @media (max-width: 900px) { .grocery-hero { grid-template-columns: 1fr; padding: 22px; } }
 @media (max-width: 560px) { .grocery-aisles { grid-template-columns: repeat(3, 1fr); padding: 12px; } .aisle-img { width: 56px; height: 56px; } }
+
+/* Product videos + audio on the product page */
+.product-media { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.product-media video { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius); background: #000; }
+.product-audio { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 10px 14px; border-radius: var(--radius); background: var(--brand-faint); }
+.product-audio span { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--brand); white-space: nowrap; }
+.product-audio audio { flex: 1; min-width: 0; height: 36px; }

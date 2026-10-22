@@ -45,6 +45,18 @@ Parameters:
     Type: String
     Default: ""
     NoEcho: true
+  RazorpayKeyId:
+    Type: String
+    Default: ""
+    Description: Razorpay key id (rzp_live_... or rzp_test_...); empty = cash on delivery only
+  RazorpayKeySecret:
+    Type: String
+    Default: ""
+    NoEcho: true
+  RazorpayWebhookSecret:
+    Type: String
+    Default: ""
+    NoEcho: true
   MailFrom:
     Type: String
     Default: "Veyra <no-reply@example.com>"
@@ -81,7 +93,7 @@ Resources:
     Type: AWS::SecretsManager::Secret
     Properties:
       Name: !Sub veyra/${Environment}/app
-      SecretString: !Sub '{"MONGO_URI": "${MongoUri}", "ANTHROPIC_API_KEY": "${AnthropicApiKey}", "SMTP_PASS": "${SmtpPass}"}'
+      SecretString: !Sub '{"MONGO_URI": "${MongoUri}", "ANTHROPIC_API_KEY": "${AnthropicApiKey}", "SMTP_PASS": "${SmtpPass}", "RAZORPAY_KEY_SECRET": "${RazorpayKeySecret}", "RAZORPAY_WEBHOOK_SECRET": "${RazorpayWebhookSecret}"}'
 
   # ---------------------------------------------------------------- Networking
   AlbSecurityGroup:
@@ -279,11 +291,14 @@ Resources:
             - { Name: SMTP_HOST, Value: !Ref SmtpHost }
             - { Name: SMTP_USER, Value: !Ref SmtpUser }
             - { Name: MAIL_FROM, Value: !Ref MailFrom }
+            - { Name: RAZORPAY_KEY_ID, Value: !Ref RazorpayKeyId }
           Secrets:
             - { Name: DB_PASSWORD, ValueFrom: !Sub "${DbSecret}:password::" }
             - { Name: JWT_SECRET, ValueFrom: !Ref JwtSecret }
             - { Name: MONGO_URI, ValueFrom: !Sub "${AppSecrets}:MONGO_URI::" }
             - { Name: SMTP_PASS, ValueFrom: !Sub "${AppSecrets}:SMTP_PASS::" }
+            - { Name: RAZORPAY_KEY_SECRET, ValueFrom: !Sub "${AppSecrets}:RAZORPAY_KEY_SECRET::" }
+            - { Name: RAZORPAY_WEBHOOK_SECRET, ValueFrom: !Sub "${AppSecrets}:RAZORPAY_WEBHOOK_SECRET::" }
           LogConfiguration:
             LogDriver: awslogs
             Options:

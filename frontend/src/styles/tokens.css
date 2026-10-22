@@ -48,7 +48,7 @@
 
   /* Layout */
   --container: 1280px;
-  --nav-height: 64px;
+  --nav-height: 68px;
   --gap: 12px;
   --transition: 0.18s ease;
 }

@@ -7,8 +7,9 @@ import { useToast } from '../context/ToastContext';
 import { deliveryDate, formatDate, formatPrice } from '../utils/format';
 import { StatusBadge } from './Orders';
 
-const PAYMENT_LABELS = { cod: 'Cash on Delivery', upi: 'UPI', card: 'Card' };
+const PAYMENT_LABELS = { cod: 'Cash on Delivery', upi: 'UPI', card: 'Card', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI' };
 const TRACK_STEPS = ['Ordered', 'Packed', 'Shipped', 'Delivered'];
+const STEP_OF = { pending: 0, packed: 1, shipped: 2, delivered: 3 };
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -28,7 +29,10 @@ export default function OrderDetail() {
     try {
       const updated = await api.cancelOrder(id);
       setOrder({ ...order, ...updated });
-      toast.show('Your order has been cancelled', 'info');
+      toast.show(
+        updated.refund ? 'Order cancelled. Your refund is on its way to the account you paid from (usually 5–7 working days).' : 'Your order has been cancelled',
+        'info',
+      );
     } catch (err) {
       toast.show(err.message, 'error');
     } finally {
@@ -41,6 +45,9 @@ export default function OrderDetail() {
 
   const itemsTotal = order.items.reduce((s, i) => s + Number(i.price) * i.qty, 0);
   const cancelled = order.status === 'cancelled';
+  // The order is as far along as its least-advanced item (items from several sellers ship separately)
+  const step = Math.min(...order.items.map((i) => STEP_OF[i.fulfilment] ?? 0));
+  const shipped = step >= STEP_OF.shipped;
 
   return (
     <div className="page-orders container narrow">
@@ -70,7 +77,7 @@ export default function OrderDetail() {
 
           {!cancelled && (
             <ol className="tracker">
-              {TRACK_STEPS.map((s, i) => <li key={s} className={i === 0 ? 'done' : ''}><span />{s}</li>)}
+              {TRACK_STEPS.map((s, i) => <li key={s} className={i <= step ? 'done' : ''} aria-current={i === step ? 'step' : undefined}><span />{s}</li>)}
             </ol>
           )}
 
@@ -87,7 +94,10 @@ export default function OrderDetail() {
             ))}
           </ul>
 
-          {order.status === 'placed' && (
+          {order.status === 'placed' && shipped && (
+            <p className="muted small">{step === STEP_OF.delivered ? 'Delivered.' : 'On its way, so it can no longer be cancelled.'} Need help? <Link to="/help">Contact support</Link></p>
+          )}
+          {order.status === 'placed' && !shipped && (
             <button type="button" className="btn btn-outline" disabled={cancelling} onClick={cancel}>
               <Icon name="x" size={14} /> {cancelling ? 'Cancelling…' : 'Cancel order'}
             </button>

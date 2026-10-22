@@ -5,14 +5,14 @@ import { discountPercent } from '../../utils/format';
 import Icon from '../common/Icon';
 import Spin360 from '../product/Spin360';
 
-const EMPTY = { name: '', brand: '', category: 'electronics', audience: '', description: '', price: '', mrp: '', stock: '10', tags: '', images: [], images360: [], active: true };
-const MAX_IMAGES = { images: 8, images360: 36 };
+const EMPTY = { name: '', brand: '', category: 'electronics', audience: '', description: '', price: '', mrp: '', stock: '10', tags: '', images: [], images360: [], videos: [], audio: '', unit: '', active: true };
+const MAX_IMAGES = { images: 8, images360: 36, videos: 4 };
 
 const fromProduct = (p) => ({
   name: p.name, brand: p.brand || '', category: p.category, description: p.description || '',
   price: String(p.price), mrp: p.mrp ? String(p.mrp) : '', stock: String(p.stock ?? 0),
   tags: (p.tags || []).join(', '), images: p.images?.length ? p.images : p.image ? [p.image] : [], active: p.active !== false,
-  audience: p.audience || '', images360: p.images360 || [],
+  audience: p.audience || '', images360: p.images360 || [], videos: p.videos || [], audio: p.audio || '', unit: p.unit || '',
 });
 
 function validate(f) {
@@ -35,6 +35,9 @@ export default function ProductForm({ product, onSaved, onClose }) {
   const [imageUrl, setImageUrl] = useState('');
   const fileRef = useRef(null);
   const spinFileRef = useRef(null);
+  const videoRef = useRef(null);
+  const audioRef = useRef(null);
+  const [videoUrl, setVideoUrl] = useState('');
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   const off = discountPercent(Number(form.price), Number(form.mrp));
 
@@ -45,14 +48,37 @@ export default function ProductForm({ product, onSaved, onClose }) {
     try {
       const urls = [];
       const ordered = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-      for (const file of ordered.slice(0, MAX_IMAGES[key] - form[key].length)) urls.push((await api.uploadImage(file)).url);
+      const kind = key === 'videos' ? 'video' : 'image';
+      for (const file of ordered.slice(0, MAX_IMAGES[key] - form[key].length)) urls.push((await api.uploadMedia(file, kind)).url);
       setForm((f) => ({ ...f, [key]: [...f[key], ...urls] }));
     } catch (err) {
       setError(err.message);
     } finally {
       setUploading(false);
-      [fileRef, spinFileRef].forEach((r) => r.current && (r.current.value = ''));
+      [fileRef, spinFileRef, videoRef].forEach((r) => r.current && (r.current.value = ''));
     }
+  };
+
+  const addAudio = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    setError('');
+    try {
+      const { url } = await api.uploadMedia(file, 'audio');
+      setForm((f) => ({ ...f, audio: url }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+      if (audioRef.current) audioRef.current.value = '';
+    }
+  };
+
+  const addVideoUrl = () => {
+    if (!/^https:\/\/\S+$/i.test(videoUrl.trim())) return setError('Enter a full video URL starting with https:// (an MP4 or WebM file)');
+    setForm({ ...form, videos: [...form.videos, videoUrl.trim()].slice(0, MAX_IMAGES.videos) });
+    setVideoUrl('');
+    setError('');
   };
 
   const addUrl = () => {
@@ -71,6 +97,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
     const body = {
       name: form.name, brand: form.brand, category: form.category, description: form.description,
       audience: form.category === 'fashion' ? form.audience : '', images360: form.images360,
+      videos: form.videos, audio: form.audio, unit: form.unit.trim(),
       price: Number(form.price), mrp: form.mrp ? Number(form.mrp) : null, stock: Number(form.stock),
       tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean), images: form.images, image: form.images[0], active: form.active,
     };
@@ -109,6 +136,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
             <label className="field">Selling price (₹)<input type="number" min="1" step="1" value={form.price} onChange={set('price')} required /></label>
             <label className="field">MRP (₹) <span className="muted">{off > 0 ? `· ${off}% off` : ''}</span><input type="number" min="1" step="1" value={form.mrp} onChange={set('mrp')} /></label>
             <label className="field">Stock<input type="number" min="0" step="1" value={form.stock} onChange={set('stock')} required /></label>
+            <label className="field">Pack size <span className="muted">(optional)</span><input value={form.unit} onChange={set('unit')} maxLength={40} placeholder="e.g. 500 g, 1 L, Pack of 2" /></label>
             <label className="field">Tags <span className="muted">(comma separated)</span><input value={form.tags} onChange={set('tags')} placeholder="5g, android, dual sim" /></label>
             <label className="field span-2">Description<textarea rows={4} value={form.description} onChange={set('description')} maxLength={5000} /></label>
           </div>
@@ -134,6 +162,44 @@ export default function ProductForm({ product, onSaved, onClose }) {
               <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="…or paste an image URL" aria-label="Image URL" />
               <button type="button" className="btn btn-outline btn-sm" onClick={addUrl}>Add</button>
             </div>
+          </div>
+
+          <div className="image-manager">
+            <p className="field-label"><Icon name="video" size={15} /> Videos <span className="muted small">(optional · up to 4 · MP4 or WebM, 50 MB each)</span></p>
+            <div className="media-grid">
+              {form.videos.map((src, i) => (
+                <figure key={src} className="media-item">
+                  <video src={src} muted preload="metadata" controls />
+                  <figcaption>Video {i + 1}</figcaption>
+                  <button type="button" onClick={() => setForm({ ...form, videos: form.videos.filter((x) => x !== src) })} aria-label={`Remove video ${i + 1}`}><Icon name="x" size={14} /></button>
+                </figure>
+              ))}
+              {form.videos.length < MAX_IMAGES.videos && (
+                <button type="button" className="image-add media-add" onClick={() => videoRef.current?.click()} disabled={uploading}>
+                  <Icon name="video" size={22} /> {uploading ? 'Uploading…' : 'Upload video'}
+                </button>
+              )}
+            </div>
+            <input ref={videoRef} type="file" accept="video/mp4,video/webm" multiple hidden onChange={(e) => addImages(e.target.files, 'videos')} />
+            <div className="url-row">
+              <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="…or paste a video file URL (https://…mp4)" aria-label="Video URL" />
+              <button type="button" className="btn btn-outline btn-sm" onClick={addVideoUrl}>Add</button>
+            </div>
+          </div>
+
+          <div className="image-manager">
+            <p className="field-label"><Icon name="music" size={15} /> Audio <span className="muted small">(optional · a sound sample or a spoken description · MP3, M4A, OGG or WAV, 10 MB)</span></p>
+            {form.audio ? (
+              <div className="audio-row">
+                <audio src={form.audio} controls preload="metadata" />
+                <button type="button" className="btn-link small" onClick={() => setForm({ ...form, audio: '' })}>Remove</button>
+              </div>
+            ) : (
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => audioRef.current?.click()} disabled={uploading}>
+                <Icon name="music" size={14} /> {uploading ? 'Uploading…' : 'Upload audio'}
+              </button>
+            )}
+            <input ref={audioRef} type="file" accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/ogg,audio/wav,audio/x-wav" hidden onChange={(e) => addAudio(e.target.files[0])} />
           </div>
 
           <div className="image-manager">

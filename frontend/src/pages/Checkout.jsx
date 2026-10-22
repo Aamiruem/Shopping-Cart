@@ -12,12 +12,37 @@ import { useToast } from '../context/ToastContext';
 import { formatPrice } from '../utils/format';
 import { playSound } from '../utils/sound';
 
-const PAYMENT_OPTIONS = [
+const COD = { id: 'cod', icon: 'truck', label: 'Cash on Delivery', note: 'Pay when your order arrives' };
+// Real payments through Razorpay (RBI-authorised payment aggregator) when the store has Razorpay keys
+const LIVE_OPTIONS = [
+  {
+    id: 'razorpay',
+    icon: 'card',
+    label: 'Pay online: UPI, Net Banking, Cards, Wallets',
+    note: 'Google Pay, PhonePe, Paytm, BHIM UPI · Net banking with all major banks · Visa, Mastercard, RuPay · Secured by Razorpay',
+  },
+  COD,
+];
+// Development without Razorpay keys: an emailed OTP stands in for the payment gateway
+const DEMO_OPTIONS = [
   { id: 'upi', icon: 'phone', label: 'UPI', note: 'Pay by any UPI app · OTP verified (demo — no real charge)' },
   { id: 'card', icon: 'card', label: 'Credit / Debit / ATM Card', note: 'Visa, Mastercard, RuPay · OTP verified (demo — no real charge)' },
-  { id: 'cod', icon: 'truck', label: 'Cash on Delivery', note: 'Pay when your order arrives' },
+  COD,
 ];
-const ONLINE_PAYMENTS = ['upi', 'card'];
+const OTP_DEMO = ['upi', 'card'];
+const RAZORPAY_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
+
+// Razorpay Checkout is loaded only when a shopper actually pays online
+function loadRazorpay() {
+  if (window.Razorpay) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = RAZORPAY_SCRIPT;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Could not load the payment window. Check your connection and try again.'));
+    document.body.appendChild(script);
+  });
+}
 
 function Step({ number, title, done, summary, active, onChange, children }) {
   return (
@@ -47,6 +72,17 @@ export default function Checkout() {
   const [payment, setPayment] = useState('cod');
   const [placing, setPlacing] = useState(false);
   const [otpOpen, setOtpOpen] = useState(false);
+  const [gateway, setGateway] = useState(null); // { enabled, keyId } from the API
+
+  useEffect(() => {
+    api.paymentsConfig()
+      .then((cfg) => {
+        setGateway(cfg);
+        if (cfg.enabled) setPayment('razorpay');
+      })
+      .catch(() => setGateway({ enabled: false }));
+  }, []);
+  const options = gateway?.enabled ? LIVE_OPTIONS : DEMO_OPTIONS;
 
   useEffect(() => {
     api.addresses()
@@ -78,9 +114,49 @@ export default function Checkout() {
     navigate(`/orders/${order.id}`, { replace: true, state: { justPlaced: true } });
   };
 
-  // Cash on delivery places the order straight away; online payments need an emailed OTP first
+  // UPI / net banking / card / wallet in Razorpay Checkout; the order is created only after the server verifies the payment
+  const payOnline = async () => {
+    setPlacing(true);
+    try {
+      await loadRazorpay();
+      const start = await api.startPayment({ addressId });
+      const checkout = new window.Razorpay({
+        key: start.keyId,
+        order_id: start.orderId,
+        amount: start.amount,
+        currency: start.currency,
+        name: start.name,
+        description: start.description,
+        image: `${window.location.origin}/brand/arvixa-mark-192.png`,
+        prefill: start.prefill,
+        theme: { color: '#2874f0' },
+        handler: async (response) => {
+          try {
+            const { orderId } = await api.verifyPayment(response);
+            await refresh();
+            playSound('success');
+            navigate(`/orders/${orderId}`, { replace: true, state: { justPlaced: true } });
+          } catch (err) {
+            playSound('error');
+            toast.show(err.message, 'error');
+            setPlacing(false);
+          }
+        },
+        modal: { ondismiss: () => setPlacing(false), confirm_close: true },
+      });
+      checkout.on('payment.failed', (r) => toast.show(r.error?.description || 'Payment failed. No money was taken; please try again.', 'error'));
+      checkout.open();
+    } catch (err) {
+      playSound('error');
+      toast.show(err.message, 'error');
+      setPlacing(false);
+    }
+  };
+
+  // Cash on delivery places the order straight away; the dev OTP demo asks for an emailed code first
   const placeOrder = async () => {
-    if (ONLINE_PAYMENTS.includes(payment)) return setOtpOpen(true);
+    if (payment === 'razorpay') return payOnline();
+    if (OTP_DEMO.includes(payment)) return setOtpOpen(true);
     setPlacing(true);
     try {
       await submitOrder();
@@ -157,7 +233,7 @@ export default function Checkout() {
         </Step>
 
         <Step number={4} title="Payment options" active={step === 4}>
-          {PAYMENT_OPTIONS.map((p) => (
+          {options.map((p) => (
             <label key={p.id} className={`payment-option ${payment === p.id ? 'selected' : ''}`}>
               <input type="radio" name="payment" checked={payment === p.id} onChange={() => setPayment(p.id)} />
               <Icon name={p.icon} size={20} />
@@ -165,7 +241,7 @@ export default function Checkout() {
             </label>
           ))}
           <button type="button" className="btn btn-buy btn-lg btn-block" disabled={placing || !address} onClick={placeOrder}>
-            {placing ? 'Placing order…' : ONLINE_PAYMENTS.includes(payment) ? `Pay ${formatPrice(cart.total)}` : `Confirm order · ${formatPrice(cart.total)}`}
+            {placing ? 'Processing…' : payment === 'cod' ? `Confirm order · ${formatPrice(cart.total)}` : `Pay ${formatPrice(cart.total)}`}
           </button>
         </Step>
       </div>

@@ -16,7 +16,7 @@ from .core.config import get_settings
 from .core.errors import register_error_handlers
 from .db.mongo import close_mongo, connect_mongo
 from .db.postgres import close_postgres, connect_postgres
-from .routers import addresses, ai, analytics, auth, cart, orders, products, recommendations, seller, support, wishlist
+from .routers import addresses, ai, analytics, auth, cart, orders, payments, products, recommendations, seller, support, wishlist
 from .services.storage import LOCAL_URL_PREFIX
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -52,7 +52,7 @@ def create_app() -> FastAPI:
     async def health():
         return {"ok": True}
 
-    for module in (auth, products, cart, wishlist, addresses, orders, ai, seller, analytics, recommendations, support):
+    for module in (auth, products, cart, wishlist, addresses, orders, payments, ai, seller, analytics, recommendations, support):
         app.include_router(module.router)
 
     # Locally stored product images (production uses S3 / CloudFront instead)

@@ -46,7 +46,14 @@ class Settings(BaseSettings):
     mail_from: str = "Arvixa <no-reply@arvixa.example>"
     otp_ttl_minutes: int = 5
 
-    # Product image storage: S3 when S3_BUCKET is set, else the local uploads/ folder
+    # Online payments through Razorpay (an RBI-authorised payment aggregator): UPI, net banking, cards, wallets.
+    # Test keys (rzp_test_...) from https://dashboard.razorpay.com/app/keys; without them checkout offers cash on delivery
+    # plus the demo OTP payment used in development.
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+
+    # Product media storage (images, videos, audio): S3 when S3_BUCKET is set, else the local uploads/ folder
     aws_region: str = "ap-south-1"
     s3_bucket: str = ""
     s3_public_url: str = ""  # e.g. a CloudFront domain in front of the bucket

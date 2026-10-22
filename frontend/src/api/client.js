@@ -111,6 +111,12 @@ export const api = {
   order: (id) => request(`/orders/${id}`),
   cancelOrder: (id) => request(`/orders/${id}/cancel`, { method: 'PATCH' }),
 
+  // Online payments (Razorpay: UPI, net banking, cards, wallets)
+  paymentsConfig: () => request('/payments/config'),
+  startPayment: (body) => request('/payments/razorpay/order', { method: 'POST', body }),
+  verifyPayment: (body) => request('/payments/razorpay/verify', { method: 'POST', body }),
+  myPayments: () => request('/payments/mine'),
+
   // Seller hub
   becomeSeller: (body) => request('/seller/register', { method: 'POST', body }),
   sellerProfile: () => request('/seller/profile'),
@@ -120,7 +126,13 @@ export const api = {
   sellerPatchProduct: (id, body) => request(`/seller/products/${id}`, { method: 'PATCH', body }),
   sellerDeleteProduct: (id) => request(`/seller/products/${id}`, { method: 'DELETE' }),
   sellerOrders: (params = {}) => request(`/seller/orders?${query(params)}`),
-  uploadImage: (file) => upload('/seller/uploads', file),
+  sellerUpdateFulfilment: (orderId, fulfilment) => request(`/seller/orders/${orderId}`, { method: 'PATCH', body: { fulfilment } }),
+  sellerUpdateProfile: (body) => request('/seller/profile', { method: 'PUT', body }),
+  sellerBulk: (ids, action, extra = {}) => request('/seller/products/bulk', { method: 'POST', body: { ids, action, ...extra } }),
+  sellerDuplicateProduct: (id) => request(`/seller/products/${id}/duplicate`, { method: 'POST' }),
+  sellerEarnings: () => request('/seller/earnings'),
+  uploadImage: (file) => upload('/seller/uploads?kind=image', file),
+  uploadMedia: (file, kind) => upload(`/seller/uploads?kind=${kind}`, file),
 
   // Analytics & ML (sellers see their own store; admins can pass sellerId)
   analyticsSellers: () => request('/analytics/sellers'),

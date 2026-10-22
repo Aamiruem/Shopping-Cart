@@ -1,10 +1,14 @@
 """Validated product input for seller / admin create and update."""
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ..services.catalog import CATEGORIES
+
+# Media must be an https link or a file uploaded to this store
+MEDIA_URL = re.compile(r"^(https?://\S+|/api/uploads/[\w.-]+)$")
 
 
 class ProductIn(BaseModel):
@@ -23,6 +27,10 @@ class ProductIn(BaseModel):
     images360: list[str] = Field(default_factory=list, max_length=72)
     # Who a fashion item is for (drives the Women / Men filters); empty for everything else
     audience: Literal["", "women", "men", "unisex"] = ""
+    # Product videos (MP4 / WebM) and an audio clip (e.g. a sound sample or a spoken description)
+    videos: list[str] = Field(default_factory=list, max_length=4)
+    audio: str = Field(default="", max_length=1000)
+    unit: str = Field(default="", max_length=40)  # pack size, e.g. "500 g" or "1 L"
     active: bool = True
     featured: bool = False  # only admins may set this
 
@@ -36,6 +44,21 @@ class ProductIn(BaseModel):
     def known_category(cls, value: str) -> str:
         if value not in CATEGORIES:
             raise ValueError(f"must be one of: {', '.join(CATEGORIES)}")
+        return value
+
+    @field_validator("videos", "images", "images360")
+    @classmethod
+    def media_urls(cls, value: list[str]) -> list[str]:
+        bad = [u for u in value if not MEDIA_URL.match(u)]
+        if bad:
+            raise ValueError("media must be https links or uploaded files")
+        return value
+
+    @field_validator("audio", "image")
+    @classmethod
+    def media_url(cls, value: str) -> str:
+        if value and not MEDIA_URL.match(value):
+            raise ValueError("media must be an https link or an uploaded file")
         return value
 
     @field_validator("tags")

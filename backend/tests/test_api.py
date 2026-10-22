@@ -184,3 +184,144 @@ def test_subcategories_and_aisle_filter(client):
     first = rows[0]
     in_aisle = client.get("/api/products", params={"category": "fashion", "subCategory": first["id"]}).json()
     assert len(in_aisle) == first["count"] and {p["subCategory"] for p in in_aisle} == {first["id"]}
+
+
+def _seller_product(client, seller, **extra):
+    body = {"name": f"Pytest Item {time.time_ns()}", "category": "electronics", "price": 500, "stock": 20, **extra}
+    r = client.post("/api/seller/products", json=body, headers=seller)
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def _customer_with_cart(client, product_id):
+    customer, _ = _register(client)
+    assert client.post("/api/cart", json={"productId": product_id, "qty": 1}, headers=customer).status_code in (200, 201)
+    address = client.post(
+        "/api/addresses",
+        json={"name": "Asha", "phone": "9876543210", "line1": "1 MG Road", "city": "Pune", "state": "Maharashtra", "pincode": "411001"},
+        headers=customer,
+    ).json()
+    return customer, address
+
+
+def test_seller_profile_and_payout_details(client):
+    seller = _seller(client)
+    base = {"storeName": f"Pytest Profile {time.time_ns()}", "description": "Handmade goods"}
+    bad_upi = client.put("/api/seller/profile", json={**base, "payoutUpi": "not-a-upi"}, headers=seller)
+    assert bad_upi.status_code == 400 and "UPI" in bad_upi.json()["error"]
+    bad_ifsc = client.put("/api/seller/profile", json={**base, "bankAccountNumber": "123456789012", "bankIfsc": "HDFC123"}, headers=seller)
+    assert bad_ifsc.status_code == 400 and "IFSC" in bad_ifsc.json()["error"]
+
+    ok = {
+        **base,
+        "payoutUpi": "mystore@okhdfcbank",
+        "bankAccountName": "Asha",
+        "bankAccountNumber": "123456789012",
+        "bankIfsc": "hdfc0001234",
+    }
+    r = client.put("/api/seller/profile", json=ok, headers=seller)
+    assert r.status_code == 200, r.text
+    saved = r.json()
+    assert saved["bank_account_number"].endswith("9012") and "1234567" not in saved["bank_account_number"]  # masked
+    assert saved["bank_ifsc"] == "HDFC0001234" and saved["payout_upi"] == "mystore@okhdfcbank"
+    # Saving again with the masked number keeps the real one
+    again = client.put("/api/seller/profile", json={**ok, "bankAccountNumber": saved["bank_account_number"]}, headers=seller)
+    assert again.json()["bank_account_number"] == saved["bank_account_number"]
+
+
+def test_seller_bulk_actions_and_duplicate(client):
+    seller = _seller(client)
+    a, b = _seller_product(client, seller), _seller_product(client, seller, videos=["https://example.com/demo.mp4"])
+    bulk = client.post("/api/seller/products/bulk", json={"ids": [a["_id"], b["_id"]], "action": "unlist"}, headers=seller)
+    assert bulk.json()["updated"] == 2
+    assert client.get(f"/api/products/{a['_id']}").status_code == 404
+    client.post("/api/seller/products/bulk", json={"ids": [a["_id"]], "action": "stock", "stock": 7}, headers=seller)
+    assert client.get(f"/api/seller/products/{a['_id']}", headers=seller).json()["stock"] == 7
+
+    copy = client.post(f"/api/seller/products/{b['_id']}/duplicate", headers=seller)
+    assert copy.status_code == 201 and copy.json()["name"].endswith("(copy)") and copy.json()["active"] is False
+    assert copy.json()["videos"] == ["https://example.com/demo.mp4"]
+
+    other = _seller(client)
+    assert client.post("/api/seller/products/bulk", json={"ids": [a["_id"]], "action": "delete"}, headers=other).status_code == 403
+    ids = [a["_id"], b["_id"], copy.json()["_id"]]
+    assert client.post("/api/seller/products/bulk", json={"ids": ids, "action": "delete"}, headers=seller).json()["updated"] == 3
+    # Media links must be https or uploaded files
+    bad = {"name": "Bad media", "category": "electronics", "price": 1, "audio": "javascript:alert(1)"}
+    assert client.post("/api/seller/products", json=bad, headers=seller).status_code == 400
+
+
+def test_fulfilment_blocks_cancel_and_feeds_earnings(client):
+    seller = _seller(client)
+    product = _seller_product(client, seller)
+    customer, address = _customer_with_cart(client, product["_id"])
+    order = client.post("/api/orders", json={"addressId": address["id"], "paymentMethod": "cod"}, headers=customer).json()
+
+    listed = client.get("/api/seller/orders", headers=seller).json()
+    assert listed[0]["id"] == order["id"] and listed[0]["fulfilment"] == "pending"
+    assert client.patch(f"/api/seller/orders/{order['id']}", json={"fulfilment": "shipped"}, headers=seller).status_code == 200
+    assert client.get(f"/api/orders/{order['id']}", headers=customer).json()["items"][0]["fulfilment"] == "shipped"
+    assert client.patch(f"/api/orders/{order['id']}/cancel", headers=customer).status_code == 400  # already shipped
+    assert client.patch(f"/api/seller/orders/{order['id']}", json={"fulfilment": "delivered"}, headers=_seller(client)).status_code == 404
+
+    totals = client.get("/api/seller/earnings", headers=seller).json()["totals"]
+    assert float(totals["gross"]) == 500 and int(totals["orders"]) == 1
+
+
+def test_razorpay_flow_with_mocked_gateway(client, monkeypatch):
+    import hashlib
+    import hmac
+
+    from app.core.config import get_settings
+    from app.services import razorpay
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "razorpay_key_id", "rzp_test_key")
+    monkeypatch.setattr(settings, "razorpay_key_secret", "key-secret")
+    created, refunds = {}, []
+
+    async def fake_create_order(amount, receipt, notes=None):
+        created["paise"] = round(amount * 100)
+        return {"id": f"order_{time.time_ns()}", "amount": created["paise"], "currency": "INR"}
+
+    async def fake_fetch(payment_id):
+        return {"id": payment_id, "method": "netbanking", "amount": created["paise"]}
+
+    async def fake_refund(payment_id, amount=None):
+        refunds.append(payment_id)
+        return {"id": "rfnd_1"}
+
+    monkeypatch.setattr(razorpay, "create_order", fake_create_order)
+    monkeypatch.setattr(razorpay, "fetch_payment", fake_fetch)
+    monkeypatch.setattr(razorpay, "refund", fake_refund)
+
+    assert client.get("/api/payments/config").json()["enabled"] is True
+    seller = _seller(client)
+    product = _seller_product(client, seller)
+    customer, address = _customer_with_cart(client, product["_id"])
+    # With a real gateway configured, the OTP demo is switched off
+    demo = {"addressId": address["id"], "paymentMethod": "upi", "otp": "123456"}
+    assert client.post("/api/orders", json=demo, headers=customer).status_code == 400
+
+    start = client.post("/api/payments/razorpay/order", json={"addressId": address["id"]}, headers=customer).json()
+    assert start["keyId"] == "rzp_test_key" and start["amount"] == created["paise"]
+    paid = {"razorpay_order_id": start["orderId"], "razorpay_payment_id": "pay_123"}
+    forged = client.post("/api/payments/razorpay/verify", json={**paid, "razorpay_signature": "0" * 64}, headers=customer)
+    assert forged.status_code == 400
+
+    # A fresh attempt with a genuine signature creates the order
+    start = client.post("/api/payments/razorpay/order", json={"addressId": address["id"]}, headers=customer).json()
+    paid = {"razorpay_order_id": start["orderId"], "razorpay_payment_id": "pay_456"}
+    message = (paid["razorpay_order_id"] + "|pay_456").encode()
+    signature = hmac.new(b"key-secret", message, hashlib.sha256).hexdigest()
+    r = client.post("/api/payments/razorpay/verify", json={**paid, "razorpay_signature": signature}, headers=customer)
+    assert r.status_code == 200, r.text
+    order_id = r.json()["orderId"]
+    assert client.get(f"/api/orders/{order_id}", headers=customer).json()["payment_method"] == "netbanking"
+    assert client.get("/api/cart", headers=customer).json()["items"] == []
+
+    # Cancelling a paid order refunds it
+    cancelled = client.patch(f"/api/orders/{order_id}/cancel", headers=customer).json()
+    assert cancelled["refund"] == "refunded" and refunds == ["pay_456"]
+    history = client.get("/api/payments/mine", headers=customer).json()
+    assert [p["status"] for p in history][:2] == ["refunded", "failed"]

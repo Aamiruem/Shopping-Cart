@@ -8,6 +8,9 @@
   { "ParameterKey": "SmtpHost", "ParameterValue": "" },
   { "ParameterKey": "SmtpUser", "ParameterValue": "" },
   { "ParameterKey": "SmtpPass", "ParameterValue": "" },
+  { "ParameterKey": "RazorpayKeyId", "ParameterValue": "" },
+  { "ParameterKey": "RazorpayKeySecret", "ParameterValue": "" },
+  { "ParameterKey": "RazorpayWebhookSecret", "ParameterValue": "" },
   { "ParameterKey": "MailFrom", "ParameterValue": "Veyra <no-reply@yourdomain.com>" },
   { "ParameterKey": "DesiredCount", "ParameterValue": "1" }
 ]
