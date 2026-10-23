@@ -47,8 +47,8 @@
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
 
   /* Layout */
-  --container: 1280px;
+  --container: 1600px;
   --nav-height: 68px;
-  --gap: 12px;
+  --gap: 8px;
   --transition: 0.18s ease;
 }

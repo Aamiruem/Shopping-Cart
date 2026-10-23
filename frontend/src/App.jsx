@@ -5,6 +5,7 @@ import ChatWidget from './components/chat/ChatWidget';
 import CategoryBar from './components/layout/CategoryBar';
 import Footer from './components/layout/Footer';
 import Navbar from './components/layout/Navbar';
+import SiteHeader from './components/layout/SiteHeader';
 import ProtectedRoute from './components/routing/ProtectedRoute';
 import ScrollToTop from './components/routing/ScrollToTop';
 import Account from './pages/Account';
@@ -42,8 +43,10 @@ export default function App() {
   return (
     <div className="app">
       <ScrollToTop />
-      <Navbar />
-      {WITH_CATEGORY_BAR.includes(pathname) && <CategoryBar />}
+      <SiteHeader>
+        <Navbar />
+        {WITH_CATEGORY_BAR.includes(pathname) && <CategoryBar />}
+      </SiteHeader>
 
       <main className="app-main">
         <Suspense fallback={<Spinner />}>

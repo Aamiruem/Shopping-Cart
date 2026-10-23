@@ -54,6 +54,28 @@ async function upload(path, file) {
   return data;
 }
 
+// multipart/form-data POST with upload progress (fetch can't report it) for large files like bulk-import ZIPs
+function sendForm(path, fields, onProgress) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const body = new FormData();
+  Object.entries(fields).forEach(([k, v]) => v != null && body.append(k, v));
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${BASE}/api${path}`);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    if (onProgress) xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    xhr.onerror = () => reject(new Error('Cannot reach the server. Check your connection and try again.'));
+    xhr.onload = () => {
+      let data = null;
+      try { data = JSON.parse(xhr.responseText); } catch { /* non-JSON error page */ }
+      if (xhr.status === 413) return reject(new Error('The upload is too large for the server. Split it into smaller files.'));
+      if (xhr.status < 200 || xhr.status >= 300) return reject(new Error(data?.error || data?.detail || `Upload failed (${xhr.status}).`));
+      resolve(data);
+    };
+    xhr.send(body);
+  });
+}
+
 // Downloads a file from an authenticated endpoint (e.g. CSV exports)
 export async function downloadFile(url, filename) {
   const token = localStorage.getItem(TOKEN_KEY);
@@ -138,6 +160,9 @@ export const api = {
   sellerEarnings: () => request('/seller/earnings'),
   uploadImage: (file) => upload('/seller/uploads?kind=image', file),
   uploadMedia: (file, kind) => upload(`/seller/uploads?kind=${kind}`, file),
+  sellerImportTemplateUrl: () => `${BASE}/api/seller/imports/template`,
+  sellerImport: (sheet, media, dryRun, onProgress) => sendForm('/seller/imports', { sheet, media, dryRun: String(dryRun) }, onProgress),
+  sellerImportStatus: (jobId) => request(`/seller/imports/${jobId}`),
   aiListing: (body) => request('/ai/listing', { method: 'POST', body }),
 
   // Analytics & ML (sellers see their own store; admins can pass sellerId)

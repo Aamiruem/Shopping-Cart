@@ -44,6 +44,23 @@
 .product-card-compact .product-img { aspect-ratio: 1; }
 .product-card-compact .wish-btn { top: 8px; right: 8px; width: 28px; height: 28px; }
 
+/* Fashion: tall full-bleed model photo, second photo on hover, Flipkart-style text block */
+.product-card-portrait { padding: 0 0 12px; gap: 0; overflow: hidden; }
+.product-card-portrait .product-img, .product-card-compact.product-card-portrait .product-img { aspect-ratio: 3 / 4; background: var(--bg); }
+.product-card-portrait .product-img img { object-fit: cover; object-position: center top; }
+.product-card-portrait:hover .product-img img { transform: none; }
+.product-img .product-img-alt { opacity: 0; transition: opacity 0.35s ease; }
+.product-card-portrait:hover .product-img-alt { opacity: 1; }
+.product-card-portrait .product-info { padding: 10px 12px 0; gap: 3px; }
+.product-card-portrait .product-brand { color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-transform: none; letter-spacing: 0; }
+.product-card-portrait .product-name { color: var(--text-muted); font-size: var(--fs-sm); font-weight: 400; -webkit-line-clamp: 1; }
+.product-card-portrait:hover .product-name { color: var(--text-muted); }
+.product-card-portrait .price { gap: 6px; }
+.product-card-portrait .price-now { font-size: var(--fs-md); font-weight: 700; }
+.product-card-portrait .price-mrp, .product-card-portrait .price-off { font-size: var(--fs-xs); }
+.product-card-portrait > .btn { margin: 10px 12px 0; width: calc(100% - 24px); }
+.product-card-portrait .badge-360 { top: 8px; left: 8px; }
+
 /* ---------- Rails ---------- */
 .rail { overflow: hidden; }
 .rail-head { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--border-light); }
@@ -92,15 +109,21 @@
 
 /* ---------- Product detail ---------- */
 .page-detail { display: flex; flex-direction: column; gap: var(--gap); }
-.detail { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 24px; padding: 16px; }
+.detail { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; padding: 16px; }
 .detail-gallery { position: sticky; top: calc(var(--nav-height) + 12px); align-self: start; display: grid; grid-template-columns: 64px 1fr; gap: 12px; }
 .thumbs { display: flex; flex-direction: column; gap: 8px; }
 .thumbs button { width: 64px; height: 64px; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .thumbs button.active { border: 2px solid var(--brand); }
 .thumbs img { width: 100%; height: 100%; object-fit: contain; }
-.main-image { position: relative; border: 1px solid var(--border-light); border-radius: var(--radius-sm); aspect-ratio: 1; display: grid; place-items: center; padding: 16px; }
-.main-image > img { width: 100%; height: 100%; object-fit: contain; }
+.main-image { position: relative; overflow: hidden; border: 1px solid var(--border-light); border-radius: var(--radius-sm); aspect-ratio: 1; display: grid; place-items: center; padding: 16px; background: #fff; }
+.zoom-frame { width: 100%; height: 100%; overflow: hidden; cursor: zoom-in; }
+.zoom-frame img { width: 100%; height: 100%; object-fit: contain; transition: transform 0.2s ease; }
+.zoom-frame.zooming img { transform: scale(2.2); transition: none; }
 .detail-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.detail-gallery-portrait .thumbs button { height: 85px; padding: 0; overflow: hidden; }
+.detail-gallery-portrait .thumbs img { object-fit: cover; object-position: center top; }
+.detail-gallery-portrait .main-image { aspect-ratio: 3 / 4; padding: 0; overflow: hidden; background: var(--bg); }
+.detail-gallery-portrait .zoom-frame img { object-fit: cover; object-position: center top; }
 
 /* ---------- 360° view ---------- */
 .badge-360 { position: absolute; top: 0; left: 0; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; background: var(--brand-light); color: var(--brand); font-size: 11px; font-weight: 700; }
@@ -189,7 +212,7 @@
 
 /* ---------- Grocery store page ---------- */
 .page-grocery { display: flex; flex-direction: column; gap: var(--gap); }
-.grocery-hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; align-items: center; padding: 28px 32px; border-radius: var(--radius-sm); background: linear-gradient(120deg, #1b7a3a 0%, #2e9e4f 100%); color: #fff; }
+.grocery-hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: center; padding: 20px 20px; border-radius: var(--radius-sm); background: linear-gradient(120deg, #1b7a3a 0%, #2e9e4f 100%); color: #fff; }
 .grocery-eyebrow { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.18); font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .grocery-hero h1 { font-size: var(--fs-2xl); margin: 10px 0 6px; }
 .grocery-hero p { color: #e3f4e8; }
@@ -229,3 +252,18 @@
 .type-chips button { flex-shrink: 0; padding: 7px 14px; border: 1px solid var(--border); border-radius: 18px; font-size: var(--fs-sm); font-weight: 600; background: var(--surface); transition: border-color var(--transition), color var(--transition), background var(--transition); }
 .type-chips button:hover { border-color: var(--brand); color: var(--brand); }
 .type-chips button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+/* "Still looking for these?" band: coloured backdrop, big white cards, discount badge on the photo */
+.off-badge { display: none; }
+.rail-highlight { background: linear-gradient(135deg, #6a1fd8, #8b3dff); border-radius: var(--radius-lg); box-shadow: none; }
+.rail-highlight .rail-head { border-bottom: 0; padding: 14px 16px 4px; }
+.rail-highlight .rail-head h2 { color: #fff; }
+.rail-highlight .rail-track { gap: 12px; padding: 10px 16px 16px; }
+.rail-highlight .product-card-compact { width: 230px; padding: 0 0 12px; border-radius: var(--radius); overflow: hidden; }
+.rail-highlight .product-card-compact .product-img { aspect-ratio: 1; background: #fff; }
+.rail-highlight .product-card-portrait .product-img { aspect-ratio: 1; }
+.rail-highlight .product-info { padding: 8px 10px 0; }
+.rail-highlight .off-badge { display: block; position: absolute; top: 0; left: 0; z-index: 1; padding: 3px 8px; border-radius: 0 0 var(--radius-sm) 0; background: var(--brand); color: #fff; font-size: var(--fs-sm); font-weight: 700; }
+.rail-highlight .rail-arrow { width: 44px; height: 44px; border-radius: 50%; right: 12px; }
+.rail-highlight .rail-arrow.left { left: 12px; }
+@media (max-width: 560px) { .rail-highlight .product-card-compact { width: 160px; } }

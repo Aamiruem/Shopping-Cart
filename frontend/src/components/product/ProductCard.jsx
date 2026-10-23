@@ -6,6 +6,7 @@ import useShopActions from '../../hooks/useShopActions';
 import Icon from '../common/Icon';
 import Price from '../common/Price';
 import Rating from '../common/Rating';
+import { discountPercent } from '../../utils/format';
 
 // variant "grid" = listing pages, "compact" = horizontal home-page rails
 export default function ProductCard({ product, variant = 'grid' }) {
@@ -14,9 +15,13 @@ export default function ProductCard({ product, variant = 'grid' }) {
   const { addToCart, toggleWishlist } = useShopActions();
   const outOfStock = product.stock === 0;
   const wished = inWishlist(product._id);
+  const off = discountPercent(product.price, product.mrp);
+  // Clothing reads best as a full-bleed portrait photo (Flipkart / Myntra style); gadgets stay square
+  const portrait = product.category === 'fashion';
+  const hoverImage = portrait && product.images?.find((src) => src !== product.image);
 
   return (
-    <article className={`product-card product-card-${variant}`}>
+    <article className={`product-card product-card-${variant} ${portrait ? 'product-card-portrait' : ''}`}>
       <button
         type="button"
         className={`wish-btn ${wished ? 'active' : ''}`}
@@ -29,8 +34,10 @@ export default function ProductCard({ product, variant = 'grid' }) {
 
       <Link to={productPath(product)} className="product-link">
         <div className="product-img">
-          <img src={product.image} alt={product.name} loading="lazy" />
+          <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
+          {hoverImage && <img className="product-img-alt" src={hoverImage} alt="" loading="lazy" decoding="async" aria-hidden="true" />}
           {outOfStock && <span className="stock-flag">Sold out</span>}
+          {off >= 10 && <span className="off-badge" aria-hidden="true">↓{off}%</span>}
           {product.images360?.length >= 4 && <span className="badge-360"><Icon name="rotate" size={11} /> 360°</span>}
         </div>
         <div className="product-info">

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { EmptyState, ErrorMessage, Spinner } from '../../components/common/Feedback';
 import Icon from '../../components/common/Icon';
+import BulkImport from '../../components/seller/BulkImport';
 import ProductForm from '../../components/seller/ProductForm';
 import { categoryLabel } from '../../constants/catalog';
 import { useToast } from '../../context/ToastContext';
@@ -36,6 +37,7 @@ export default function SellerProducts() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [editing, setEditing] = useState(undefined); // undefined = closed, null = new product
+  const [importing, setImporting] = useState(false);
   const { data: products, error, loading, reload } = useApi(() => api.sellerProducts({ q: search, status }), [search, status]);
   const [rows, setRows] = useState([]);
   const [selected, setSelected] = useState(new Set());
@@ -113,7 +115,10 @@ export default function SellerProducts() {
           <h1>Products</h1>
           <p className="muted small">{rows.length} products · edit price and stock in the table, tick rows for bulk actions</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => setEditing(null)}><Icon name="plus" size={16} /> Add product</button>
+        <div className="seller-head-actions">
+          <button type="button" className="btn btn-outline" onClick={() => setImporting(true)}><Icon name="upload" size={16} /> Bulk upload</button>
+          <button type="button" className="btn btn-primary" onClick={() => setEditing(null)}><Icon name="plus" size={16} /> Add product</button>
+        </div>
       </header>
 
       <div className="seller-toolbar">
@@ -191,6 +196,9 @@ export default function SellerProducts() {
       )}
 
       {editing !== undefined && <ProductForm product={editing} onSaved={onSaved} onClose={() => setEditing(undefined)} />}
+      {importing && (
+        <BulkImport onClose={() => setImporting(false)} onImported={(n) => { toast.show(`${n} product(s) added to your store`); reload(); }} />
+      )}
     </div>
   );
 }

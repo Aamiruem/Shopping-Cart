@@ -7,7 +7,7 @@
 .hero-slide {
   flex: 0 0 calc((100% - (var(--per-view) - 1) * var(--hero-gap)) / var(--per-view));
   position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  min-height: 250px; padding: 24px 20px 24px 26px; border-radius: var(--radius-lg); color: #fff; overflow: hidden;
+  min-height: 250px; padding: 16px 20px 16px 18px; border-radius: var(--radius-lg); color: #fff; overflow: hidden;
 }
 .hero-slide::before { content: ''; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); }
 .hero-copy { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
@@ -30,8 +30,10 @@
   display: grid; place-items: center; background: #fff; color: var(--text); box-shadow: var(--shadow); transition: box-shadow var(--transition);
 }
 .hero-arrow:hover { box-shadow: var(--shadow-lg); }
-.hero-arrow.left { left: -12px; }
-.hero-arrow.right { right: -12px; }
+.hero-arrow.left { left: 8px; }
+.hero .hero-arrow { opacity: 0; transition: opacity var(--transition), box-shadow var(--transition); }
+.hero:hover .hero-arrow, .hero .hero-arrow:focus-visible { opacity: 1; }
+.hero-arrow.right { right: 8px; }
 .hero-dots { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
 .hero-dots button { width: 7px; height: 7px; border-radius: 4px; background: var(--border); transition: width var(--transition), background var(--transition); }
 .hero-dots button.active { width: 20px; background: var(--text-muted); }
@@ -54,7 +56,7 @@
 .video-controls { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 8px; }
 .video-controls button { width: 36px; height: 36px; border-radius: 50%; background: rgba(0, 0, 0, 0.55); color: #fff; display: grid; place-items: center; backdrop-filter: blur(4px); }
 .video-controls button:hover { background: rgba(0, 0, 0, 0.75); }
-.promo-copy { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 12px; padding: 32px; background: linear-gradient(160deg, #fff8e1, #fff); }
+.promo-copy { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 12px; padding: 20px; background: linear-gradient(160deg, #fff8e1, #fff); }
 .promo-copy .hero-eyebrow { background: var(--success-bg); color: var(--success); }
 .promo-copy h2 { font-size: var(--fs-2xl); font-weight: 800; line-height: 1.15; }
 .promo-copy p { color: #555; }
@@ -70,7 +72,7 @@
 }
 
 /* ---------- Quick links (account shortcuts at the top of the home page) ---------- */
-.quick-links { display: flex; align-items: center; gap: 16px 24px; flex-wrap: wrap; padding: 14px 20px; }
+.quick-links { display: flex; align-items: center; gap: 16px 16px; flex-wrap: wrap; padding: 14px 20px; }
 .quick-hello { display: flex; flex-direction: column; gap: 2px; min-width: 200px; }
 .quick-hello strong { font-size: var(--fs-lg); }
 .quick-hello span { color: var(--text-muted); font-size: var(--fs-sm); }

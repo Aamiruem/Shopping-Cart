@@ -3,15 +3,16 @@ import { Link } from 'react-router-dom';
 import Icon from '../common/Icon';
 import ProductCard from './ProductCard';
 
-// A white home-page section with a title and a horizontally scrolling row
-export default function ProductRail({ title, subtitle, products, viewAll, aside, loading }) {
+// A home-page section with a title and a horizontally scrolling row; tone="highlight" is the coloured
+// Flipkart-style band (big white cards, discount badge) used for "still looking for these?"
+export default function ProductRail({ title, subtitle, products, viewAll, aside, loading, tone }) {
   const scroller = useRef(null);
   const scroll = (dir) => scroller.current?.scrollBy({ left: dir * scroller.current.clientWidth * 0.8, behavior: 'smooth' });
 
   if (!loading && !products.length) return null;
 
   return (
-    <section className="rail panel">
+    <section className={`rail panel ${tone ? `rail-${tone}` : ''}`}>
       <header className="rail-head">
         <div>
           <h2>{title}</h2>

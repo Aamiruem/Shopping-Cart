@@ -67,7 +67,7 @@ function useDropdown() {
 function MenuLink({ to, icon, label, count, state }) {
   return (
     <Link to={to} state={state} className="menu-link">
-      <Icon name={icon} size={18} />
+      <Icon name={icon} size={18} strokeWidth={1.6} />
       <span>{label}</span>
       {count > 0 && <span className="menu-count">{count}</span>}
     </Link>
@@ -110,6 +110,7 @@ function AccountMenu() {
               <p>New customer? <Link to="/register">Sign Up</Link></p>
             </div>
           )}
+          <p className="menu-title">Your Account</p>
           {links.map((l) => <MenuLink key={l.to} {...l} />)}
           {user && (
             <button type="button" className="menu-link menu-logout" onClick={onLogout}>
@@ -137,6 +138,7 @@ function MoreMenu() {
       {open && (
         <div className="menu-panel menu-panel-more">
           <p className="menu-title">More</p>
+          {!isSellerRole(user) && <MenuLink to="/sell" icon="store" label="Become a Seller" />}
           <MenuLink to="/products" icon="grid" label="Shop all products" />
           <MenuLink to="/grocery" icon="home" label="Grocery Store" />
           {/* Seller Hub: sellers and admins only, and only in this menu */}
@@ -146,7 +148,7 @@ function MoreMenu() {
             <Icon name="message" size={18} /> <span>Chat with our assistant</span>
           </button>
           <button type="button" className="menu-link" onClick={() => soundStore.setMuted(!muted)} aria-pressed={!muted}>
-            <Icon name={muted ? 'volumeOff' : 'volume'} size={18} /> <span>Sounds</span>
+            <Icon name={muted ? 'volumeOff' : 'volume'} size={18} /> <span>Notification sounds</span>
             <span className={`menu-switch ${muted ? '' : 'on'}`} aria-hidden="true" />
           </button>
         </div>

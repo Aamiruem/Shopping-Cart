@@ -98,11 +98,15 @@ export default function Home() {
   });
   const deals = useProducts({ featured: 'true', sort: 'popularity', limit: 100 });
   const [recent] = useState(getRecentlyViewed);
+  const { user } = useAuth();
 
   return (
     <div className="page-home container">
       <QuickLinks />
       <HeroCarousel />
+      {recent.length > 0 && (
+        <ProductRail tone="highlight" title={user ? `${user.name.split(' ')[0]}, still looking for these?` : 'Still looking for these?'} products={recent} />
+      )}
       <ShopByNeed />
       <SeasonCollections />
       <ErrorMessage message={deals.error && `Couldn't load products: ${deals.error}`} />
@@ -122,7 +126,6 @@ export default function Home() {
       <PromoVideo />
       {RAILS.slice(3).map((r) => <Rail key={r.key} {...r} />)}
 
-      {recent.length > 0 && <ProductRail title="Recently Viewed" products={recent} />}
     </div>
   );
 }

@@ -22,6 +22,8 @@ NEW_FIELDS = ("audience", "images360", "unit", "imageCredit")
 # Placeholder values from the first seed that products.json has since replaced (e.g. one "groceries"
 # sub-category before grocery was split into aisles); these are overwritten, real seller edits are not
 LEGACY_VALUES = {"subCategory": {"groceries"}}
+# Main images that were 300 px catalog thumbnails; swapped for the full-size photo (sellers never upload these)
+LEGACY_IMAGE_MARK = "cdn.dummyjson.com/product-images/"
 
 
 async def seller_ids_by_category(pool) -> dict[str, int]:
@@ -36,7 +38,7 @@ async def main() -> None:
     try:
         sellers = await seller_ids_by_category(pool)
         catalog = json.loads(PRODUCTS_FILE.read_text(encoding="utf-8"))
-        fields = dict.fromkeys([*NEW_FIELDS, *LEGACY_VALUES], 1)
+        fields = dict.fromkeys([*NEW_FIELDS, *LEGACY_VALUES, "image"], 1)
         existing = {p["name"]: p async for p in db.products.find({}, {"name": 1, **fields})}
         now = datetime.now(UTC)
         inserted = updated = 0
@@ -52,6 +54,9 @@ async def main() -> None:
                 continue
             missing = {f: item[f] for f in NEW_FIELDS if f in item and not current.get(f)}
             missing |= {f: item[f] for f, old in LEGACY_VALUES.items() if current.get(f) in old and item.get(f) not in old}
+            image = current.get("image") or ""
+            if LEGACY_IMAGE_MARK in image and "/thumbnail." in image and item["image"] != image:
+                missing["image"] = item["image"]
             if missing:
                 await db.products.update_one({"_id": current["_id"]}, {"$set": missing})
                 updated += 1

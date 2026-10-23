@@ -25,6 +25,21 @@ const OFFERS = [
   'No-cost EMI on orders above ₹3,000',
 ];
 
+// Main photo that magnifies under the pointer (Flipkart-style hover zoom); touch screens just see the photo
+function ZoomImage({ src, alt }) {
+  const [origin, setOrigin] = useState(null);
+  const move = (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setOrigin(`${((e.clientX - r.left) / r.width) * 100}% ${((e.clientY - r.top) / r.height) * 100}%`);
+  };
+  return (
+    <div className={`zoom-frame ${origin ? 'zooming' : ''}`} onPointerMove={move} onPointerLeave={() => setOrigin(null)}>
+      <img src={src} alt={alt} style={origin ? { transformOrigin: origin } : undefined} />
+    </div>
+  );
+}
+
 function DeliveryCheck() {
   const [pincode, setPincode] = useState('');
   const [result, setResult] = useState(null);
@@ -102,7 +117,7 @@ export default function ProductDetail() {
   return (
     <div className="page-detail container">
       <div className="detail panel">
-        <div className="detail-gallery">
+        <div className={`detail-gallery ${product.category === 'fashion' ? 'detail-gallery-portrait' : ''}`}>
           <div className="thumbs">
             {frames360 && (
               <button type="button" className={`thumb-360 ${show360 ? 'active' : ''}`} onClick={() => setActiveImage(SPIN_VIEW)} aria-label="360° view">
@@ -117,7 +132,7 @@ export default function ProductDetail() {
             ))}
           </div>
           <div className="main-image">
-            {show360 ? <Spin360 frames={frames360} alt={product.name} /> : <img src={images[activeImage]} alt={product.name} />}
+            {show360 ? <Spin360 frames={frames360} alt={product.name} /> : <ZoomImage src={images[activeImage]} alt={product.name} />}
             {frames360 && !show360 && (
               <button type="button" className="view-360-btn" onClick={() => setActiveImage(SPIN_VIEW)}>
                 <Icon name="rotate" size={14} /> View in 360°
