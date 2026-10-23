@@ -74,8 +74,25 @@ def test_media_rejected(kind, content_type, content, message):
 
 def test_media_too_big():
     with pytest.raises(ApiError) as err:
-        _validate(b"\x89PNG\r\n\x1a\n" + b"0" * (5 * 1024 * 1024), "image/png", "image")
-    assert "5 MB" in err.value.message
+        _validate(b"\x89PNG\r\n\x1a\n" + b"0" * (15 * 1024 * 1024), "image/png", "image")
+    assert "15 MB" in err.value.message
+
+
+def test_photos_are_optimised_to_webp():
+    import io
+
+    from PIL import Image
+
+    from app.services.storage import optimise_image
+
+    raw = io.BytesIO()
+    Image.new("RGB", (4000, 3000), (200, 30, 30)).save(raw, "JPEG", quality=95)
+    out = optimise_image(raw.getvalue())
+    img = Image.open(io.BytesIO(out))
+    assert img.format == "WEBP" and img.size == (1600, 1200)
+    assert len(out) < len(raw.getvalue())
+    with pytest.raises(ApiError):
+        optimise_image(b"\xff\xd8\xff not really a jpeg")
 
 
 def test_bank_details_encrypted_at_rest():

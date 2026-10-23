@@ -159,3 +159,6 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN NOT NULL DEFAU
 -- Payout bank account numbers are encrypted at rest; the last 4 digits are kept separately for display
 ALTER TABLE sellers ADD COLUMN IF NOT EXISTS bank_account_last4 VARCHAR(4);
 ALTER TABLE sellers ALTER COLUMN bank_account_number TYPE TEXT;
+
+-- Size / colour chosen for clothing and footwear lines
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS options JSONB;

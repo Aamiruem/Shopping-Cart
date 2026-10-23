@@ -389,3 +389,83 @@ def test_growth_advisor_reports_each_product(client):
     assert report["summary"]["products"] == 1 and report["summary"]["revenue30"] == 500
     customer_only, _ = _register(client)
     assert client.get("/api/analytics/growth", headers=customer_only).status_code == 403
+
+
+def test_sizes_colours_and_age_groups_flow_to_the_order(client):
+    seller = _seller(client)
+    shirt = _seller_product(
+        client,
+        seller,
+        name=f"Pytest Shirt {time.time_ns()}",
+        category="fashion",
+        audience="men",
+        sizes=["S", "M", "L"],
+        colors=["Navy", "White"],
+        ageGroups=["18-25", "26-35"],
+        material="Cotton",
+        fit="Slim",
+    )
+    customer, address = _customer_with_cart(client, _seller_product(client, seller)["_id"])
+    assert client.post("/api/cart", json={"productId": shirt["_id"], "qty": 1}, headers=customer).status_code == 400  # size needed
+    assert client.post("/api/cart", json={"productId": shirt["_id"], "size": "XXL"}, headers=customer).status_code == 400
+    client.post("/api/cart", json={"productId": shirt["_id"], "size": "M"}, headers=customer)
+    cart = client.post("/api/cart", json={"productId": shirt["_id"], "size": "L", "color": "White"}, headers=customer).json()
+    lines = [i for i in cart["items"] if i["productId"] == shirt["_id"]]
+    assert {(i["size"], i["color"]) for i in lines} == {("M", "Navy"), ("L", "White")}  # colour defaults to the first one
+    m_line = next(i for i in lines if i["size"] == "M")
+    cart = client.put(f"/api/cart/{m_line['lineId']}", json={"qty": 2}, headers=customer).json()
+    assert next(i for i in cart["items"] if i["lineId"] == m_line["lineId"])["qty"] == 2
+
+    # Filters see the attributes
+    by_size = client.get("/api/products", params={"category": "fashion", "size": "M", "ageGroup": "18-25"}).json()
+    assert shirt["_id"] in {p["_id"] for p in by_size}
+    assert "M" in client.get("/api/products/facets", params={"category": "fashion"}).json()["sizes"]
+
+    order = client.post("/api/orders", json={"addressId": address["id"], "paymentMethod": "cod"}, headers=customer).json()
+    items = client.get(f"/api/orders/{order['id']}", headers=customer).json()["items"]
+    assert sorted((i.get("options") or {}).get("size", "") for i in items if i["product_id"] == shirt["_id"]) == ["L", "M"]
+    seller_view = next(o for o in client.get("/api/seller/orders", headers=seller).json() if o["id"] == order["id"])
+    assert {(i["options"] or {}).get("size") for i in seller_view["items"] if i["productId"] == shirt["_id"]} == {"M", "L"}
+
+
+def test_bulk_import_from_sheet_and_zip(client):
+    import io
+    import zipfile
+
+    from PIL import Image
+
+    seller = _seller(client)
+    photo = io.BytesIO()
+    Image.new("RGB", (2400, 3200), (20, 40, 160)).save(photo, "JPEG")
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as z:
+        for name in ("jeans-front.jpg", "jeans-back.jpg", "kurta-front.jpg"):
+            z.writestr(f"photos/{name}", photo.getvalue())
+        z.writestr("walk.mp4", b"\x00\x00\x00\x18ftypmp42" + b"0" * 100)
+    tag = time.time_ns()
+    sheet = (
+        "name,brand,category,audience,ageGroups,sizes,colors,price,mrp,stock,images,video,tags\n"
+        f"Pytest Jeans {tag},Urban Thread,fashion,men,18-25|26-35,30|32|34,Blue,1299,2499,50,"
+        "jeans-front.jpg|JEANS-BACK.jpg,walk.mp4,jeans|denim\n"
+        f"Pytest Kurta {tag},Ethnix,fashion,women,26-35,S|M|L,Teal,799,1599,40,kurta-front.jpg,,kurta\n"
+        f"Pytest Broken {tag},,fashion,women,,,,,,,missing.jpg,,\n"
+    ).encode()
+    files = lambda: {"sheet": ("products.csv", sheet, "text/csv"), "media": ("media.zip", archive.getvalue(), "application/zip")}  # noqa: E731
+
+    check = client.post("/api/seller/imports", files=files(), data={"dryRun": "true"}, headers=seller).json()
+    assert check["dryRun"] and check["ok"] == 2
+    assert "missing.jpg" in next(r for r in check["results"] if r["status"] == "error")["error"]
+
+    job = client.post("/api/seller/imports", files=files(), headers=seller).json()
+    for _ in range(100):
+        status = client.get(f"/api/seller/imports/{job['jobId']}", headers=seller).json()
+        if status["status"] != "running":
+            break
+        time.sleep(0.1)
+    assert status["status"] == "finished" and status["created"] == 2
+    jeans_id = next(r["productId"] for r in status["results"] if r["name"].startswith("Pytest Jeans"))
+    jeans = client.get(f"/api/seller/products/{jeans_id}", headers=seller).json()
+    assert len(jeans["images"]) == 2 and all(u.endswith(".webp") for u in jeans["images"])  # optimised on the way in
+    assert jeans["videos"] and jeans["sizes"] == ["30", "32", "34"] and jeans["ageGroups"] == ["18-25", "26-35"]
+    assert client.get(f"/api/seller/imports/{job['jobId']}", headers=_seller(client)).status_code == 404  # other sellers can't see it
+    assert "name,brand" in client.get("/api/seller/imports/template", headers=seller).text

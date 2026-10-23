@@ -14,6 +14,11 @@ PAYMENT_METHODS = ("cod", "upi", "card", "netbanking", "wallet", "emi")
 FULFILMENT_STEPS = ("pending", "packed", "shipped", "delivered")
 
 
+def _options(item: dict) -> dict | None:
+    """Size / colour of a clothing line (the asyncpg codec stores the dict as jsonb)."""
+    return {k: item[k] for k in ("size", "color") if item.get(k)} or None
+
+
 def format_address(a) -> str:
     return f"{a['name']}, {a['line1']}, {a['city']}, {a['state']} - {a['pincode']}. Phone: {a['phone']}"
 
@@ -61,10 +66,10 @@ async def place_order(
             summary["deliveryFee"],
         )
         await conn.executemany(
-            """INSERT INTO order_items (order_id, product_id, name, price, qty, image, seller_id, category)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+            """INSERT INTO order_items (order_id, product_id, name, price, qty, image, seller_id, category, options)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)""",
             [
-                (order["id"], i["productId"], i["name"], i["price"], i["qty"], i["image"], i["sellerId"], i["category"])
+                (order["id"], i["productId"], i["name"], i["price"], i["qty"], i["image"], i["sellerId"], i["category"], _options(i))
                 for i in summary["items"]
             ],
         )

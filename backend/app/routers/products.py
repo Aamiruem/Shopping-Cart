@@ -54,6 +54,9 @@ async def list_products(
     audience: str | None = None,
     use: str | None = None,
     subCategory: str | None = None,
+    size: str | None = None,
+    color: str | None = None,
+    ageGroup: str | None = None,
     brand: str | None = None,
     minPrice: str | None = None,
     maxPrice: str | None = None,
@@ -66,6 +69,9 @@ async def list_products(
     query = _base_filter(q, category, audience, use)
     if subCategory:
         query["subCategory"] = subCategory
+    for field, value in (("sizes", size), ("colors", color), ("ageGroups", ageGroup)):
+        if value:
+            query[field] = {"$in": value.split(",")}
     if brand:
         query["brand"] = {"$in": brand.split(",")}
     low, high = _number(minPrice), _number(maxPrice)
@@ -77,7 +83,8 @@ async def list_products(
         query["featured"] = True
 
     limit = max(1, min(limit, 200))
-    key = f"catalog:list:{q}|{category}|{audience}|{use}|{subCategory}|{brand}|{minPrice}|{maxPrice}|{minRating}|{sort}|{featured}|{limit}"
+    parts = (q, category, audience, use, subCategory, size, color, ageGroup, brand, minPrice, maxPrice, minRating, sort, featured, limit)
+    key = "catalog:list:" + "|".join(str(x) for x in parts)
     return await cached(key, CATALOG_TTL, lambda: _search(query, q, sort, limit))
 
 
@@ -160,7 +167,28 @@ async def _facets(q, category, audience, use):
         )
     ]
     price = ranges[0] if ranges else {"min": 0, "max": 0}
-    return {"brands": sorted(b for b in brands if b), "minPrice": price["min"], "maxPrice": price["max"]}
+    sizes = [s for s in await db.products.distinct("sizes", query) if s]
+    colors = [c for c in await db.products.distinct("colors", query) if c]
+    return {
+        "brands": sorted(b for b in brands if b),
+        "minPrice": price["min"],
+        "maxPrice": price["max"],
+        "sizes": sorted(sizes, key=_size_order),
+        "colors": sorted(colors),
+    }
+
+
+SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "Free Size"]
+
+
+def _size_order(size: str):
+    """Letter sizes in wearing order, then numeric sizes (waist / shoe) by number."""
+    if size in SIZE_ORDER:
+        return (0, SIZE_ORDER.index(size), 0.0)
+    try:
+        return (1, 0, float(size))
+    except ValueError:
+        return (2, 0, 0.0)
 
 
 @router.get("/{product_id}")

@@ -276,7 +276,7 @@ async def upload_media(
     kind: Literal["image", "video", "audio"] = Query("image"),
     user: CurrentUser = Depends(require_seller),
 ):
-    """Uploads product media to S3 (production) or local storage: images up to 5 MB, audio 10 MB, videos 50 MB."""
+    """Uploads product media to S3 (production) or local storage: photos up to 15 MB (optimised to WebP), audio 10 MB, videos 50 MB."""
     content = await file.read(MEDIA[kind]["max"] + 1)
     return {"url": await save_media(content, file.content_type or "", user.id, kind), "kind": kind}
 
@@ -300,7 +300,8 @@ async def my_orders(
     sql = f"""
         SELECT o.id, o.created_at, o.status, o.payment_method, split_part(o.address, ',', 1) AS customer, o.address,
                json_agg(json_build_object('productId', oi.product_id, 'name', oi.name, 'image', oi.image,
-                                          'price', oi.price, 'qty', oi.qty, 'fulfilment', oi.fulfilment) ORDER BY oi.id) AS items,
+                                          'price', oi.price, 'qty', oi.qty, 'fulfilment', oi.fulfilment,
+                                          'options', oi.options) ORDER BY oi.id) AS items,
                SUM(oi.price * oi.qty) AS amount,
                MIN(array_position(ARRAY['pending','packed','shipped','delivered'], oi.fulfilment::text)) AS step,
                (SELECT p.status FROM payments p WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1) AS payment_status

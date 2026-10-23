@@ -31,6 +31,12 @@ class ProductIn(BaseModel):
     videos: list[str] = Field(default_factory=list, max_length=4)
     audio: str = Field(default="", max_length=1000)
     unit: str = Field(default="", max_length=40)  # pack size, e.g. "500 g" or "1 L"
+    # Clothing & footwear details: shoppers pick a size (and colour) before adding to cart
+    sizes: list[str] = Field(default_factory=list, max_length=20)  # e.g. ["S", "M", "L"] or ["28", "30", "32"]
+    colors: list[str] = Field(default_factory=list, max_length=20)
+    ageGroups: list[Literal["18-25", "26-35", "36-50", "50+"]] = Field(default_factory=list, max_length=4)
+    material: str = Field(default="", max_length=80)
+    fit: str = Field(default="", max_length=40)  # e.g. Slim, Regular, Relaxed
     active: bool = True
     featured: bool = False  # only admins may set this
 
@@ -60,6 +66,11 @@ class ProductIn(BaseModel):
         if value and not MEDIA_URL.match(value):
             raise ValueError("media must be an https link or an uploaded file")
         return value
+
+    @field_validator("sizes", "colors")
+    @classmethod
+    def clean_options(cls, value: list[str]) -> list[str]:
+        return list(dict.fromkeys(v.strip()[:20] for v in value if v and v.strip()))
 
     @field_validator("tags")
     @classmethod

@@ -18,7 +18,7 @@ def _ftyp(content: bytes) -> bool:  # MP4 / M4A containers: "ftyp" box at byte 4
 # kind -> allowed content types (with file extension and a signature check, so a renamed .exe can't pose as media)
 MEDIA = {
     "image": {
-        "max": 5 * MB,
+        "max": 15 * MB,  # phone photos are fine: they are optimised to ~1600 px WebP on upload
         "label": "JPEG, PNG or WebP image",
         "types": {
             "image/jpeg": (".jpg", lambda c: c.startswith(b"\xff\xd8\xff")),
@@ -75,9 +75,33 @@ def _put_s3(key: str, content: bytes, content_type: str) -> str:
     return f"{base}/{key}"
 
 
+MAX_SIDE = 1600  # px: sharp on retina product pages, small enough to load fast
+
+
+def optimise_image(content: bytes) -> bytes:
+    """Upright (EXIF orientation), at most MAX_SIDE px, WebP. Keeps transparency. Raises ApiError on a broken image."""
+    import io
+
+    from PIL import Image, ImageOps, UnidentifiedImageError
+
+    try:
+        with Image.open(io.BytesIO(content)) as img:
+            img = ImageOps.exif_transpose(img)
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGBA" if "A" in img.getbands() or img.mode == "P" else "RGB")
+            img.thumbnail((MAX_SIDE, MAX_SIDE), Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            img.save(out, "WEBP", quality=82, method=4)
+            return out.getvalue()
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        raise ApiError(400, "The image could not be read. Please upload a JPEG, PNG or WebP photo.") from None
+
+
 async def save_media(content: bytes, content_type: str, seller_id: int, kind: str = "image") -> str:
     """Stores a product image / video / audio file and returns its public URL."""
     ext = _validate(content, content_type, kind)
+    if kind == "image":
+        content, content_type, ext = await asyncio.to_thread(optimise_image, content), "image/webp", ".webp"
     name = f"{uuid.uuid4().hex}{ext}"
     settings = get_settings()
     if settings.s3_bucket:
