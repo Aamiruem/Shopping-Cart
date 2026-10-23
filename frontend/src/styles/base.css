@@ -104,7 +104,11 @@ fieldset.field { border: 0; padding: 0; margin: 0; }
   pointer-events: none; transition: all var(--transition);
 }
 .field.floating input:focus ~ span,
-.field.floating input:not(:placeholder-shown) ~ span { top: 0; font-size: var(--fs-xs); color: var(--brand); }
+.field.floating input:not(:placeholder-shown) ~ span,
+.field.floating input:-webkit-autofill ~ span { top: 0; font-size: var(--fs-xs); color: var(--brand); }
+.field.floating input:autofill ~ span { top: 0; font-size: var(--fs-xs); color: var(--brand); }
+/* keep autofilled fields white instead of the browser's yellow / blue tint */
+.field.floating input:-webkit-autofill { -webkit-box-shadow: 0 0 0 40px #fff inset; -webkit-text-fill-color: var(--text); }
 .field.floating .password-toggle { position: absolute; right: 0; bottom: 6px; }
 .field.invalid input { border-color: var(--error); }
 .field.invalid input ~ span { color: var(--error) !important; }

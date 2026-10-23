@@ -1,5 +1,5 @@
-"""/api/auth - verified-email signup, email + password login, Google sign-in, phone OTP (SMS / WhatsApp),
-profile and password."""
+"""/api/auth - verified-email signup, email + password login, one-time-code login (email or mobile),
+Google sign-in, phone OTP (SMS / WhatsApp), profile and password."""
 
 import asyncio
 from typing import Literal
@@ -44,6 +44,16 @@ class PhoneOtpIn(BaseModel):
 
 class PhoneVerifyIn(BaseModel):
     phone: str = ""
+    code: str = ""
+
+
+class OtpLoginIn(BaseModel):
+    identifier: str = ""  # email address or 10-digit mobile number
+    channel: Literal["sms", "whatsapp"] = "sms"  # mobile only; email codes always go by email
+
+
+class OtpLoginVerifyIn(BaseModel):
+    identifier: str = ""
     code: str = ""
 
 
@@ -196,6 +206,59 @@ async def login(body: LoginIn):
     if not u or not await asyncio.to_thread(verify_password, body.password, u["password_hash"]):
         raise ApiError(401, "Invalid email or password")
     await pool.execute("UPDATE users SET last_login = NOW() WHERE id = $1", u["id"])
+    return await session(dict(u))
+
+
+def _login_target(identifier: str) -> tuple[str, bool]:
+    """(normalised email or mobile number, is_email). Accepts "+91 98765 43210" style input for mobiles."""
+    raw = identifier.strip()
+    if "@" in raw:
+        email = v.normalize_email(raw)
+        if error := v.email_error(email):
+            raise ApiError(400, error)
+        return email, True
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if len(digits) == 12 and digits.startswith("91"):
+        digits = digits[2:]
+    if not digits or (error := v.phone_error(digits)):
+        raise ApiError(400, error or "Please enter your email address or mobile number")
+    return digits, False
+
+
+async def _login_user(target: str, is_email: bool) -> dict:
+    # Mobile login only for numbers the owner has verified: a number typed at signup proves nothing
+    if is_email:
+        u = await get_pool().fetchrow("SELECT * FROM users WHERE email = $1", target)
+    else:
+        u = await get_pool().fetchrow("SELECT * FROM users WHERE phone = $1 AND phone_verified ORDER BY id LIMIT 1", target)
+    if not u:
+        raise ApiError(
+            404,
+            "No Arvixa account uses this email. Please create an account."
+            if is_email
+            else "No account has verified this mobile number yet. Log in with your email, then verify the number in My Profile.",
+        )
+    return dict(u)
+
+
+@router.post("/otp", dependencies=[Depends(otp_limiter)])
+async def otp_login(body: OtpLoginIn):
+    """Passwordless login, step 1: sends a 6-digit code to the account's email, or by SMS / WhatsApp to its
+    verified mobile number."""
+    target, is_email = _login_target(body.identifier)
+    u = await _login_user(target, is_email)
+    return await send_code("login", target, "email" if is_email else body.channel, user_id=u["id"])
+
+
+@router.post("/otp/verify", dependencies=[Depends(auth_limiter)])
+async def otp_login_verify(body: OtpLoginVerifyIn):
+    """Passwordless login, step 2: a correct code signs the user in (and proves the email, if that was used)."""
+    target, is_email = _login_target(body.identifier)
+    row = await check_code("login", target, body.code)
+    verified = ", email_verified = TRUE" if is_email else ""
+    u = await get_pool().fetchrow(f"UPDATE users SET last_login = NOW(){verified} WHERE id = $1 RETURNING *", row["user_id"])
+    if not u:
+        raise ApiError(404, "User not found")
     return await session(dict(u))
 
 

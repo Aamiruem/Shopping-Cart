@@ -102,6 +102,9 @@ export const api = {
   phoneOtp: (phone, channel) => request('/auth/phone/otp', { method: 'POST', body: { phone, channel } }),
   phoneVerify: (phone, code) => request('/auth/phone/verify', { method: 'POST', body: { phone, code } }),
   login: (body) => request('/auth/login', { method: 'POST', body }),
+  // Passwordless login: code to the account's email, or SMS / WhatsApp to its verified mobile
+  otpLogin: (identifier, channel) => request('/auth/otp', { method: 'POST', body: { identifier, channel } }),
+  otpLoginVerify: (identifier, code) => request('/auth/otp/verify', { method: 'POST', body: { identifier, code } }),
   googleLogin: (credential) => request('/auth/google', { method: 'POST', body: { credential } }),
   me: () => request('/auth/me'),
   updateProfile: (body) => request('/auth/me', { method: 'PUT', body }),

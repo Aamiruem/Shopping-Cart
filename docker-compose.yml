@@ -47,6 +47,7 @@ services:
       TWILIO_WHATSAPP_FROM: ${TWILIO_WHATSAPP_FROM:-}
       DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-}
       SITE_URL: http://localhost:8080
+      FRONTEND_INDEX_URL: http://frontend/index.html  # server-rendered SEO heads for product / category pages
     ports: ["5000:5000"]
     volumes: [uploads:/app/uploads]
     depends_on:

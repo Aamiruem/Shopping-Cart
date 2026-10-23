@@ -376,6 +376,32 @@ def test_phone_verification_by_sms_and_whatsapp(client):
     assert changed["phoneVerified"] is False
 
 
+def test_login_with_one_time_code_by_email_or_verified_mobile(client):
+    headers, email = _register(client)
+    # Email: code goes to the account's address and signs in
+    sent = client.post("/api/auth/otp", json={"identifier": email.upper()})
+    assert sent.status_code == 200 and sent.json()["channel"] == "email"
+    wrong = "000000" if sent.json()["devCode"] != "000000" else "111111"
+    bad = client.post("/api/auth/otp/verify", json={"identifier": email, "code": wrong})
+    assert bad.status_code == 400
+    ok = client.post("/api/auth/otp/verify", json={"identifier": email, "code": sent.json()["devCode"]})
+    assert ok.status_code == 200 and ok.json()["user"]["email"] == email
+    # Mobile: refused until the owner has verified the number, then works with +91 / spaces
+    phone = f"8{time.time_ns() % 1_000_000_000:09d}"
+    client.put("/api/auth/me", json={"name": "Test Shopper", "phone": phone}, headers=headers)
+    assert client.post("/api/auth/otp", json={"identifier": phone}).status_code == 404
+    code = client.post("/api/auth/phone/otp", json={"phone": phone}, headers=headers).json()["devCode"]
+    client.post("/api/auth/phone/verify", json={"phone": phone, "code": code}, headers=headers)
+    spaced = f"+91 {phone[:5]} {phone[5:]}"
+    sent = client.post("/api/auth/otp", json={"identifier": spaced, "channel": "whatsapp"}).json()
+    assert sent["channel"] == "whatsapp" and sent["sentTo"].endswith(phone[-4:])
+    ok = client.post("/api/auth/otp/verify", json={"identifier": phone, "code": sent["devCode"]})
+    assert ok.status_code == 200 and ok.json()["user"]["phoneVerified"] is True
+    # Unknown accounts and junk input
+    assert client.post("/api/auth/otp", json={"identifier": f"nobody{time.time_ns()}@gmail.com"}).status_code == 404
+    assert client.post("/api/auth/otp", json={"identifier": "12345"}).status_code == 400
+
+
 def test_growth_advisor_reports_each_product(client):
     seller = _seller(client)
     product = _seller_product(client, seller)

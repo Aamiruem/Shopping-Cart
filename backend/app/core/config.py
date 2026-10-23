@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     ai_service_url: str = "http://localhost:8100"  # 8000 is often taken by other local FastAPI apps
     cors_origin: str = "http://localhost:5173"  # comma-separated list
     site_url: str = ""  # public storefront URL for sitemap / canonical links (default: first CORS origin)
+    # The built storefront's index.html (e.g. http://frontend/index.html in Docker). Lets /api/seo/page serve
+    # product and category pages with their title, description, preview card and content already in the HTML.
+    frontend_index_url: str = ""
 
     # Email (payment OTPs, support replies). Without SMTP_HOST emails are logged instead.
     smtp_host: str = ""

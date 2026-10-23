@@ -8,10 +8,12 @@ from pydantic import BaseModel, Field
 
 from ..core.config import get_settings
 from ..core.errors import ApiError
+from ..core.lazy import lazy_import
 from ..core.rate_limit import rate_limit
 from ..db.postgres import get_pool, rows
 from ..deps import CurrentUser, get_current_user, require_admin
-from ..ml import support as support_ml
+
+support_ml = lazy_import("app.ml.support")  # scikit-learn loads on the first ticket, not at startup
 
 router = APIRouter(prefix="/api/support", tags=["support"])
 ticket_limiter = rate_limit(10, 60 * 60, "You've raised many tickets in the last hour. Our team will get back to you soon.")

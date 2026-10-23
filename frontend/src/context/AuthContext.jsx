@@ -33,6 +33,7 @@ export function AuthProvider({ children }) {
     user,
     ready,
     login: async (email, password) => saveSession(await api.login({ email, password })),
+    otpLogin: async (identifier, code) => saveSession(await api.otpLoginVerify(identifier, code)),
     // Signup is two steps: register() emails a code, verifySignup() creates the account and signs in
     register: (form) => api.register(form),
     verifySignup: async (email, code) => saveSession(await api.verifySignup({ email, code })),

@@ -142,7 +142,7 @@ CREATE INDEX IF NOT EXISTS payments_order_idx ON payments (order_id);
 -- Codes are stored only as an HMAC. A signup is held here (payload) until its email code is confirmed.
 CREATE TABLE IF NOT EXISTS verification_codes (
   id         SERIAL PRIMARY KEY,
-  purpose    VARCHAR(20)  NOT NULL,          -- signup | phone | payout
+  purpose    VARCHAR(20)  NOT NULL,          -- signup | login | phone | payout
   target     VARCHAR(255) NOT NULL,          -- email address or phone number
   channel    VARCHAR(10)  NOT NULL,          -- email | sms | whatsapp
   user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,

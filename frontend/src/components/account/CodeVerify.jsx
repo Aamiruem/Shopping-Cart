@@ -3,6 +3,31 @@ import Icon from '../common/Icon';
 
 const RESEND_SECONDS = 30;
 
+// Six digit boxes over one real input, so paste, SMS autofill (one-time-code) and screen readers all just work
+function OtpBoxes({ value, onChange, inputRef }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div className={`otp-boxes ${focused ? 'focused' : ''}`} onClick={() => inputRef.current?.focus()}>
+      {Array.from({ length: 6 }, (_, i) => (
+        <span key={i} className={`otp-box ${value[i] ? 'filled' : ''} ${focused && i === Math.min(value.length, 5) ? 'active' : ''}`} aria-hidden="true">
+          {value[i] || ''}
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        className="otp-boxes-input"
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        aria-label="6-digit verification code"
+      />
+    </div>
+  );
+}
+
 // 6-digit code entry shared by signup (email), phone (SMS / WhatsApp) and payout confirmation.
 // `info` = what the API returned when it sent the code: { sentTo, channel, devCode? }
 export default function CodeVerify({ title, info, onVerify, onResend, onBack, verifyLabel = 'Verify' }) {
@@ -23,18 +48,30 @@ export default function CodeVerify({ title, info, onVerify, onResend, onBack, ve
 
   const via = { email: 'email', sms: 'SMS', whatsapp: 'WhatsApp' }[sent?.channel] || 'email';
 
-  const submit = async (e) => {
-    e.preventDefault();
-    e.stopPropagation(); // never also submit a surrounding form (e.g. the profile form)
-    if (!/^\d{6}$/.test(code)) return setError('Please enter the 6-digit code');
+  const verify = async (value) => {
     setBusy(true);
     setError('');
     try {
-      await onVerify(code);
+      await onVerify(value);
     } catch (err) {
       setError(err.message);
+      setCode('');
       setBusy(false);
+      inputRef.current?.focus();
     }
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // never also submit a surrounding form (e.g. the profile form)
+    if (!/^\d{6}$/.test(code)) return setError('Please enter the 6-digit code');
+    verify(code);
+  };
+
+  // Verify as soon as the sixth digit is typed or pasted
+  const onCode = (value) => {
+    setCode(value);
+    if (value.length === 6 && !busy) verify(value);
   };
 
   const resend = async () => {
@@ -56,16 +93,7 @@ export default function CodeVerify({ title, info, onVerify, onResend, onBack, ve
       {sent?.devCode && (
         <p className="otp-dev"><Icon name="zap" size={12} /> Dev mode ({via} not connected yet): your code is <code>{sent.devCode}</code></p>
       )}
-      <input
-        ref={inputRef}
-        className="otp-input"
-        value={code}
-        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        placeholder="••••••"
-        aria-label="6-digit verification code"
-      />
+      <OtpBoxes value={code} onChange={onCode} inputRef={inputRef} />
       {error && <p className="alert alert-error" role="alert">{error}</p>}
       <button type="submit" className="btn btn-buy btn-lg btn-block" disabled={busy || code.length !== 6}>{busy ? 'Verifying…' : verifyLabel}</button>
       <p className="code-actions small">

@@ -96,7 +96,7 @@ python -m venv .venv && .venv\Scripts\activate          # macOS/Linux: source .v
 pip install -r requirements.txt
 cp .env.example .env                                      # set DATABASE_URL to your PostgreSQL user/password
 python -m scripts.seed
-uvicorn app.main:app --reload --port 5000
+uvicorn app.main:app --reload --port 5000                # or: python app/main.py (also works from backend/app)
 
 # Storefront (http://localhost:5173)
 cd frontend && npm install && npm run dev
@@ -106,8 +106,13 @@ cd ai-service && python -m venv .venv && .venv\Scripts\activate && pip install -
 uvicorn app.main:app --port 8100                         # 8100: port 8000 is often used by other local apps
 ```
 
-After the first setup, `powershell -ExecutionPolicy Bypass -File .\start-dev.ps1` starts all three in their
-own windows. If the storefront says "Our server is not responding", the API on port 5000 is not running.
+After the first setup one command starts all three: `powershell -ExecutionPolicy Bypass -File .\start-dev.ps1`
+on Windows (separate windows), or `./start-dev.sh` on macOS / Linux / Git Bash (Ctrl+C stops them). If the
+storefront says "Our server is not responding", the API on port 5000 is not running; "Port 5173 is already in use"
+means an old dev server is still open.
+
+The API starts in about a second and stays light: pandas, NumPy and scikit-learn load only when a seller
+dashboard, recommendation or support-ticket endpoint is first used (`app/core/lazy.py`).
 
 ### Demo accounts (created by the seed)
 
@@ -156,8 +161,11 @@ in Secrets Manager.
   worker processes (`WEB_CONCURRENCY`).
 - **SEO:** readable product URLs (`/products/<id>/<slug>`), per-page titles, descriptions, canonical links,
   Open Graph / Twitter cards, schema.org `Product` (price, stock, rating), `BreadcrumbList`, `ItemList`,
-  `Organization` and `WebSite` search box data, a live `/sitemap.xml` and `/robots.txt`. The storefront is a
-  single-page app: Google renders it, but for other crawlers add prerendering (or move to SSR) before launch.
+  `Organization` and `WebSite` search box data, a live `/sitemap.xml` and `/robots.txt`. Product and category
+  pages are also served with all of that already in the HTML (nginx sends them to `/api/seo/page`, which fills
+  in the built `index.html`; set `FRONTEND_INDEX_URL`), plus a plain-HTML copy of the content, so Bing and link
+  previews on WhatsApp, Facebook, X and LinkedIn show the right product, price and photo - not only Google. If
+  the API is down nginx serves the plain app. On AWS (CloudFront + S3) route `/products*` to the API the same way.
 - **Seller growth tools:** the Growth advisor (Seller Hub -> Analytics) ranks products by the sales each fix could
   unlock (pricing vs similar items, listing quality, stock, demand trends, cart drop-off); the AI listing writer
   drafts SEO titles, descriptions and tags (Claude with `ANTHROPIC_API_KEY`, a template otherwise).

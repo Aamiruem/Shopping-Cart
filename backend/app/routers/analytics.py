@@ -7,23 +7,26 @@ Results are cached (settings.analytics_cache_minutes); POST /retrain clears the 
 import asyncio
 import io
 
-import pandas as pd
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from ..core.config import get_settings
 from ..core.errors import ApiError
+from ..core.lazy import lazy_import
 from ..db.mongo import get_db
 from ..db.postgres import get_pool, rows
 from ..deps import CurrentUser, require_admin, require_seller
 from ..ml import cache
-from ..ml import support as support_ml
-from ..ml.bestsellers import predict_bestsellers
-from ..ml.customers import cohort_retention, predict_churn, segment_customers
-from ..ml.data import completed, load_dataset, load_events, local_today
-from ..ml.forecasting import forecast_revenue
-from ..ml.growth import growth_report
-from ..ml.overview import overview as build_overview
+
+# pandas / scikit-learn load on the first analytics request, not at API startup
+pd = lazy_import("pandas")
+support_ml = lazy_import("app.ml.support")
+ml_bestsellers = lazy_import("app.ml.bestsellers")
+ml_customers = lazy_import("app.ml.customers")
+ml_data = lazy_import("app.ml.data")
+ml_forecasting = lazy_import("app.ml.forecasting")
+ml_growth = lazy_import("app.ml.growth")
+ml_overview = lazy_import("app.ml.overview")
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
@@ -52,8 +55,8 @@ async def overview(days: int = 30, sellerId: int | None = None, user: CurrentUse
     scope = _scope(user, sellerId)
 
     async def compute():
-        data = await load_dataset(scope)
-        return await asyncio.to_thread(build_overview, data.sales, data.events, data.today, days)
+        data = await ml_data.load_dataset(scope)
+        return await asyncio.to_thread(ml_overview.overview, data.sales, data.events, data.today, days)
 
     return await cache.cached(f"overview:{scope}:{days}", _ttl(2), compute)
 
@@ -64,8 +67,8 @@ async def forecast(horizon: int = 30, sellerId: int | None = None, user: Current
     scope = _scope(user, sellerId)
 
     async def compute():
-        data = await load_dataset(scope, with_events=False)
-        return await asyncio.to_thread(forecast_revenue, data.sales, data.today, horizon)
+        data = await ml_data.load_dataset(scope, with_events=False)
+        return await asyncio.to_thread(ml_forecasting.forecast_revenue, data.sales, data.today, horizon)
 
     return await cache.cached(f"forecast:{scope}:{horizon}", _ttl(), compute)
 
@@ -76,8 +79,8 @@ async def bestsellers(horizon: int = 30, sellerId: int | None = None, user: Curr
     scope = _scope(user, sellerId)
 
     async def compute():
-        data = await load_dataset(scope)
-        return await asyncio.to_thread(predict_bestsellers, data.sales, data.products, data.events, data.today, horizon)
+        data = await ml_data.load_dataset(scope)
+        return await asyncio.to_thread(ml_bestsellers.predict_bestsellers, data.sales, data.products, data.events, data.today, horizon)
 
     return await cache.cached(f"bestsellers:{scope}:{horizon}", _ttl(), compute)
 
@@ -109,10 +112,10 @@ async def growth(sellerId: int | None = None, user: CurrentUser = Depends(requir
         }
         products = [d async for d in db.products.find(query, fields).limit(1000)]
         peers = pd.DataFrame([d async for d in db.products.find({"active": {"$ne": False}}, {"category": 1, "subCategory": 1, "price": 1})])
-        data = await load_dataset(scope)
+        data = await ml_data.load_dataset(scope)
         if scope is not None:  # market conversion benchmark uses every seller's events
-            data.events = pd.concat([data.events, await load_events(None, days=60)]).drop_duplicates()
-        return await asyncio.to_thread(growth_report, products, peers, data.sales, data.events, data.today)
+            data.events = pd.concat([data.events, await ml_data.load_events(None, days=60)]).drop_duplicates()
+        return await asyncio.to_thread(ml_growth.growth_report, products, peers, data.sales, data.events, data.today)
 
     return await cache.cached(f"growth:{scope}", _ttl(5), compute)
 
@@ -123,13 +126,13 @@ async def customers(sellerId: int | None = None, user: CurrentUser = Depends(req
     mask = not user.is_admin  # sellers don't get shoppers' full email addresses
 
     async def compute():
-        data = await load_dataset(scope, with_users=True)
+        data = await ml_data.load_dataset(scope, with_users=True)
 
         def run():
-            segments = segment_customers(data.sales, data.today)
+            segments = ml_customers.segment_customers(data.sales, data.today)
             labels = segments.pop("labels", None)
-            churn = predict_churn(data.sales, data.events, data.users, data.today, labels, mask_emails=mask)
-            return {"segments": segments, "churn": churn, "cohorts": cohort_retention(data.sales)}
+            churn = ml_customers.predict_churn(data.sales, data.events, data.users, data.today, labels, mask_emails=mask)
+            return {"segments": segments, "churn": churn, "cohorts": ml_customers.cohort_retention(data.sales)}
 
         return await asyncio.to_thread(run)
 
@@ -176,11 +179,11 @@ async def retrain(_: CurrentUser = Depends(require_admin)):
 async def export(dataset: str = "orders", sellerId: int | None = None, user: CurrentUser = Depends(require_seller)):
     """CSV download for analysis in Excel / pandas / Power BI."""
     scope = _scope(user, sellerId)
-    data = await load_dataset(scope, with_events=False)
+    data = await ml_data.load_dataset(scope, with_events=False)
     if dataset == "orders":
         frame = data.sales.drop(columns=["date"]).assign(created_at=lambda d: d["created_at"].dt.strftime("%Y-%m-%d %H:%M"))
     elif dataset == "products":
-        done = completed(data.sales)
+        done = ml_data.completed(data.sales)
         sold = done.groupby("product_id").agg(units_sold=("qty", "sum"), revenue=("revenue", "sum"))
         frame = (
             data.products.drop(columns=["createdAt", "image"], errors="ignore")
@@ -194,7 +197,7 @@ async def export(dataset: str = "orders", sellerId: int | None = None, user: Cur
 
     buffer = io.StringIO()
     frame.to_csv(buffer, index=False)
-    filename = f"arvixa-{dataset}-{local_today():%Y%m%d}.csv"
+    filename = f"arvixa-{dataset}-{ml_data.local_today():%Y%m%d}.csv"
     return StreamingResponse(
         iter([buffer.getvalue()]), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )

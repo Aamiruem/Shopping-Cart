@@ -1,4 +1,5 @@
-"""One-time verification codes for signup (email), phone numbers (SMS / WhatsApp) and payout changes.
+"""One-time verification codes for signup (email), passwordless login (email / SMS / WhatsApp), phone numbers
+and payout changes.
 
 Codes are 6 digits, stored only as an HMAC, expire after OTP_TTL_MINUTES, allow 5 attempts and can be
 re-sent after 30 seconds. In development, when the channel isn't configured (no SMTP / Twilio), the
@@ -21,6 +22,7 @@ MAX_ATTEMPTS = 5
 RESEND_AFTER_SECONDS = 30
 PURPOSE_TEXT = {
     "signup": "verify your email and finish creating your Arvixa account",
+    "login": "log in to your Arvixa account",
     "phone": "verify your mobile number on Arvixa",
     "payout": "confirm the change to your payout account",
 }

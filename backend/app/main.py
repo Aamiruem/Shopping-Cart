@@ -1,12 +1,21 @@
 """Arvixa marketplace API (FastAPI).
 
-Run locally:   uvicorn app.main:app --reload --port 5000
+Run locally:   uvicorn app.main:app --reload --port 5000     (from the backend folder)
+          or:  python -m app.main  /  python app/main.py  /  python main.py (from backend/app)
 API docs:      http://localhost:5000/docs
 """
 
+import sys
+from pathlib import Path
+
+if not __package__:
+    # Run as a file (`python main.py`, an IDE "Run" button, or uvicorn's reload worker on Windows, which
+    # re-runs this file as __mp_main__): make the `app` package importable so the relative imports below work.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    __package__ = "app"  # noqa: A001 - tells Python which package "from .core ..." is relative to
+
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -106,3 +115,18 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+if __name__ == "__main__":
+    # `python main.py` / `python app/main.py`: same as `uvicorn app.main:app --reload --port 5000` in backend/
+    import os
+
+    import uvicorn
+
+    uvicorn.run(
+        "app.main:app",
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "5000")),
+        reload=os.getenv("RELOAD", "1") != "0",
+        reload_dirs=[str(Path(__file__).resolve().parent)],
+        app_dir=str(Path(__file__).resolve().parents[1]),
+    )

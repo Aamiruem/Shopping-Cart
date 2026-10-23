@@ -4,20 +4,24 @@ import asyncio
 
 from fastapi import APIRouter, Depends
 
+from ..core.lazy import lazy_import
 from ..db.mongo import get_db
 from ..deps import CurrentUser, get_optional_user
-from ..ml import cache, recommender
-from ..ml.data import load_events, load_products, load_sales, local_today
+from ..ml import cache
 from ..services.catalog import serialize_product, to_object_id
+
+# pandas / scikit-learn load on the first recommendation request, not at API startup
+recommender = lazy_import("app.ml.recommender")
+ml_data = lazy_import("app.ml.data")
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 TTL_SECONDS = 10 * 60
 
 
-async def _model() -> recommender.RecommenderModel:
+async def _model() -> "recommender.RecommenderModel":
     async def compute():
-        products = await load_products()
-        events = await load_events(days=120)
+        products = await ml_data.load_products()
+        events = await ml_data.load_events(days=120)
         ids = products.loc[products["active"], "product_id"].tolist()
         return await asyncio.to_thread(recommender.build, events, ids)
 
@@ -26,8 +30,8 @@ async def _model() -> recommender.RecommenderModel:
 
 async def _trending_ids(k: int) -> list[str]:
     async def compute():
-        events = await load_events(days=30)
-        return await asyncio.to_thread(recommender.trending, events, local_today(), 24)
+        events = await ml_data.load_events(days=30)
+        return await asyncio.to_thread(recommender.trending, events, ml_data.local_today(), 24)
 
     return [t["productId"] for t in await cache.cached("trending", TTL_SECONDS, compute)][:k]
 
@@ -77,7 +81,7 @@ async def bought_together(product_id: str, k: int = 6):
     k = max(1, min(k, 12))
 
     async def compute():
-        sales = await load_sales()
+        sales = await ml_data.load_sales()
         return await asyncio.to_thread(recommender.bought_together, sales, product_id, k)
 
     pairs = await cache.cached(f"together:{product_id}:{k}", TTL_SECONDS, compute)
