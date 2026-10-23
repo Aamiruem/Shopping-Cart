@@ -6,7 +6,7 @@ template writer produces a clean, reasonable listing so the feature still works 
 
 import re
 
-from . import llm
+from ..llm import client as llm
 
 SCHEMA = {
     "type": "object",

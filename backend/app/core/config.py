@@ -92,6 +92,11 @@ class Settings(BaseSettings):
         return f"postgres://{quote(self.db_user)}:{quote(self.db_password, safe='')}@{self.db_host}:{self.db_port}/{self.db_name}"
 
     @property
+    def analytics_schema(self) -> str:
+        """Schema of the read-only reporting views the AI data analyst queries (see db/schema.sql)."""
+        return f"{self.pg_schema}_analytics" if self.pg_schema else "analytics"
+
+    @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.cors_origin.split(",") if o.strip()]
 

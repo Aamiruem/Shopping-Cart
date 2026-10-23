@@ -1,15 +1,15 @@
 """Agentic shopping assistant.
 
 Claude decides which tools to call (search, recommend, view cart, add to cart,
-store policy lookup) and loops until it can answer. Cart tools call the Node
+store policy lookup) and loops until it can answer. Cart tools call the Arvixa
 backend with the shopper's own JWT, so the agent can only touch that user's cart.
 """
 import json
 
 import httpx
 
-from . import llm
-from .config import BACKEND_URL
+from ..llm import client as llm
+from ..core.config import get_settings
 
 MAX_STEPS = 8
 
@@ -96,12 +96,12 @@ class ShoppingAgent:
         return [p["text"] for p in self.rag.retrieve(question, k=2)]
 
     def view_cart(self):
-        response = httpx.get(f"{BACKEND_URL}/api/cart", headers=self.headers, timeout=10)
+        response = httpx.get(f"{get_settings().backend_url}/api/cart", headers=self.headers, timeout=10)
         return response.json()
 
     def add_to_cart(self, product_id: str, qty: int = 1):
         response = httpx.post(
-            f"{BACKEND_URL}/api/cart", headers=self.headers, json={"productId": product_id, "qty": qty}, timeout=10
+            f"{get_settings().backend_url}/api/cart", headers=self.headers, json={"productId": product_id, "qty": qty}, timeout=10
         )
         return response.json()
 

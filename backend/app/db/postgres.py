@@ -47,8 +47,10 @@ async def connect_postgres(run_schema: bool = True) -> asyncpg.Pool:
         server_settings=server_settings,
     )
     if run_schema:
+        if not SCHEMA_NAME.fullmatch(settings.analytics_schema):
+            raise ValueError(f"Invalid analytics schema name {settings.analytics_schema!r}")
         async with _pool.acquire() as conn:
-            await conn.execute(SCHEMA_FILE.read_text(encoding="utf-8"))
+            await conn.execute(SCHEMA_FILE.read_text(encoding="utf-8").replace("{analytics}", settings.analytics_schema))
     return _pool
 
 

@@ -162,3 +162,49 @@ ALTER TABLE sellers ALTER COLUMN bank_account_number TYPE TEXT;
 
 -- Size / colour chosen for clothing and footwear lines
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS options JSONB;
+
+-- Read-only reporting views for the AI data analyst (ai-service). Only safe columns: no names, emails,
+-- phones, passwords, bank details or codes. When the session sets arvixa.seller_id (the AI service does
+-- this for sellers), every view shows only that seller's sales; unset or '' = whole marketplace (admins).
+-- {analytics} is replaced with "<PG_SCHEMA>_analytics" (see db/postgres.py); the unqualified table names
+-- below bind to the store's own schema because this file runs with search_path = PG_SCHEMA.
+CREATE SCHEMA IF NOT EXISTS {analytics};
+
+CREATE OR REPLACE VIEW {analytics}.order_items AS
+SELECT oi.id, oi.order_id, oi.product_id, oi.name AS product_name, oi.category, oi.seller_id,
+       oi.price, oi.qty, oi.price * oi.qty AS line_total, oi.fulfilment,
+       o.status AS order_status, o.payment_method, o.created_at AS ordered_at
+  FROM order_items oi JOIN orders o ON o.id = oi.order_id
+ WHERE NULLIF(current_setting('arvixa.seller_id', true), '') IS NULL
+    OR oi.seller_id = NULLIF(current_setting('arvixa.seller_id', true), '')::int;
+
+CREATE OR REPLACE VIEW {analytics}.orders AS
+SELECT o.id, o.user_id AS customer_id, o.status, o.payment_method, o.source, o.delivery_fee, o.created_at,
+       -- a seller sees only their own share of an order shared with other sellers
+       CASE WHEN NULLIF(current_setting('arvixa.seller_id', true), '') IS NULL THEN o.total
+            ELSE (SELECT SUM(i.price * i.qty) FROM order_items i
+                   WHERE i.order_id = o.id AND i.seller_id = NULLIF(current_setting('arvixa.seller_id', true), '')::int)
+       END AS total
+  FROM orders o
+ WHERE NULLIF(current_setting('arvixa.seller_id', true), '') IS NULL
+    OR EXISTS (SELECT 1 FROM order_items i
+                WHERE i.order_id = o.id AND i.seller_id = NULLIF(current_setting('arvixa.seller_id', true), '')::int);
+
+CREATE OR REPLACE VIEW {analytics}.customers AS
+SELECT u.id, u.city, u.created_at AS joined_at, u.is_synthetic
+  FROM users u
+ WHERE u.role = 'customer'
+   AND (NULLIF(current_setting('arvixa.seller_id', true), '') IS NULL
+        OR EXISTS (SELECT 1 FROM orders o JOIN order_items i ON i.order_id = o.id
+                    WHERE o.user_id = u.id AND i.seller_id = NULLIF(current_setting('arvixa.seller_id', true), '')::int));
+
+CREATE OR REPLACE VIEW {analytics}.sellers AS
+SELECT s.user_id AS seller_id, s.store_name, s.created_at
+  FROM sellers s
+ WHERE NULLIF(current_setting('arvixa.seller_id', true), '') IS NULL
+    OR s.user_id = NULLIF(current_setting('arvixa.seller_id', true), '')::int;
+
+CREATE OR REPLACE VIEW {analytics}.support_tickets AS  -- marketplace-wide only (admins)
+SELECT t.id, t.category, t.priority, t.status, t.sentiment, t.created_at, t.resolved_at
+  FROM support_tickets t
+ WHERE NULLIF(current_setting('arvixa.seller_id', true), '') IS NULL;

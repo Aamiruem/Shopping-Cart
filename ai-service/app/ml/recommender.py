@@ -8,7 +8,7 @@ enough orders.
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from .catalog import product_text
+from ..services.catalog import product_text
 
 
 class Recommender:
