@@ -20,9 +20,19 @@ def _clean(value):
         value = value.item()
     if isinstance(value, float) and not math.isfinite(value):
         return None
-    if isinstance(value, (datetime, date, pd.Timestamp)):
+    if isinstance(value, datetime | date | pd.Timestamp):
         return value.isoformat()[:10] if not isinstance(value, datetime) or value.time() == datetime.min.time() else value.isoformat()
     return value
+
+
+def inr(amount: float) -> str:
+    """₹ with Indian digit grouping: 5647604 -> ₹56,47,604."""
+    sign, whole = ("-" if amount < 0 else ""), f"{abs(round(amount)):d}"
+    if len(whole) > 3:
+        head, tail = whole[:-3], whole[-3:]
+        head = ",".join([head[max(i - 2, 0) : i] for i in range(len(head), 0, -2)][::-1])
+        whole = f"{head},{tail}"
+    return f"{sign}₹{whole}"
 
 
 def records(df: pd.DataFrame, limit: int | None = None) -> list[dict]:
@@ -55,7 +65,7 @@ def auto_chart(df: pd.DataFrame, title: str = "") -> dict | None:
     sample = df[x].dropna().head(5)
     is_time = len(sample) > 0 and (
         pd.api.types.is_datetime64_any_dtype(df[x])
-        or all(isinstance(v, (date, datetime)) for v in sample)
+        or all(isinstance(v, date | datetime) for v in sample)
         or sample.astype(str).str.fullmatch(r"\d{4}-\d{2}(-\d{2})?.*").all()  # "2026-10", "2026-10-23"
     )
     if not labels:

@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
+from app.ml.recommender import Recommender
 from app.rag import RagIndex
-from app.recommender import Recommender
 
 # Small fixed catalog so these tests do not depend on the store's demo data
 SAMPLE = json.loads((Path(__file__).parent / "fixtures" / "products.json").read_text(encoding="utf-8"))

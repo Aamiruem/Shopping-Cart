@@ -18,20 +18,98 @@ ALLOWED_TABLES = {"orders", "order_items", "customers", "sellers", "support_tick
 # Notably absent: set_config / current_setting (would lift the seller scope), pg_* system functions,
 # dblink, lo_* (large objects), query_to_xml and friends.
 SAFE_FUNCTIONS = {
-    "to_char", "date_part", "date_trunc", "extract", "percentile_cont", "percentile_disc", "mode", "width_bucket",
-    "greatest", "least", "nullif", "coalesce", "round", "ceil", "ceiling", "floor", "abs", "sign", "sqrt", "power",
-    "ln", "log", "exp", "stddev", "stddev_samp", "stddev_pop", "variance", "var_samp", "var_pop", "corr",
-    "covar_pop", "covar_samp", "regr_slope", "regr_intercept", "regr_r2", "string_agg", "array_agg", "bool_and",
-    "bool_or", "every", "count", "sum", "avg", "min", "max", "lower", "upper", "initcap", "length", "trim",
-    "substring", "split_part", "concat", "replace", "left", "right", "make_interval", "age", "now",
-    "rank", "dense_rank", "row_number", "ntile", "lag", "lead", "first_value", "last_value", "cume_dist",
-    "percent_rank", "generate_series", "to_date", "date", "justify_interval", "isodow",
+    "to_char",
+    "date_part",
+    "date_trunc",
+    "extract",
+    "percentile_cont",
+    "percentile_disc",
+    "mode",
+    "width_bucket",
+    "greatest",
+    "least",
+    "nullif",
+    "coalesce",
+    "round",
+    "ceil",
+    "ceiling",
+    "floor",
+    "abs",
+    "sign",
+    "sqrt",
+    "power",
+    "ln",
+    "log",
+    "exp",
+    "stddev",
+    "stddev_samp",
+    "stddev_pop",
+    "variance",
+    "var_samp",
+    "var_pop",
+    "corr",
+    "covar_pop",
+    "covar_samp",
+    "regr_slope",
+    "regr_intercept",
+    "regr_r2",
+    "string_agg",
+    "array_agg",
+    "bool_and",
+    "bool_or",
+    "every",
+    "count",
+    "sum",
+    "avg",
+    "min",
+    "max",
+    "lower",
+    "upper",
+    "initcap",
+    "length",
+    "trim",
+    "substring",
+    "split_part",
+    "concat",
+    "replace",
+    "left",
+    "right",
+    "make_interval",
+    "age",
+    "now",
+    "rank",
+    "dense_rank",
+    "row_number",
+    "ntile",
+    "lag",
+    "lead",
+    "first_value",
+    "last_value",
+    "cume_dist",
+    "percent_rank",
+    "generate_series",
+    "to_date",
+    "date",
+    "justify_interval",
+    "isodow",
 }
 # Statement and expression types that never belong in a read-only report
 FORBIDDEN = (
-    exp.Insert, exp.Update, exp.Delete, exp.Merge, exp.Create, exp.Drop, exp.Alter, exp.Command,
-    exp.TruncateTable, exp.Into, exp.Lock, exp.Set, exp.Copy, exp.Grant,
-)  # fmt: skip
+    exp.Insert,
+    exp.Update,
+    exp.Delete,
+    exp.Merge,
+    exp.Create,
+    exp.Drop,
+    exp.Alter,
+    exp.Command,
+    exp.TruncateTable,
+    exp.Into,
+    exp.Lock,
+    exp.Set,
+    exp.Copy,
+    exp.Grant,
+)
 # Built-ins that reveal server details (version(), current_user, current_database()...); dates stay allowed
 SAFE_CURRENT = {"current_date", "current_time", "current_timestamp", "current_datetime"}
 # Bare keywords Postgres answers with the login name although they parse as column references
@@ -65,8 +143,10 @@ def validate(sql: str) -> str:
             raise UnsafeSQL(f"Function {node.name}() is not allowed")
         if isinstance(node, exp.Func):
             name = _function_name(node)
-            if name.startswith(("pg_", "set_config", "dblink", "lo_")) or name == "session_user" or (
-                name.startswith("current_") and name not in SAFE_CURRENT
+            if (
+                name.startswith(("pg_", "set_config", "dblink", "lo_"))
+                or name == "session_user"
+                or (name.startswith("current_") and name not in SAFE_CURRENT)
             ):
                 raise UnsafeSQL(f"Function {name}() is not allowed")
         if isinstance(node, exp.Column) and not node.table and node.name.lower() in IDENTITY_KEYWORDS:

@@ -74,7 +74,7 @@ TEMPLATES = [
         ("bar", "month", ["orders"]),
     ),
     (
-        {"payment", "payments", "upi", "cod", "card", "method", "methods"},
+        {"pay", "paid", "paying", "payment", "payments", "upi", "cod", "card", "method", "methods"},
         "Orders by payment method (last 90 days)",
         """SELECT payment_method, COUNT(*) AS orders, ROUND(AVG(total)) AS avg_order_value
              FROM orders WHERE status <> 'cancelled' AND created_at >= now() - interval '90 days'

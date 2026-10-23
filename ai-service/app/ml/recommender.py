@@ -5,6 +5,7 @@ and tags; similar products are found with cosine similarity. Swap in
 collaborative filtering (e.g. implicit ALS on order history) once you have
 enough orders.
 """
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 

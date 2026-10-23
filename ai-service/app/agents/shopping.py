@@ -4,12 +4,13 @@ Claude decides which tools to call (search, recommend, view cart, add to cart,
 store policy lookup) and loops until it can answer. Cart tools call the Arvixa
 backend with the shopper's own JWT, so the agent can only touch that user's cart.
 """
+
 import json
 
 import httpx
 
-from ..llm import client as llm
 from ..core.config import get_settings
+from ..llm import client as llm
 
 MAX_STEPS = 8
 

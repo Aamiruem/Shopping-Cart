@@ -1,14 +1,22 @@
 """Listing writer: the template path (tests run without an API key)."""
 
-from app import listing
+from app.services import listing
 
 
 def test_template_listing_without_api_key(monkeypatch):
     monkeypatch.setattr(listing.llm, "enabled", lambda: False)
-    out = listing.generate({
-        "name": "cotton kurta", "brand": "Ethnix", "category": "fashion", "audience": "women", "unit": "Size M",
-        "price": 799, "description": "Soft cotton, hand block print.", "tags": ["Kurta"],
-    })
+    out = listing.generate(
+        {
+            "name": "cotton kurta",
+            "brand": "Ethnix",
+            "category": "fashion",
+            "audience": "women",
+            "unit": "Size M",
+            "price": 799,
+            "description": "Soft cotton, hand block print.",
+            "tags": ["Kurta"],
+        }
+    )
     assert out["source"] == "template"
     assert out["title"].startswith("Ethnix cotton kurta") and "(Size M)" in out["title"]
     assert "kurta" in out["tags"] and "ethnix" in out["tags"] and len(out["tags"]) <= 10
