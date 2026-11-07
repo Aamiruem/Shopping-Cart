@@ -159,9 +159,11 @@ export default function ProductDetail() {
                 <Icon name="rotate" size={14} /> View in 360°
               </button>
             )}
+            {!PREVIEW && (
             <button type="button" className={`wish-btn large ${wished ? 'active' : ''}`} onClick={() => toggleWishlist(product)} aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}>
               <Icon name="heart" size={20} filled={wished} />
             </button>
+            )}
           </div>
           <div className="detail-actions">
             {PREVIEW ? (

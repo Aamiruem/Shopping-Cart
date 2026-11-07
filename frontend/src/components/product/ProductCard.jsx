@@ -24,6 +24,7 @@ export default function ProductCard({ product, variant = 'grid' }) {
 
   return (
     <article className={`product-card product-card-${variant} ${portrait ? 'product-card-portrait' : ''}`}>
+      {!PREVIEW && (
       <button
         type="button"
         className={`wish-btn ${wished ? 'active' : ''}`}
@@ -33,6 +34,7 @@ export default function ProductCard({ product, variant = 'grid' }) {
       >
         <Icon name="heart" size={16} filled={wished} />
       </button>
+      )}
 
       <Link to={productPath(product)} className="product-link">
         <div className="product-img">
