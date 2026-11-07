@@ -248,15 +248,29 @@ npx vercel deploy --prod
 
 - **Pages:** `frontend/scripts/prerender.mjs` writes real HTML for every public page, plus `sitemap.xml`, `robots.txt`
   and the web app manifest. Crawlers need neither JavaScript nor an API.
-- **API:** `api/catalog.mjs` is a read-only function serving `backend/app/data/products.json` with the same response
-  shapes as the FastAPI backend. Account, cart and checkout routes answer 503 with an "opening soon" message.
-- **Preview mode** (`VITE_STORE_MODE=preview`, the Vercel default): ordering is off and a short notice says so. Sample
-  ratings, discounts, offers, delivery promises and `Product` structured data are left out. Run the store with the
-  full API and databases, and a real catalog, before setting `VITE_STORE_MODE=live`.
+- **API:** `api/catalog.mjs` serves `backend/app/data/products.json` with the same response shapes as the FastAPI
+  backend. `api/_auth.mjs` handles sign-up, login, profile and password. Cart and checkout routes answer 503 with an
+  "opening soon" message.
+- **Accounts mode** (`VITE_STORE_MODE=accounts`, the Vercel default): real accounts, with ordering off and a short
+  notice saying so. Sample ratings, discounts, offers, delivery promises and `Product` structured data are left out.
+  `VITE_STORE_MODE=preview` turns accounts off too. Run the store with the full API and databases, and a real catalog,
+  before setting `VITE_STORE_MODE=live`.
+- **Accounts** use the backend's `users` table, bcrypt hashes and token format, so they carry over to the full API
+  when it uses the same database and `JWT_SECRET`. With no email service yet, sign-up doesn't verify the address, and
+  there is no password reset, one-time-code login or Google sign-in.
 - **Product URLs** use ids derived from the product name (`stable_product_id`), so they stay the same after moving
   to MongoDB. Marked-up ratings stay off until real customer reviews exist.
 
-Settings are build-time environment variables (add them in Vercel, then redeploy):
+One-time database setup: add a Neon database to the Vercel project (it sets `DATABASE_URL`), add a random
+`JWT_SECRET` of at least 32 characters, then create the tables from the repository root:
+
+```bash
+npx vercel env pull .env.local
+npm ci
+npm run db:setup
+```
+
+Other settings are build-time environment variables (add them in Vercel, then redeploy):
 
 | Variable | Purpose |
 |---|---|

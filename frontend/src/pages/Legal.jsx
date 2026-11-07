@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { EmptyState } from '../components/common/Feedback';
-import { CONTACT_EMAIL, PREVIEW } from '../config';
+import { ACCOUNTS, CONTACT_EMAIL, PREVIEW } from '../config';
 import useSeo from '../hooks/useSeo';
 import { ABOUT_DESCRIPTION, PRIVACY_DESCRIPTION } from '../seo/copy';
 
@@ -39,15 +39,15 @@ export function Privacy() {
   );
 }
 
-// Replaces the login and sign-up pages while the store has no accounts
+// Replaces the pages the store can't serve yet
 export function OpeningSoon() {
   useSeo({ title: 'Opening soon', noindex: true });
   return (
     <div className="container">
       <EmptyState
         icon="shield"
-        title="Accounts are opening soon"
-        message="Arvixa Store is in preview, so sign-in, cart and checkout aren’t available yet. You can still browse the whole catalog."
+        title={ACCOUNTS ? 'Opening soon' : 'Accounts are opening soon'}
+        message={`Arvixa Store is in preview, so ${ACCOUNTS ? '' : 'sign-in, '}cart and checkout aren’t available yet. You can still browse the whole catalog.`}
         action={{ to: '/products', label: 'Browse products' }}
       />
     </div>

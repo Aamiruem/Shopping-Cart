@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { PREVIEW } from '../config';
 import CodeVerify from '../components/account/CodeVerify';
 import GoogleButton from '../components/account/GoogleButton';
 import Icon from '../components/common/Icon';
@@ -14,14 +15,14 @@ import useSeo from '../hooks/useSeo';
 const COPY = {
   login: {
     title: 'Welcome back',
-    blurb: 'Log in to track orders, save your wishlist and get picks made for you.',
+    blurb: PREVIEW ? 'Log in to your Arvixa Store account.' : 'Log in to track orders, save your wishlist and get picks made for you.',
     submit: 'Login',
     switchText: 'New to Arvixa Store?',
     switchLink: { to: '/register', label: 'Create an account' },
   },
   register: {
     title: 'Looks like you’re new here!',
-    blurb: 'Create your account in a minute and start shopping with India’s best prices.',
+    blurb: PREVIEW ? 'Create your account now and be ready when ordering opens.' : 'Create your account in a minute and start shopping with India’s best prices.',
     submit: 'Create account',
     switchText: 'Existing user?',
     switchLink: { to: '/login', label: 'Log in' },
@@ -79,15 +80,19 @@ function AuthAside({ copy }) {
         <h1>{copy.title}</h1>
         <p>{copy.blurb}</p>
       </div>
-      <ul className="auth-benefits">
-        {BENEFITS.map((b) => (
-          <li key={b.title}>
-            <span className="auth-benefit-icon"><Icon name={b.icon} size={18} /></span>
-            <span><strong>{b.title}</strong><small>{b.text}</small></span>
-          </li>
-        ))}
-      </ul>
-      <p className="auth-trust"><Icon name="lock" size={14} /> Your details are encrypted and never shared</p>
+      {!PREVIEW && (
+        <>
+          <ul className="auth-benefits">
+            {BENEFITS.map((b) => (
+              <li key={b.title}>
+                <span className="auth-benefit-icon"><Icon name={b.icon} size={18} /></span>
+                <span><strong>{b.title}</strong><small>{b.text}</small></span>
+              </li>
+            ))}
+          </ul>
+          <p className="auth-trust"><Icon name="lock" size={14} /> Your details are encrypted and never shared</p>
+        </>
+      )}
     </aside>
   );
 }
@@ -106,8 +111,8 @@ export default function Login({ mode = 'login' }) {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState(null); // signup waiting for its email code
-  // Login: one-time code (default, like Flipkart) or password
-  const [method, setMethod] = useState('otp');
+  // Login: one-time code (default, like Flipkart) or password. One-time codes need the full API.
+  const [method, setMethod] = useState(PREVIEW ? 'password' : 'otp');
   const [identifier, setIdentifier] = useState('');
   const [channel, setChannel] = useState('sms');
   const [otpSent, setOtpSent] = useState(null); // { identifier, sentTo, channel, devCode? }
@@ -178,6 +183,10 @@ export default function Login({ mode = 'login' }) {
         await requestOtp();
       } else if (isRegister) {
         const sent = await register({ name: form.name.trim(), email: form.email.trim(), password: form.password, ...(form.phone ? { phone: form.phone } : {}) });
+        if (sent.user) {
+          finish(sent.user, true); // no email step: the account already exists
+          return;
+        }
         setPending({ email: form.email.trim().toLowerCase(), ...sent });
       } else {
         finish(await login(form.email.trim(), form.password), false);
@@ -234,7 +243,7 @@ export default function Login({ mode = 'login' }) {
           <form className="auth-form" onSubmit={onSubmit} noValidate>
             <img className="auth-logo" src="/brand/arvixa-logo.webp" alt="Arvixa — Shop Beyond Limits" width="240" height="96" />
 
-            {!isRegister && (
+            {!isRegister && !PREVIEW && (
               <div className="auth-tabs" role="tablist" aria-label="How do you want to log in?">
                 <button type="button" role="tab" aria-selected={method === 'otp'} className={method === 'otp' ? 'active' : ''} onClick={() => switchMethod('otp')}>
                   <Icon name="phone" size={16} /> Login with OTP
@@ -306,7 +315,7 @@ export default function Login({ mode = 'login' }) {
                     <Icon name={showPassword ? 'eyeOff' : 'eye'} size={18} />
                   </button>
                 </Field>
-                {!isRegister && (
+                {!isRegister && !PREVIEW && (
                   <button type="button" className="btn-link auth-forgot" onClick={() => switchMethod('otp', 'No problem — log in with a one-time code instead, then set a new password in My Profile.')}>
                     Forgot password?
                   </button>
@@ -329,7 +338,7 @@ export default function Login({ mode = 'login' }) {
 
             <GoogleButton onCredential={onGoogle} onError={setError} />
 
-            {!isRegister && (
+            {!isRegister && !PREVIEW && (
               <p className="demo-hint">
                 <Icon name="zap" size={12} /> Demo account: <code>demo@shop.local</code> / <code>demo123</code>
               </p>

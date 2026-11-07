@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { PREVIEW } from '../../config';
+import { ACCOUNTS, PREVIEW } from '../../config';
 import { useAuth } from '../../context/AuthContext';
 import Icon from '../common/Icon';
 import { useAccountLinks } from '../layout/Navbar';
@@ -18,7 +18,7 @@ export default function QuickLinks() {
         <span>{user ? 'Everything for your account, one click away' : PREVIEW ? 'Have a look around while we get ready to open' : 'Log in to track orders, save a wishlist and check out faster'}</span>
       </div>
       <nav className="quick-list">
-        {!user && !PREVIEW && (
+        {!user && ACCOUNTS && (
           <>
             <Link to="/login" state={{ from: location }} className="quick-link primary"><Icon name="user" size={18} /> Login</Link>
             <Link to="/register" className="quick-link"><Icon name="plus" size={18} /> Create account</Link>

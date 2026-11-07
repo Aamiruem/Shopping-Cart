@@ -15,7 +15,7 @@ import { siteUrl } from './site-url.mjs';
 
 const DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const SITE = siteUrl();
-const PREVIEW = process.env.VITE_STORE_MODE === 'preview';
+const PREVIEW = ['preview', 'accounts'].includes(process.env.VITE_STORE_MODE);
 const template = readFileSync(join(DIST, 'index.html'), 'utf8');
 
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

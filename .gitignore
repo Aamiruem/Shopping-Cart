@@ -23,8 +23,9 @@ Thumbs.db
 infra/aws/params.json
 *.backup
 
-# Vercel CLI
+# Vercel CLI (.env.local holds a token and the database URL)
 .vercel
+.env.local
 
 .vercel
 .env*

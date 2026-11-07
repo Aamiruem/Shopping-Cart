@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+import { PREVIEW } from '../config';
 import { useAuth } from './AuthContext';
 
 const EMPTY = { items: [], totalMrp: 0, discount: 0, subtotal: 0, deliveryFee: 0, total: 0 };
@@ -11,7 +12,7 @@ export function CartProvider({ children }) {
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!user) return setCart(EMPTY);
+    if (!user || PREVIEW) return setCart(EMPTY);
     setLoading(true);
     try {
       setCart(await api.cart());

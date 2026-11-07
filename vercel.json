@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "npm ci --prefix frontend",
-  "buildCommand": "cd frontend && VITE_IMAGE_OPTIMIZER=vercel VITE_STORE_MODE=${VITE_STORE_MODE:-preview} npm run build:static",
+  "installCommand": "npm ci && npm ci --prefix frontend",
+  "buildCommand": "cd frontend && VITE_IMAGE_OPTIMIZER=vercel VITE_STORE_MODE=${VITE_STORE_MODE:-accounts} npm run build:static",
   "outputDirectory": "frontend/dist",
   "regions": [
     "bom1"

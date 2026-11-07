@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+import { PREVIEW } from '../config';
 import { useAuth } from './AuthContext';
 
 const WishlistContext = createContext(null);
@@ -9,7 +10,7 @@ export function WishlistProvider({ children }) {
   const [items, setItems] = useState([]);
 
   const refresh = useCallback(async () => {
-    if (!user) return setItems([]);
+    if (!user || PREVIEW) return setItems([]);
     try {
       setItems(await api.wishlist());
     } catch {

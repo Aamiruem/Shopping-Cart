@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
+import { PREVIEW } from '../config';
 import AddressForm from '../components/account/AddressForm';
 import CodeVerify from '../components/account/CodeVerify';
 import { Spinner } from '../components/common/Feedback';
@@ -12,12 +13,14 @@ import { formatDate } from '../utils/format';
 import { PASSWORD_MIN, validatePassword } from '../utils/validation';
 import useSeo from '../hooks/useSeo';
 
-const TABS = [
+const ALL_TABS = [
   { id: 'profile', label: 'Profile information', icon: 'user' },
   { id: 'addresses', label: 'Manage addresses', icon: 'mapPin' },
   { id: 'security', label: 'Change password', icon: 'lock' },
   { id: 'support', label: 'Support tickets', icon: 'message' },
 ];
+// Addresses and tickets need the full store
+const TABS = PREVIEW ? ALL_TABS.filter((t) => ['profile', 'security'].includes(t.id)) : ALL_TABS;
 
 const STATUS_LABEL = { open: 'Open', in_progress: 'In progress', resolved: 'Resolved' };
 
@@ -150,7 +153,7 @@ function ProfileTab() {
       )}
       {user.createdAt && <p className="muted small">Member since {formatDate(user.createdAt, { month: 'long', year: 'numeric' })}</p>}
     </form>
-    {!editing && <PhoneVerification phone={user.phone} />}
+    {!editing && !PREVIEW && <PhoneVerification phone={user.phone} />}
     </>
   );
 }
@@ -256,8 +259,8 @@ export default function Account() {
           <div><span className="muted small">Hello,</span><strong>{user.name}</strong></div>
         </div>
         <nav className="panel account-nav">
-          <Link to="/orders"><Icon name="package" size={18} /> My orders <Icon name="chevronRight" size={16} /></Link>
-          <Link to="/wishlist"><Icon name="heart" size={18} /> My wishlist <Icon name="chevronRight" size={16} /></Link>
+          {!PREVIEW && <Link to="/orders"><Icon name="package" size={18} /> My orders <Icon name="chevronRight" size={16} /></Link>}
+          {!PREVIEW && <Link to="/wishlist"><Icon name="heart" size={18} /> My wishlist <Icon name="chevronRight" size={16} /></Link>}
           <p className="nav-group">Account settings</p>
           {TABS.map((t) => (
             <button key={t.id} type="button" className={tab === t.id ? 'active' : ''} onClick={() => setParams({ tab: t.id })}>

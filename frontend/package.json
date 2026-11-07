@@ -8,7 +8,7 @@
     "build": "vite build",
     "build:static": "vite build && node scripts/prerender.mjs",
     "preview": "vite preview",
-    "test": "node --test scripts/catalog.test.mjs",
+    "test": "node --test scripts/catalog.test.mjs scripts/auth.test.mjs",
     "lint": "eslint ."
   },
   "dependencies": {
