@@ -118,7 +118,7 @@ export default function Home() {
       <ErrorMessage message={deals.error && `Couldn't load products: ${deals.error}`} />
 
       <ProductRail
-        title="Deals of the Day"
+        title={PREVIEW ? 'Popular Picks' : 'Deals of the Day'}
         products={mixCategories(deals.products, 14)}
         loading={deals.loading}
         aside={PREVIEW ? undefined : <DealTimer />}
@@ -126,7 +126,7 @@ export default function Home() {
       />
 
       <ForYou />
-      <OfferBanners />
+      {!PREVIEW && <OfferBanners />}
 
       {RAILS.slice(0, 3).map((r) => <Rail key={r.key} {...r} />)}
       <PromoVideo />

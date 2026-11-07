@@ -55,7 +55,7 @@ export default function HeroCarousel({ slides = HERO_SLIDES }) {
             return (
               <Link key={s.id} to={s.to} className={`hero-slide theme-${s.theme}`} aria-hidden={!visible} tabIndex={visible ? 0 : -1}>
                 <div className="hero-copy">
-                  <span className="hero-eyebrow">{s.eyebrow}</span>
+                  {!PREVIEW && <span className="hero-eyebrow">{s.eyebrow}</span>}
                   <h2>{s.title}</h2>
                   {!PREVIEW && <p>{s.subtitle}</p>}
                   <span className="btn btn-light btn-sm">Shop now <Icon name="arrowRight" size={14} /></span>

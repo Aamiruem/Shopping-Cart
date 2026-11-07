@@ -1,5 +1,6 @@
 import { responsiveImage } from '../../utils/image';
 import { Link } from 'react-router-dom';
+import { PREVIEW } from '../../config';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { productPath } from '../../hooks/useSeo';
@@ -38,7 +39,7 @@ export default function ProductCard({ product, variant = 'grid' }) {
           <img {...responsiveImage(product.image)} alt={product.name} loading="lazy" decoding="async" />
           {hoverImage && <img className="product-img-alt" {...responsiveImage(hoverImage)} alt="" loading="lazy" decoding="async" aria-hidden="true" />}
           {outOfStock && <span className="stock-flag">Sold out</span>}
-          {off >= 10 && <span className="off-badge" aria-hidden="true">↓{off}%</span>}
+          {!PREVIEW && off >= 10 && <span className="off-badge" aria-hidden="true">↓{off}%</span>}
           {product.images360?.length >= 4 && <span className="badge-360"><Icon name="rotate" size={11} /> 360°</span>}
         </div>
         <div className="product-info">
@@ -55,8 +56,8 @@ export default function ProductCard({ product, variant = 'grid' }) {
         inCart(product._id) ? (
           <Link to="/cart" className="btn btn-outline btn-block btn-sm"><Icon name="cart" size={14} /> Go to cart</Link>
         ) : (
-          <button type="button" className="btn btn-cart btn-block btn-sm" disabled={outOfStock} onClick={() => addToCart(product)}>
-            <Icon name="cart" size={14} /> {outOfStock ? 'Out of stock' : 'Add to cart'}
+          <button type="button" className="btn btn-cart btn-block btn-sm" disabled={outOfStock || PREVIEW} onClick={() => addToCart(product)}>
+            <Icon name="cart" size={14} /> {PREVIEW ? 'Coming soon' : outOfStock ? 'Out of stock' : 'Add to cart'}
           </button>
         )
       )}

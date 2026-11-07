@@ -1,8 +1,9 @@
+import { PREVIEW } from '../../config';
 import { discountPercent, formatPrice } from '../../utils/format';
 
 // Selling price, struck-through MRP and "% off" in one line
 export default function Price({ price, mrp, size = 'md' }) {
-  const off = discountPercent(price, mrp);
+  const off = PREVIEW ? 0 : discountPercent(price, mrp); // sample prices have no real discount to show
   return (
     <div className={`price price-${size}`}>
       <span className="price-now">{formatPrice(price)}</span>

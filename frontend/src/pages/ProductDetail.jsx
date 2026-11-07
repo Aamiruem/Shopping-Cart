@@ -164,16 +164,22 @@ export default function ProductDetail() {
             </button>
           </div>
           <div className="detail-actions">
-            {inCart(product._id) ? (
-              <Link to="/cart" className="btn btn-cart btn-lg"><Icon name="cart" size={18} /> Go to cart</Link>
+            {PREVIEW ? (
+              <button type="button" className="btn btn-cart btn-lg coming-soon" disabled>Coming soon</button>
             ) : (
-              <button type="button" className="btn btn-cart btn-lg" disabled={outOfStock} onClick={() => addToCart(product)}>
-                <Icon name="cart" size={18} /> Add to cart
-              </button>
+              <>
+                {inCart(product._id) ? (
+                  <Link to="/cart" className="btn btn-cart btn-lg"><Icon name="cart" size={18} /> Go to cart</Link>
+                ) : (
+                  <button type="button" className="btn btn-cart btn-lg" disabled={outOfStock} onClick={() => addToCart(product)}>
+                    <Icon name="cart" size={18} /> Add to cart
+                  </button>
+                )}
+                <button type="button" className="btn btn-buy btn-lg" disabled={outOfStock} onClick={() => buyNow(product)}>
+                  <Icon name="zap" size={18} filled /> Buy now
+                </button>
+              </>
             )}
-            <button type="button" className="btn btn-buy btn-lg" disabled={outOfStock} onClick={() => buyNow(product)}>
-              <Icon name="zap" size={18} filled /> Buy now
-            </button>
           </div>
           {product.imageCredit && (
             <p className="image-credit">
@@ -203,9 +209,9 @@ export default function ProductDetail() {
                 <span className="muted">{rating.count.toLocaleString('en-IN')} ratings</span>
               </>
             ) : <span className="muted">No ratings yet</span>}
-            {product.featured && <span className="assured"><Icon name="shield" size={12} /> Arvixa Assured</span>}
+            {!PREVIEW && product.featured && <span className="assured"><Icon name="shield" size={12} /> Arvixa Assured</span>}
           </div>
-          {product.discount > 0 && <p className="text-success special">Special price</p>}
+          {!PREVIEW && product.discount > 0 && <p className="text-success special">Special price</p>}
           <Price price={product.price} mrp={product.mrp} size="lg" />
           {!PREVIEW && (
             <>

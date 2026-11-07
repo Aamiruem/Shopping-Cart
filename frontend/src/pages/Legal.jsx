@@ -12,7 +12,7 @@ export function About() {
     <article className="legal-page container panel">
       <h1>About Arvixa Store</h1>
       <p>Arvixa Store is an online marketplace being built for shoppers and sellers in India, bringing mobiles, electronics, fashion, beauty, home, kitchen and grocery products together in one place.</p>
-      {PREVIEW && <p>The store is in preview: you can browse the catalog today, while prices, ratings and stock are samples and orders aren’t being taken yet.</p>}
+      {PREVIEW && <p>You can browse the catalog today. Ordering opens shortly, and prices may change.</p>}
       <p>We plan to serve India first and to expand to other countries in future. Sellers can read about the programme on our <Link to="/sell">Sell on Arvixa Store</Link> page.</p>
       <h2>Contact</h2>
       <p>{contactLine}</p>

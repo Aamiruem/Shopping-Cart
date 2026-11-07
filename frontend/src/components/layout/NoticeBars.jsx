@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { PREVIEW } from '../../config';
 import { needsConsent, setConsent } from '../../utils/analytics';
 
-// Shown on every page in preview mode, so nobody mistakes the sample catalog for live offers
+// Shown on every page until the store can take orders
 export function PreviewBanner() {
   if (!PREVIEW) return null;
   return (
     <p className="preview-banner" role="status">
-      <strong>Opening soon.</strong> This is a preview of Arvixa Store: prices, ratings and stock are samples and orders aren’t being taken yet.
+      <strong>Coming soon.</strong> Ordering opens shortly, and prices may change.
     </p>
   );
 }

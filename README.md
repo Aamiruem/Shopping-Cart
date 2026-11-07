@@ -250,9 +250,9 @@ npx vercel deploy --prod
   and the web app manifest. Crawlers need neither JavaScript nor an API.
 - **API:** `api/catalog.mjs` is a read-only function serving `backend/app/data/products.json` with the same response
   shapes as the FastAPI backend. Account, cart and checkout routes answer 503 with an "opening soon" message.
-- **Preview mode** (`VITE_STORE_MODE=preview`, the Vercel default): ordering is off, a banner says prices are samples,
-  and offers, delivery promises and `Product` structured data are left out. Run the store with the full API and
-  databases before setting `VITE_STORE_MODE=live`.
+- **Preview mode** (`VITE_STORE_MODE=preview`, the Vercel default): ordering is off and a short notice says so. Sample
+  ratings, discounts, offers, delivery promises and `Product` structured data are left out. Run the store with the
+  full API and databases, and a real catalog, before setting `VITE_STORE_MODE=live`.
 - **Product URLs** use ids derived from the product name (`stable_product_id`), so they stay the same after moving
   to MongoDB. Marked-up ratings stay off until real customer reviews exist.
 

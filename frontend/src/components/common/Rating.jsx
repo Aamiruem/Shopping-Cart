@@ -1,9 +1,8 @@
-import { PREVIEW } from '../../config';
 import Icon from './Icon';
 import { formatCount } from '../../utils/format';
 
-// Live stores show real buyers' reviews only; the preview shows the catalog's sample ratings
-export const shownRating = (p) => (PREVIEW ? { value: p.rating, count: p.ratingCount } : { value: p.reviewRating || 0, count: p.reviewCount || 0 });
+// Real buyers' reviews only: the catalog's sample ratings are never shown to shoppers
+export const shownRating = (p) => ({ value: p.reviewRating || 0, count: p.reviewCount || 0 });
 
 // Green rating pill, e.g. "4.3 ★  (1,234)"
 export default function Rating({ value = 0, count, size = 'md' }) {

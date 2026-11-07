@@ -112,3 +112,5 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   .photo-search { padding: 0 8px; }
   .searchbar > button { padding: 0 6px 0 10px; }
 }
+
+.coming-soon { grid-column: 1 / -1; }
