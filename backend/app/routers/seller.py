@@ -301,7 +301,8 @@ async def my_orders(
         where.append(f"oi.fulfilment = ${len(params)}")
     params.append(max(1, min(limit, 500)))
     sql = f"""
-        SELECT o.id, o.created_at, o.status, o.payment_method, split_part(o.address, ',', 1) AS customer, o.address,
+        SELECT o.id, o.created_at, o.status, o.payment_method, o.user_id AS customer_id,
+               split_part(o.address, ',', 1) AS customer, o.address,
                json_agg(json_build_object('productId', oi.product_id, 'name', oi.name, 'image', oi.image,
                                           'price', oi.price, 'qty', oi.qty, 'fulfilment', oi.fulfilment,
                                           'options', oi.options) ORDER BY oi.id) AS items,

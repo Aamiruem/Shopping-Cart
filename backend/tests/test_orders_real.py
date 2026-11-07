@@ -102,6 +102,8 @@ def test_verifying_twice_creates_one_order(client, gateway):
     assert first.status_code == 200, first.text
     assert second.json()["orderId"] == first.json()["orderId"]
     assert len(_orders(client, headers)) == 1
+    assert _orders(client, headers)[0]["payment_status"] == "paid"
+    assert client.get(f"/api/orders/{first.json()['orderId']}", headers=headers).json()["payment_status"] == "paid"
 
 
 def test_closed_tab_after_paying_still_places_the_order(client, gateway):
@@ -236,6 +238,15 @@ def test_order_page_shows_the_timeline_and_tracking(client):
     assert [e["status"] for e in detail["events"]] == ["placed", "shipped", "delivered"]
     assert "AWB123" in detail["events"][1]["note"]
     assert detail["items"][0]["tracking_number"] == "AWB123"
+    assert detail["payment_status"] is None and detail["payment_method"] == "cod"  # cash has no gateway payment
+    assert detail["items"][0]["product_id"]
+
+
+def test_seller_sees_which_customer_placed_an_order(client):
+    headers, order, _, seller_headers = _placed_order(client)
+    customer = client.get("/api/auth/me", headers=headers).json()
+    row = next(o for o in client.get("/api/seller/orders", headers=seller_headers).json() if o["id"] == order["id"])
+    assert row["customer_id"] == customer["id"]
 
 
 def test_return_flow_restores_stock(client):

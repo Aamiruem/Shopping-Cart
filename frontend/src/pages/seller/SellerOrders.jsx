@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import useApi from '../../hooks/useApi';
 import { formatDate, formatPrice } from '../../utils/format';
+import { paymentStatus } from '../../utils/orders';
 import { StatusBadge } from '../Orders';
 import { PAYMENT_LABELS } from './SellerEarnings';
 
@@ -123,7 +124,7 @@ export default function SellerOrders() {
                 return (
                   <tr key={o.id} className={closed ? 'inactive' : ''}>
                     <td><strong>#{o.id}</strong><span className="muted small block">{formatDate(o.created_at)}</span></td>
-                    <td title={o.address}>{o.customer}</td>
+                    <td title={o.address}>{o.customer}<span className="muted small block">Customer ID {o.customer_id}</span></td>
                     <td>
                       <div className="order-items-cell">
                         {o.items.map((i) => <span key={i.productId + i.name} title={i.name}><img src={i.image} alt="" /> {i.qty}× {i.name.length > 28 ? `${i.name.slice(0, 27)}…` : i.name}</span>)}
@@ -131,7 +132,7 @@ export default function SellerOrders() {
                     </td>
                     <td>
                       {PAYMENT_LABELS[o.payment_method] || o.payment_method}
-                      {o.payment_status && <span className={`pay-status ${o.payment_status} block`}>{o.payment_status.replace('_', ' ')}</span>}
+                      <span className={`pay-status ${o.payment_status || 'cod'} block`}>{paymentStatus(o, o.fulfilment === 'delivered')}</span>
                     </td>
                     <td>
                       {closed ? <StatusBadge status={o.status} /> : (

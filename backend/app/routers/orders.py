@@ -30,7 +30,8 @@ OTP_DEMO_METHODS = ("upi", "card")
 RETURN_WINDOW_DAYS = 7
 
 ORDERS_SQL = """
-  SELECT o.*, COALESCE(json_agg(oi.* ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
+  SELECT o.*, COALESCE(json_agg(oi.* ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items,
+         (SELECT p.status FROM payments p WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1) AS payment_status
     FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id
    WHERE o.user_id = $1"""
 

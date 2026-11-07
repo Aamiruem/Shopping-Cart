@@ -5,6 +5,7 @@ import { EmptyState, Spinner } from '../components/common/Feedback';
 import Icon from '../components/common/Icon';
 import { useToast } from '../context/ToastContext';
 import { deliveryDate, formatDate, formatPrice } from '../utils/format';
+import { paymentStatus } from '../utils/orders';
 import { StatusBadge } from './Orders';
 
 const PAYMENT_LABELS = { cod: 'Cash on Delivery', upi: 'UPI', card: 'Card', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI' };
@@ -91,7 +92,7 @@ export default function OrderDetail() {
         <section className="panel order-detail">
           <header className="order-detail-head">
             <div>
-              <h2>Order #{order.id}</h2>
+              <h2>Order ID #{order.id}</h2>
               <p className="muted small">Placed on {formatDate(order.created_at, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
             </div>
             <StatusBadge status={order.status} />
@@ -131,6 +132,7 @@ export default function OrderDetail() {
                 <div>
                   <Link to={`/products/${i.product_id}`}>{i.name}</Link>
                   <p className="muted small">Qty: {i.qty} · {formatPrice(i.price)} each</p>
+                  <p className="muted small id-line">Product ID: {i.product_id}</p>
                 </div>
                 <strong>{formatPrice(Number(i.price) * i.qty)}</strong>
               </li>
@@ -177,7 +179,8 @@ export default function OrderDetail() {
               <div><dt>Items total</dt><dd>{formatPrice(itemsTotal)}</dd></div>
               <div><dt>Delivery</dt><dd>{Number(order.delivery_fee) ? formatPrice(order.delivery_fee) : 'FREE'}</dd></div>
               <div className="total-row"><dt>Order total</dt><dd>{formatPrice(order.total)}</dd></div>
-              <div><dt>Paid by</dt><dd>{PAYMENT_LABELS[order.payment_method] || order.payment_method}</dd></div>
+              <div><dt>Payment method</dt><dd>{PAYMENT_LABELS[order.payment_method] || order.payment_method}</dd></div>
+              <div><dt>Payment status</dt><dd><strong>{paymentStatus(order, delivered)}</strong></dd></div>
             </dl>
           </div>
         </aside>
