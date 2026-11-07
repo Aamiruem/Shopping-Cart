@@ -1,7 +1,6 @@
 """Deep learning: a neural-network demand forecaster.
 
-A multilayer perceptron (feed-forward neural network: 2 hidden ReLU layers, trained by backpropagation with the
-Adam optimiser and early stopping) learns daily units sold from:
+A PyTorch LSTM (or, without PyTorch, a scikit-learn multilayer perceptron) learns daily units sold from:
   * the last 14 days of sales (lag features),
   * the 7-day moving average,
   * the day of the week (one-hot), since Indian shoppers buy more at weekends.
@@ -10,8 +9,7 @@ It is evaluated honestly: trained on all but the last 14 days, scored on those u
 seasonal-naive baseline ("same as 7 days ago"). Then it is refit on all data and forecasts the next 14 days
 recursively (each prediction becomes an input for the next day).
 
-scikit-learn's MLPRegressor keeps the service light (no 1 GB+ PyTorch install). The same feature pipeline
-drops into a PyTorch / Keras LSTM unchanged if the catalog grows enough to need one.
+Every run's settings and scores go to MLflow when MLFLOW_TRACKING_URI is set.
 """
 
 import numpy as np
@@ -21,6 +19,8 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from ..analytics.charts import chart
+from ..core.optional import has
+from ..core.tracking import tracked_run
 
 LAGS = 14
 HORIZON = 14
@@ -38,6 +38,10 @@ def _dataset(series: np.ndarray, weekdays: np.ndarray, start: int, end: int):
 
 
 def _network(seed: int = 0):
+    if has("torch"):
+        from .lstm import LstmForecaster
+
+        return LstmForecaster(LAGS, seed=seed)
     return make_pipeline(
         StandardScaler(),
         MLPRegressor(
@@ -53,6 +57,13 @@ def _network(seed: int = 0):
             random_state=seed,
         ),
     )
+
+
+def _describe(model) -> str:
+    if hasattr(model, "describe"):
+        return model.describe()
+    net = model.named_steps["mlpregressor"]
+    return f"Neural network (MLP {'-'.join(map(str, net.hidden_layer_sizes))}, ReLU, Adam), {net.n_iter_} epochs"
 
 
 def _mae(a, b) -> float:
@@ -83,6 +94,8 @@ def forecast_units(daily: pd.DataFrame) -> dict:
     actual = series[split:]
     naive = series[split - 7 : len(series) - 7]  # seasonal naive: same weekday last week
     mae, naive_mae = _mae(actual, test_pred), _mae(actual, naive)
+    with tracked_run("demand-forecast", {"model": _describe(model), "lags": LAGS, "train_days": split - LAGS}) as log_metrics:
+        log_metrics({"mae": mae, "naive_mae": naive_mae})
 
     # 2) Refit on everything and forecast the next HORIZON days
     X_all, y_all = _dataset(series, weekdays, LAGS, len(series))
@@ -95,7 +108,6 @@ def forecast_units(daily: pd.DataFrame) -> dict:
         future.append(y)
         history.append(y)
 
-    net = model.named_steps["mlpregressor"]
     frame = (
         pd.concat(
             [
@@ -110,7 +122,7 @@ def forecast_units(daily: pd.DataFrame) -> dict:
     better = mae < naive_mae
     return {
         "ready": True,
-        "model": f"Neural network (MLP {'-'.join(map(str, net.hidden_layer_sizes))}, ReLU, Adam), {net.n_iter_} epochs",
+        "model": _describe(model),
         "features": f"{LAGS} lag days, 7-day average, day of week",
         "metrics": {
             "mae": round(mae, 2),

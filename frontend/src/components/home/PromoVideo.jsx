@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PREVIEW } from '../../config';
 import { PROMO_VIDEO } from '../../constants/catalog';
 import Icon from '../common/Icon';
 
@@ -9,6 +10,17 @@ export default function PromoVideo() {
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [nearby, setNearby] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      setNearby(true);
+      observer.disconnect();
+    }, { rootMargin: '300px' });
+    observer.observe(videoRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const togglePlay = () => {
     const v = videoRef.current;
@@ -32,13 +44,13 @@ export default function PromoVideo() {
         ) : (
           <video
             ref={videoRef}
-            src={PROMO_VIDEO.src}
+            src={nearby ? PROMO_VIDEO.src : undefined}
             poster={PROMO_VIDEO.poster}
             autoPlay
             muted
             loop
             playsInline
-            preload="metadata"
+            preload="none"
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
             onError={() => setFailed(true)}
@@ -58,7 +70,7 @@ export default function PromoVideo() {
       <div className="promo-copy">
         <span className="hero-eyebrow">The Home Edit</span>
         <h2>Bring a little nature home</h2>
-        <p>Planters, decor and furniture picked to make every corner feel fresh. Up to 40% off this week only.</p>
+        <p>Planters, decor and furniture picked to make every corner feel fresh.{!PREVIEW && ' Up to 40% off this week only.'}</p>
         <Link to="/products?category=home" className="btn btn-buy">Explore Home <Icon name="arrowRight" size={16} /></Link>
       </div>
     </section>

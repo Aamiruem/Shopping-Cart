@@ -1,0 +1,151 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci --prefix frontend",
+  "buildCommand": "cd frontend && VITE_IMAGE_OPTIMIZER=vercel VITE_STORE_MODE=${VITE_STORE_MODE:-preview} npm run build:static",
+  "outputDirectory": "frontend/dist",
+  "regions": [
+    "bom1"
+  ],
+  "trailingSlash": false,
+  "images": {
+    "sizes": [
+      384,
+      640
+    ],
+    "formats": [
+      "image/webp"
+    ],
+    "minimumCacheTTL": 2678400,
+    "localPatterns": [
+      {
+        "pathname": "^/catalog/.*$"
+      }
+    ],
+    "qualities": [
+      80
+    ],
+    "remotePatterns": [
+      {
+        "protocol": "https",
+        "hostname": "cdn.dummyjson.com",
+        "pathname": "/product-images/**"
+      }
+    ]
+  },
+  "functions": {
+    "api/catalog.mjs": {
+      "includeFiles": "backend/app/data/products.json"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/catalog?path=:path*"
+    },
+    {
+      "source": "/products",
+      "has": [
+        {
+          "type": "query",
+          "key": "category",
+          "value": "fashion"
+        },
+        {
+          "type": "query",
+          "key": "audience",
+          "value": "(?<audience>women|men)"
+        }
+      ],
+      "destination": "/_seo/category/fashion-:audience/index.html"
+    },
+    {
+      "source": "/products",
+      "has": [
+        {
+          "type": "query",
+          "key": "category",
+          "value": "(?<category>mobiles|electronics|fashion|accessories|beauty|home|kitchen|sports|grocery)"
+        }
+      ],
+      "destination": "/_seo/category/:category/index.html"
+    },
+    {
+      "source": "/products",
+      "has": [
+        {
+          "type": "query",
+          "key": "use",
+          "value": "(?<use>daily|general)"
+        }
+      ],
+      "destination": "/_seo/use/:use/index.html"
+    },
+    {
+      "source": "/products",
+      "destination": "/_seo/products/index.html"
+    },
+    {
+      "source": "/products/:id",
+      "destination": "/_seo/shell/index.html"
+    },
+    {
+      "source": "/(cart|checkout|wishlist|account|login|register|orders|seller)",
+      "destination": "/_seo/shell/index.html"
+    },
+    {
+      "source": "/(orders|seller)/:rest*",
+      "destination": "/_seo/shell/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(self)"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(catalog|brand)/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=2592000"
+        }
+      ]
+    },
+    {
+      "source": "/(cart|checkout|wishlist|account|login|register|orders|seller|_seo)(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ]
+}

@@ -21,8 +21,8 @@ from . import mailer, messaging
 MAX_ATTEMPTS = 5
 RESEND_AFTER_SECONDS = 30
 PURPOSE_TEXT = {
-    "signup": "verify your email and finish creating your Arvixa account",
-    "login": "log in to your Arvixa account",
+    "signup": "verify your email and finish creating your Arvixa Store account",
+    "login": "log in to your Arvixa Store account",
     "phone": "verify your mobile number on Arvixa",
     "payout": "confirm the change to your payout account",
 }
@@ -72,14 +72,13 @@ async def send_code(purpose: str, target: str, channel: str, user_id: int | None
         )
 
     why = PURPOSE_TEXT[purpose]
-    text = (
-        f"{code} is your Arvixa verification code to {why}. It expires in {settings.otp_ttl_minutes} minutes. Never share it with anyone."
-    )
+    expiry = f"It expires in {settings.otp_ttl_minutes} minutes. Never share it with anyone."
+    text = f"{code} is your Arvixa Store verification code to {why}. {expiry}"
     if channel == "email":
         try:
             await mailer.send_mail(
                 to=target,
-                subject=f"{code} is your Arvixa verification code",
+                subject=f"{code} is your Arvixa Store verification code",
                 text=text,
                 html=f"<p>Use this code to {why}:</p><p style='font-size:28px;letter-spacing:6px;font-weight:bold'>{code}</p>"
                 f"<p>It expires in {settings.otp_ttl_minutes} minutes. Never share it with anyone, including Arvixa staff.</p>",

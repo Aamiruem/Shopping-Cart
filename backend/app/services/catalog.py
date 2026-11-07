@@ -1,5 +1,6 @@
 """Product documents: id handling and the JSON shape the frontend and AI service expect."""
 
+import hashlib
 from datetime import datetime
 
 from bson import ObjectId
@@ -11,6 +12,16 @@ CATEGORY_GROUPS = {
     "daily": ["grocery", "kitchen", "beauty"],
     "general": ["mobiles", "electronics", "fashion", "accessories", "home", "sports"],
 }
+
+
+def stable_product_id(name: str, occurrence: int = 0) -> ObjectId:
+    """The same catalog product always gets the same id (and so the same URL), even after a re-seed.
+
+    Matches stableId() in api/_catalog.mjs, so product URLs indexed by search engines keep working when the
+    store moves from the static catalog to MongoDB. `occurrence` separates products that share a name.
+    """
+    key = f"{name}#{occurrence}" if occurrence else name
+    return ObjectId(hashlib.sha1(key.encode("utf-8"), usedforsecurity=False).hexdigest()[:24])
 
 
 def to_object_id(value) -> ObjectId | None:

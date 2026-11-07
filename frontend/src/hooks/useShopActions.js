@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { useWishlist } from '../context/WishlistContext';
+import { OPENING_SOON_MESSAGE, PREVIEW } from '../config';
+import { trackAddToCart, trackWishlist } from '../utils/analytics';
 import { playSound } from '../utils/sound';
 
 // Cart / wishlist actions with the same UX everywhere: send guests to login
@@ -16,6 +18,10 @@ export default function useShopActions() {
   const location = useLocation();
 
   const requireLogin = () => {
+    if (PREVIEW) {
+      toast.show(OPENING_SOON_MESSAGE, 'info');
+      return false;
+    }
     if (user) return true;
     toast.show('Please log in to continue', 'info');
     navigate('/login', { state: { from: location } });
@@ -37,11 +43,17 @@ export default function useShopActions() {
 
   return {
     addToCart: (product, qty = 1) =>
-      requireLogin() && run(() => cart.add(product._id, qty), `${product.name} added to cart`, 'add'),
+      requireLogin() && run(async () => {
+        await cart.add(product._id, qty);
+        trackAddToCart(product, qty);
+      }, `${product.name} added to cart`, 'add'),
 
     buyNow: async (product) => {
       if (!requireLogin()) return;
-      const ok = cart.has(product._id) || (await run(() => cart.add(product._id, 1), null, 'add'));
+      const ok = cart.has(product._id) || (await run(async () => {
+        await cart.add(product._id, 1);
+        trackAddToCart(product);
+      }, null, 'add'));
       if (ok) navigate('/checkout');
     },
 
@@ -49,7 +61,10 @@ export default function useShopActions() {
       if (!requireLogin()) return;
       return wishlist.has(product._id)
         ? run(() => wishlist.remove(product._id), 'Removed from wishlist', 'click')
-        : run(() => wishlist.add(product._id), 'Added to wishlist', 'wishlist');
+        : run(async () => {
+          await wishlist.add(product._id);
+          trackWishlist(product);
+        }, 'Added to wishlist', 'wishlist');
     },
 
     // Cart page "Save for later": wishlist it, then drop it from the cart

@@ -1,4 +1,4 @@
-// Display data for the catalog. Category ids match `category` in backend/src/data/products.json.
+// Display data for the catalog. Category ids match `category` in backend/app/data/products.json.
 export const CATEGORIES = [
   { id: 'mobiles', label: 'Mobiles' },
   { id: 'electronics', label: 'Electronics' },
@@ -83,7 +83,7 @@ export const HERO_SLIDES = [
     eyebrow: 'Big Saving Days',
     title: 'Latest smartphones',
     subtitle: 'From ₹8,299 · No-cost EMI available',
-    image: `${IMG}/smartphones/iphone-13-pro/thumbnail.webp`,
+    image: `${IMG}/smartphones/iphone-13-pro/1.webp`,
     to: '/products?category=mobiles',
     theme: 'blue',
   },
@@ -92,7 +92,7 @@ export const HERO_SLIDES = [
     eyebrow: 'Work & Play',
     title: 'Laptops & tablets',
     subtitle: 'Up to 25% off on top brands',
-    image: `${IMG}/laptops/apple-macbook-pro-14-inch-space-grey/thumbnail.webp`,
+    image: `${IMG}/laptops/apple-macbook-pro-14-inch-space-grey/1.webp`,
     to: '/products?category=electronics',
     theme: 'purple',
   },
@@ -101,7 +101,7 @@ export const HERO_SLIDES = [
     eyebrow: 'New Season Styles',
     title: 'Fashion for every mood',
     subtitle: 'Min. 40% off · Shirts, dresses & shoes',
-    image: `${IMG}/womens-dresses/corset-leather-with-skirt/thumbnail.webp`,
+    image: `${IMG}/womens-dresses/corset-leather-with-skirt/1.webp`,
     to: '/products?category=fashion',
     theme: 'orange',
   },
@@ -110,7 +110,7 @@ export const HERO_SLIDES = [
     eyebrow: 'Home Makeover',
     title: 'Furniture & decor',
     subtitle: 'Starting ₹999 · Free delivery',
-    image: `${IMG}/furniture/annibale-colombo-sofa/thumbnail.webp`,
+    image: `${IMG}/furniture/annibale-colombo-sofa/1.webp`,
     to: '/products?category=home',
     theme: 'green',
   },
@@ -119,7 +119,7 @@ export const HERO_SLIDES = [
     eyebrow: 'Arvixa Fresh',
     title: 'Groceries & daily needs',
     subtitle: 'Fruits, atta, dal, snacks & more',
-    image: `${IMG}/groceries/strawberry/thumbnail.webp`,
+    image: `${IMG}/groceries/strawberry/1.webp`,
     to: '/grocery',
     theme: 'teal',
   },
@@ -128,7 +128,7 @@ export const HERO_SLIDES = [
     eyebrow: 'New Arrivals',
     title: "Women's fashion",
     subtitle: 'Dresses, tops & heels · 360° view',
-    image: `${IMG}/womens-dresses/black-women's-gown/thumbnail.webp`,
+    image: `${IMG}/womens-dresses/black-women's-gown/1.webp`,
     to: '/products?category=fashion&audience=women',
     theme: 'rose',
   },
@@ -136,5 +136,5 @@ export const HERO_SLIDES = [
 
 export const PROMO_VIDEO = {
   src: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-  poster: `${IMG}/home-decoration/plant-pot/thumbnail.webp`,
+  poster: `${IMG}/home-decoration/plant-pot/1.webp`,
 };

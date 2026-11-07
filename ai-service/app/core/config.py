@@ -18,6 +18,9 @@ class Settings:
     # Arvixa backend API (catalog for RAG / recommendations, carts for the shopping agent)
     backend_url: str = os.getenv("BACKEND_URL", "http://localhost:5000")
 
+    # Public storefront: relative product photo URLs are read from here for photo search
+    storefront_url: str = os.getenv("STOREFRONT_URL", "http://localhost:5173")
+
     # Claude (RAG answers, shopping agent, data analyst, listing writer). Unset = template / retrieval fallbacks.
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     claude_model: str = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")

@@ -1,14 +1,11 @@
 import { useEffect } from 'react';
+import { PREVIEW, SITE_URL } from '../config';
+import { HOME_TITLE, LOGO_PATH, productPath, SHARE_IMAGE_PATH, SITE_NAME, slugify, SLOGAN } from '../seo/copy';
 
-const SITE = 'Arvixa';
-const DEFAULT_IMAGE = '/brand/arvixa-logo.webp';
+export { productPath, slugify };
 
-export const slugify = (text = '') =>
-  text.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 80);
-
-export const productPath = (p) => `/products/${p._id || p.id}/${slugify(p.name)}`;
-
-const absolute = (url) => (url && !/^https?:/.test(url) ? `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}` : url);
+// Always the public address, so a deployment's secondary *.vercel.app URLs never become the canonical one
+export const absolute = (url) => (url && !/^https?:/.test(url) ? `${SITE_URL}${url.startsWith('/') ? '' : '/'}${url}` : url);
 
 function setMeta(attr, key, content) {
   let tag = document.head.querySelector(`meta[${attr}="${key}"]`);
@@ -36,26 +33,26 @@ function setLink(rel, href) {
 export default function useSeo({ title, description, path, image, type = 'website', noindex = false, jsonLd }) {
   const ld = JSON.stringify(jsonLd || null);
   useEffect(() => {
-    const fullTitle = title ? `${title} | ${SITE}` : `${SITE} — Online Shopping for Mobiles, Fashion, Groceries & More`;
+    const fullTitle = title ? `${title} | ${SITE_NAME}` : HOME_TITLE;
     const url = absolute(path ?? `${window.location.pathname}${window.location.search}`);
     document.title = fullTitle;
     setMeta('name', 'description', description);
     setMeta('name', 'robots', noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large');
     setLink('canonical', url);
-    setMeta('property', 'og:site_name', SITE);
+    setMeta('property', 'og:site_name', SITE_NAME);
     setMeta('property', 'og:type', type);
     setMeta('property', 'og:title', fullTitle);
     setMeta('property', 'og:description', description);
     setMeta('property', 'og:url', url);
-    setMeta('property', 'og:image', absolute(image || DEFAULT_IMAGE));
+    setMeta('property', 'og:image', absolute(image || SHARE_IMAGE_PATH));
     setMeta('name', 'twitter:card', 'summary_large_image');
     setMeta('name', 'twitter:title', fullTitle);
     setMeta('name', 'twitter:description', description);
-    setMeta('name', 'twitter:image', absolute(image || DEFAULT_IMAGE));
+    setMeta('name', 'twitter:image', absolute(image || SHARE_IMAGE_PATH));
 
     document.head.querySelectorAll('script[data-seo]').forEach((el) => el.remove());
     const data = JSON.parse(ld);
-    (Array.isArray(data) ? data : data ? [data] : []).forEach((item) => {
+    (Array.isArray(data) ? data : [data]).filter(Boolean).forEach((item) => {
       const script = document.createElement('script');
       script.type = 'application/ld+json';
       script.dataset.seo = '1';
@@ -71,7 +68,9 @@ export const breadcrumbLd = (items) => ({
   itemListElement: items.map((it, i) => ({ '@type': 'ListItem', position: i + 1, name: it.name, item: absolute(it.path) })),
 });
 
-export const productLd = (p) => ({
+// Google's Product rich results need a real offer, so preview mode (sample prices, no ordering) sends none at all.
+// aggregateRating comes from real buyers' reviews only: marking up sample ratings breaks Google's rules.
+export const productLd = (p) => (PREVIEW ? null : {
   '@type': 'Product',
   name: p.name,
   description: p.description,
@@ -86,11 +85,25 @@ export const productLd = (p) => ({
     price: Number(p.price).toFixed(2),
     availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
     itemCondition: 'https://schema.org/NewCondition',
+    seller: { '@type': 'Organization', name: SITE_NAME },
   },
-  ...(p.rating > 0 && p.ratingCount > 0
-    ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: p.rating, reviewCount: p.ratingCount, bestRating: 5 } }
+  ...(p.reviewCount > 0
+    ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: p.reviewRating, reviewCount: p.reviewCount, bestRating: 5 } }
     : {}),
 });
+
+export const homeLd = () => [
+  { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: SITE_NAME, url: `${SITE_URL}/`, logo: absolute(LOGO_PATH), slogan: SLOGAN },
+  {
+    '@type': 'WebSite',
+    '@id': `${SITE_URL}/#website`,
+    name: SITE_NAME,
+    url: `${SITE_URL}/`,
+    inLanguage: 'en-IN',
+    publisher: { '@id': `${SITE_URL}/#organization` },
+    potentialAction: { '@type': 'SearchAction', target: `${SITE_URL}/products?q={search_term_string}`, 'query-input': 'required name=search_term_string' },
+  },
+];
 
 export const itemListLd = (products) => ({
   '@type': 'ItemList',

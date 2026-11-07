@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { ErrorMessage } from '../components/common/Feedback';
 import DealTimer from '../components/home/DealTimer';
@@ -10,7 +10,9 @@ import SeasonCollections from '../components/home/SeasonCollections';
 import ShopByNeed from '../components/home/ShopByNeed';
 import ProductRail from '../components/product/ProductRail';
 import { useAuth } from '../context/AuthContext';
-import useSeo from '../hooks/useSeo';
+import { PREVIEW } from '../config';
+import useSeo, { homeLd } from '../hooks/useSeo';
+import { homeDescription, SITE_NAME } from '../seo/copy';
 import { getRecentlyViewed } from '../utils/recentlyViewed';
 
 // Each rail is one API call; they load independently so one failure doesn't blank the page
@@ -50,9 +52,27 @@ function mixCategories(products, max) {
   return mixed;
 }
 
-function Rail({ title, subtitle, params }) {
+function LoadedRail({ params, ...rail }) {
   const { products, loading } = useProducts(params);
-  return <ProductRail title={title} subtitle={subtitle} products={products} loading={loading} viewAll={`/products?${new URLSearchParams({ category: params.category, ...(params.audience && { audience: params.audience }), sort: params.sort })}`} />;
+  return <ProductRail {...rail} products={products} loading={loading} />;
+}
+
+// Rails further down the page show a placeholder until a shopper scrolls near them
+function Rail({ title, subtitle, params }) {
+  const slot = useRef(null);
+  const [nearby, setNearby] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      setNearby(true);
+      observer.disconnect();
+    }, { rootMargin: '500px' });
+    observer.observe(slot.current);
+    return () => observer.disconnect();
+  }, []);
+  const viewAll = `/products?${new URLSearchParams({ category: params.category, ...(params.audience && { audience: params.audience }), sort: params.sort })}`;
+  const rail = { title, subtitle, viewAll };
+  return <div ref={slot}>{nearby ? <LoadedRail {...rail} params={params} /> : <ProductRail {...rail} products={[]} loading />}</div>;
 }
 
 // Collaborative-filtering picks for logged-in shoppers, trending products for everyone else
@@ -79,29 +99,15 @@ function ForYou() {
   );
 }
 
-const HOME_LD = [
-  { '@type': 'Organization', name: 'Arvixa', url: '/', logo: '/brand/arvixa-mark-192.png', slogan: 'Shop Beyond Limits' },
-  {
-    '@type': 'WebSite',
-    name: 'Arvixa',
-    url: '/',
-    potentialAction: { '@type': 'SearchAction', target: '/products?q={search_term_string}', 'query-input': 'required name=search_term_string' },
-  },
-];
-
 export default function Home() {
-  useSeo({
-    description: 'Shop online at Arvixa: mobiles, electronics, fashion for women and men, groceries, beauty, home and kitchen. Best prices, free delivery over ₹499, UPI, cards and cash on delivery.',
-    path: '/',
-    jsonLd: HOME_LD.map((x) => ({ ...x, url: window.location.origin + x.url, ...(x.logo ? { logo: window.location.origin + x.logo } : {}),
-      ...(x.potentialAction ? { potentialAction: { ...x.potentialAction, target: window.location.origin + x.potentialAction.target } } : {}) })),
-  });
+  useSeo({ description: homeDescription(PREVIEW), path: '/', jsonLd: homeLd() });
   const deals = useProducts({ featured: 'true', sort: 'popularity', limit: 100 });
   const [recent] = useState(getRecentlyViewed);
   const { user } = useAuth();
 
   return (
     <div className="page-home container">
+      <h1 className="sr-only">{SITE_NAME}: Online Shopping in India</h1>
       <QuickLinks />
       <HeroCarousel />
       {recent.length > 0 && (
@@ -112,15 +118,15 @@ export default function Home() {
       <ErrorMessage message={deals.error && `Couldn't load products: ${deals.error}`} />
 
       <ProductRail
-        title="Deals of the Day"
+        title={PREVIEW ? 'Popular Picks' : 'Deals of the Day'}
         products={mixCategories(deals.products, 14)}
         loading={deals.loading}
-        aside={<DealTimer />}
+        aside={PREVIEW ? undefined : <DealTimer />}
         viewAll="/products?sort=popularity"
       />
 
       <ForYou />
-      <OfferBanners />
+      {!PREVIEW && <OfferBanners />}
 
       {RAILS.slice(0, 3).map((r) => <Rail key={r.key} {...r} />)}
       <PromoVideo />

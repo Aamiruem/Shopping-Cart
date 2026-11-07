@@ -1,6 +1,6 @@
-# Arvixa: full-stack marketplace with analytics and machine learning
+# Arvixa Store: full-stack marketplace with analytics and machine learning
 
-Arvixa is a multi-seller marketplace in the style of the big Indian e-commerce sites: a React storefront,
+Arvixa Store is a multi-seller marketplace in the style of the big Indian e-commerce sites: a React storefront,
 a Python (FastAPI) API on PostgreSQL + MongoDB, a seller hub with product management, and a layer of
 analytics and machine learning that helps sellers sell more and helps shoppers get faster support.
 
@@ -10,12 +10,11 @@ analytics and machine learning that helps sellers sell more and helps shoppers g
 |---|---|---|
 | Storefront & seller hub | React 18, Vite, React Router, Recharts | `frontend/` |
 | API | Python 3.12, FastAPI, asyncpg, PyMongo (async), JWT, bcrypt | `backend/` |
-| Analytics & ML | pandas, NumPy, scikit-learn | `backend/app/ml/` |
-| AI service | FastAPI + Claude: hybrid RAG, shopping and data-analyst agents (text-to-SQL), statistics, neural-network forecast | `ai-service/` ([README](ai-service/README.md)) |
+| Analytics & ML | pandas, NumPy, scikit-learn, XGBoost | `backend/app/ml/` |
+| AI service | FastAPI + Claude: hybrid RAG, LangGraph shopping agent, data-analyst agent (text-to-SQL), statistics, semantic and photo search, review NLP, PyTorch forecasting, MLflow | `ai-service/` ([README](ai-service/README.md)) |
 | Databases | PostgreSQL (users, sellers, orders, tickets) + MongoDB (catalog, carts, wishlists, behaviour events) | `backend/app/db/` |
 | Deploy | Docker Compose locally; AWS (CloudFront, S3, ECS Fargate, ALB, RDS, Secrets Manager) | `docker-compose.yml`, `infra/aws/` |
 | CI | GitHub Actions: lint, tests against real databases, build, template check | `.github/workflows/ci.yml` |
-| Previous API | The original Node/Express backend, kept for reference only | `backend-node/` |
 
 ## Features
 
@@ -50,6 +49,36 @@ Every model is trained on the shop's own data and shows how well it performs, me
 
 The analysis is also available as CSV (`/api/analytics/export`) for Excel, pandas or Power BI.
 
+## AI features
+
+Every heavy model is optional. Install `ai-service/requirements-ml.txt` (about 2 GB, plus model downloads) for the full
+stack; without it each feature uses a lighter method, and shopping works even when the AI service is off.
+
+| Feature | Technology | Without the heavy stack |
+|---|---|---|
+| Search by meaning, in Hindi and English, when keywords find little | Hugging Face sentence embeddings | Keyword search only |
+| Search with a photo | CLIP | Hidden |
+| RAG answers about products and policies | Hybrid retrieval + Claude | TF-IDF / SVD; best passage without an API key |
+| Shopping assistant: search, delivery, tracking, cart (never orders or payments) | LangGraph + Claude | Needs `ANTHROPIC_API_KEY` |
+| "For you" ranking | XGBoost, used only if it beats collaborative filtering on unseen shoppers | Collaborative filtering |
+| Best-seller prediction | XGBoost | Required dependency |
+| Demand forecast | PyTorch LSTM | scikit-learn neural network |
+| Review summary and sentiment (the model decides on confident English; star ratings decide for Hindi and Hinglish) | Hugging Face + Claude | Star ratings and quoted sentences |
+| Seller photo check: sharpness, size, exposure | Pixel analysis | Same |
+| Experiment tracking | MLflow (`MLFLOW_TRACKING_URI`) | Off |
+| Automation: refund retries, stuck payments, low-stock and late-order emails | `POST /api/automation/run`, called by a scheduler | Off until `AUTOMATION_KEY` is set |
+
+## Real orders
+
+- **Payments:** Razorpay (UPI, net banking, cards, wallets), or cash on delivery. A payment can only become one order,
+  even if the browser and the webhook both report it. If the shopper closes the tab after paying, the webhook places the
+  order. If the order can't be placed, the money is refunded automatically, and failed refunds are retried.
+- **Stock** is taken atomically, so the last item can't be sold twice.
+- **Delivery:** real pincode lookup, address autofill, "Use my current location" and estimates from `WAREHOUSE_PINCODE`.
+- **After the order:** timeline, courier and tracking number, cancellation, 7-day returns approved by an admin, printable receipt.
+- **Ratings:** only from shoppers whose order was delivered. These are the only ratings live shoppers or Google see.
+- **Production safety:** the demo OTP payment and `scripts.seed` both refuse to run. Use `scripts.create_admin`.
+
 ## Project structure
 
 ```text
@@ -71,7 +100,7 @@ frontend/src/
   pages/                 store pages + pages/seller (layout, onboarding, dashboard, products, orders)
   components/            layout, product, cart, checkout, account, seller, chat, charts, analytics tabs
   context/ hooks/ utils/ styles/
-ai-service/              RAG, agents, ML, deep learning, statistics, charts (layers: see ai-service/README.md)
+ai-service/              RAG, LangGraph and data-analyst agents, semantic and photo search, review NLP, deep learning, statistics, charts (layers: see ai-service/README.md)
 infra/aws/               cloudformation.yml, deploy.sh, seed.sh, guide
 ```
 
@@ -209,10 +238,41 @@ Full interactive docs at `/docs`. Errors always come back as `{"error": "message
 | Support | `POST/GET /api/support/tickets` · `PATCH /api/support/tickets/{id}` |
 | AI service | `POST /api/ai/ask` · `POST /api/ai/agent` · `GET /api/ai/recommend/{id}` · `POST /api/ai/analyst` · `GET /api/ai/insights` · `GET /api/ai/forecast` |
 
+## Deploy to Vercel (browsable storefront)
+
+`vercel.json` deploys the storefront with no databases, from the repository root:
+
+```bash
+npx vercel deploy --prod
+```
+
+- **Pages:** `frontend/scripts/prerender.mjs` writes real HTML for every public page, plus `sitemap.xml`, `robots.txt`
+  and the web app manifest. Crawlers need neither JavaScript nor an API.
+- **API:** `api/catalog.mjs` is a read-only function serving `backend/app/data/products.json` with the same response
+  shapes as the FastAPI backend. Account, cart and checkout routes answer 503 with an "opening soon" message.
+- **Preview mode** (`VITE_STORE_MODE=preview`, the Vercel default): ordering is off and a short notice says so. Sample
+  ratings, discounts, offers, delivery promises and `Product` structured data are left out. Run the store with the
+  full API and databases, and a real catalog, before setting `VITE_STORE_MODE=live`.
+- **Product URLs** use ids derived from the product name (`stable_product_id`), so they stay the same after moving
+  to MongoDB. Marked-up ratings stay off until real customer reviews exist.
+
+Settings are build-time environment variables (add them in Vercel, then redeploy):
+
+| Variable | Purpose |
+|---|---|
+| `VITE_GA_MEASUREMENT_ID` | Google Analytics 4 ID (`G-XXXXXXXXXX`): page views and e-commerce events, with a consent banner |
+| `VITE_GOOGLE_SITE_VERIFICATION` | The `content` value of Search Console's HTML tag |
+| `VITE_BING_SITE_VERIFICATION` | The `content` value of Bing Webmaster Tools' tag |
+| `VITE_CONTACT_EMAIL` | Real support address for the footer and legal pages |
+| `VITE_SITE_URL` | Only if the canonical domain differs from the Vercel project's production domain |
+
+Vercel's Hobby plan is for non-commercial use, so move to Pro before selling.
+
 ## Deploy to AWS
 
 See [infra/aws/README.md](infra/aws/README.md): one CloudFormation stack, `deploy.sh` to build and release,
-`seed.sh` for demo data. About US$65/month at low traffic.
+`seed.sh` to create the first admin. Budget roughly US$130/month at low traffic with the deep-learning AI service
+(estimate: check the AWS pricing calculator for your region).
 
 ## Next steps
 

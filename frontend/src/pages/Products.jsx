@@ -6,6 +6,9 @@ import Icon from '../components/common/Icon';
 import FilterSidebar from '../components/product/FilterSidebar';
 import ProductCard from '../components/product/ProductCard';
 import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, FASHION_TYPES, SORT_OPTIONS } from '../constants/catalog';
+import { PREVIEW } from '../config';
+import { listingDescription, listingTitle } from '../seo/copy';
+import { trackSearch } from '../utils/analytics';
 import useSeo, { breadcrumbLd, itemListLd } from '../hooks/useSeo';
 
 const FILTER_KEYS = ['q', 'use', 'category', 'audience', 'subCategory', 'brand', 'minPrice', 'maxPrice', 'minRating', 'sort'];
@@ -33,6 +36,10 @@ export default function Products() {
   useEffect(load, [load]);
 
   useEffect(() => {
+    if (filters.q) trackSearch(filters.q);
+  }, [filters.q]);
+
+  useEffect(() => {
     api.facets({ q: filters.q, use: filters.use, category: filters.category, audience: filters.audience }).then(setFacets).catch(() => setFacets(EMPTY_FACETS));
   }, [filters.q, filters.use, filters.category, filters.audience]);
 
@@ -54,10 +61,11 @@ export default function Products() {
   const canonical = filters.q ? `/products?q=${encodeURIComponent(filters.q)}`
     : `/products${filters.category ? `?category=${filters.category}${filters.audience ? `&audience=${filters.audience}` : ''}` : filters.use ? `?use=${filters.use}` : ''}`;
   useSeo({
-    title: filters.q ? `${filters.q} - Buy online at best price` : `${heading} - Buy ${heading} online at best prices`,
-    description: `Shop ${heading.replace(/[“”]/g, '')} online at Arvixa. ${products.length || 'Hundreds of'} products with top brands, great discounts, free delivery over ₹499 and easy returns.`,
+    title: filters.q ? `Search results for ${filters.q}` : listingTitle(heading, PREVIEW),
+    description: listingDescription(heading.replace(/[“”]/g, ''), products.length, PREVIEW),
     path: canonical,
-    noindex: Boolean(filters.brand || filters.minPrice || filters.maxPrice || filters.minRating),
+    // Search results and filtered views are thin duplicates of the category pages
+    noindex: Boolean(filters.q || filters.subCategory || filters.brand || filters.minPrice || filters.maxPrice || filters.minRating),
     jsonLd: [breadcrumbLd([{ name: 'Home', path: '/' }, { name: heading.replace(/[“”]/g, ''), path: canonical }]), ...(products.length ? [itemListLd(products)] : [])],
   });
 

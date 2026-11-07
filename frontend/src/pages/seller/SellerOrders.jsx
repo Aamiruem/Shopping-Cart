@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { ErrorMessage, Spinner } from '../../components/common/Feedback';
 import Icon from '../../components/common/Icon';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import useApi from '../../hooks/useApi';
 import { formatDate, formatPrice } from '../../utils/format';
@@ -15,17 +16,73 @@ export const FULFILMENT = [
   { id: 'delivered', label: 'Delivered', icon: 'checkCircle' },
 ];
 
-export default function SellerOrders() {
+// Admin only: returns waiting for a decision. Approving refunds online payments and restocks the items.
+function ReturnsQueue() {
   const toast = useToast();
+  const { data, reload } = useApi(() => api.pendingReturns(), []);
+  if (!data?.length) return null;
+
+  const decide = async (orderId, approve) => {
+    try {
+      await api.resolveReturn(orderId, approve);
+      toast.show(approve ? 'Return approved' : 'Return rejected');
+      reload();
+    } catch (err) {
+      toast.show(err.message, 'error');
+    }
+  };
+
+  return (
+    <section className="panel returns-queue">
+      <h2>Return requests</h2>
+      <ul>
+        {data.map((r) => (
+          <li key={r.id}>
+            <span><strong>Order #{r.order_id}</strong> · {r.customer} · {formatPrice(r.total)} · {r.reason}</span>
+            <span className="form-actions">
+              <button type="button" className="btn btn-primary" onClick={() => decide(r.order_id, true)}>Approve &amp; refund</button>
+              <button type="button" className="btn-text" onClick={() => decide(r.order_id, false)}>Reject</button>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// The courier details shoppers see on their order page
+function ShipmentForm({ order, onSubmit, onCancel }) {
+  const [courier, setCourier] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const submit = (e) => {
+    e.preventDefault();
+    onSubmit(order, 'shipped', { courier, trackingNumber });
+  };
+  return (
+    <form className="shipment-form" onSubmit={submit}>
+      <input value={courier} onChange={(e) => setCourier(e.target.value)} placeholder="Courier" aria-label="Courier" required maxLength={60} />
+      <input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="Tracking number" aria-label="Tracking number" required maxLength={60} />
+      <button type="submit" className="btn btn-primary">Mark shipped</button>
+      <button type="button" className="btn-text" onClick={onCancel}>Cancel</button>
+    </form>
+  );
+}
+
+export default function SellerOrders() {
+  const { user } = useAuth();
+  const toast = useToast();
+  const [shipping, setShipping] = useState(null); // id of the order waiting for courier details
   const [status, setStatus] = useState('');
   const [fulfilment, setFulfilment] = useState('');
   const { data, error, loading, reload } = useApi(() => api.sellerOrders({ status, fulfilment, limit: 200 }), [status, fulfilment]);
   const [orders, setOrders] = useState([]);
   useEffect(() => setOrders(data || []), [data]);
 
-  const move = async (order, next) => {
+  const move = async (order, next, shipment) => {
+    if (next === 'shipped' && !shipment) return setShipping(order.id);
+    setShipping(null);
     try {
-      await api.sellerUpdateFulfilment(order.id, next);
+      await api.sellerUpdateFulfilment(order.id, next, shipment);
       setOrders((list) => list.map((o) => (o.id === order.id ? { ...o, fulfilment: next } : o)));
       toast.show(`Order #${order.id} marked ${next}`);
     } catch (err) {
@@ -34,6 +91,8 @@ export default function SellerOrders() {
   };
 
   return (
+    <>
+    {user.role === 'admin' && <ReturnsQueue />}
     <div className="panel seller-products">
       <header className="seller-head">
         <div>
@@ -60,9 +119,9 @@ export default function SellerOrders() {
             <tbody>
               {orders.map((o) => {
                 const step = FULFILMENT.findIndex((f) => f.id === o.fulfilment);
-                const cancelled = o.status === 'cancelled';
+                const closed = o.status !== 'placed';
                 return (
-                  <tr key={o.id} className={cancelled ? 'inactive' : ''}>
+                  <tr key={o.id} className={closed ? 'inactive' : ''}>
                     <td><strong>#{o.id}</strong><span className="muted small block">{formatDate(o.created_at)}</span></td>
                     <td title={o.address}>{o.customer}</td>
                     <td>
@@ -75,7 +134,7 @@ export default function SellerOrders() {
                       {o.payment_status && <span className={`pay-status ${o.payment_status} block`}>{o.payment_status.replace('_', ' ')}</span>}
                     </td>
                     <td>
-                      {cancelled ? <StatusBadge status="cancelled" /> : (
+                      {closed ? <StatusBadge status={o.status} /> : (
                         <div className="fulfil-steps" role="group" aria-label={`Fulfilment of order ${o.id}`}>
                           {FULFILMENT.map((f, i) => (
                             <button
@@ -91,6 +150,7 @@ export default function SellerOrders() {
                           ))}
                         </div>
                       )}
+                      {shipping === o.id && <ShipmentForm order={o} onSubmit={move} onCancel={() => setShipping(null)} />}
                     </td>
                     <td className="num"><strong>{formatPrice(o.amount)}</strong></td>
                   </tr>
@@ -102,5 +162,6 @@ export default function SellerOrders() {
         </div>
       )}
     </div>
+    </>
   );
 }

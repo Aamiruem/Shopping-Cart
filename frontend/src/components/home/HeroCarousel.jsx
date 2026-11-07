@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PREVIEW } from '../../config';
 import { HERO_SLIDES } from '../../constants/catalog';
+import { responsiveImage } from '../../utils/image';
 import Icon from '../common/Icon';
 
 const INTERVAL_MS = 5000;
@@ -53,12 +55,12 @@ export default function HeroCarousel({ slides = HERO_SLIDES }) {
             return (
               <Link key={s.id} to={s.to} className={`hero-slide theme-${s.theme}`} aria-hidden={!visible} tabIndex={visible ? 0 : -1}>
                 <div className="hero-copy">
-                  <span className="hero-eyebrow">{s.eyebrow}</span>
+                  {!PREVIEW && <span className="hero-eyebrow">{s.eyebrow}</span>}
                   <h2>{s.title}</h2>
-                  <p>{s.subtitle}</p>
+                  {!PREVIEW && <p>{s.subtitle}</p>}
                   <span className="btn btn-light btn-sm">Shop now <Icon name="arrowRight" size={14} /></span>
                 </div>
-                <img src={s.image} alt="" className="hero-img" loading={i < 3 ? 'eager' : 'lazy'} />
+                <img {...responsiveImage(s.image, '220px')} alt="" className="hero-img" width="300" height="300" loading={i < 3 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined} />
               </Link>
             );
           })}

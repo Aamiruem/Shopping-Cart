@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
+import { PREVIEW } from '../../config';
+import { useToast } from '../../context/ToastContext';
 import { formatPrice } from '../../utils/format';
 import Icon from '../common/Icon';
 
 // Navbar search with debounced product suggestions
 export default function SearchBar() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [params] = useSearchParams();
+  const [searching, setSearching] = useState(false);
   const [q, setQ] = useState(params.get('q') || '');
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
@@ -42,6 +46,20 @@ export default function SearchBar() {
     navigate(q.trim() ? `/products?q=${encodeURIComponent(q.trim())}` : '/products');
   };
 
+  const searchByPhoto = async (e) => {
+    const [file] = e.target.files;
+    e.target.value = '';
+    if (!file) return;
+    setSearching(true);
+    try {
+      navigate('/visual-search', { state: { results: await api.visualSearch(file) } });
+    } catch (err) {
+      toast.show(err.message, 'error');
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const go = (path) => {
     setOpen(false);
     navigate(path);
@@ -58,6 +76,13 @@ export default function SearchBar() {
         placeholder="Search for Products, Brands and More"
         aria-label="Search products"
       />
+      {!PREVIEW && (
+        <label className="photo-search" aria-busy={searching} title="Search with a photo">
+          <Icon name="camera" size={20} />
+          <span className="sr-only">Search with a photo</span>
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={searchByPhoto} disabled={searching} />
+        </label>
+      )}
 
       {open && suggestions.length > 0 && (
         <ul className="search-suggestions">

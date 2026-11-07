@@ -138,6 +138,47 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX IF NOT EXISTS payments_user_idx  ON payments (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS payments_order_idx ON payments (order_id);
 
+-- ---------- Order timeline, shipment details and returns ----------
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS courier         VARCHAR(60);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS tracking_number VARCHAR(60);
+
+-- What the shopper sees on the order page: placed, packed, shipped, delivered, cancelled, return requested...
+CREATE TABLE IF NOT EXISTS order_events (
+  id         SERIAL PRIMARY KEY,
+  order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  status     VARCHAR(30) NOT NULL,
+  note       TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS order_events_order_idx ON order_events (order_id, created_at);
+
+-- One return per order: requested -> approved (refunded) | rejected
+CREATE TABLE IF NOT EXISTS order_returns (
+  id          SERIAL PRIMARY KEY,
+  order_id    INTEGER NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  reason      TEXT NOT NULL,
+  status      VARCHAR(15) NOT NULL DEFAULT 'requested',  -- requested | approved | rejected
+  refund      VARCHAR(20),                               -- refunded | refund_pending | cod_manual
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  resolved_at TIMESTAMPTZ
+);
+
+-- ---------- Product reviews: only from shoppers whose order for the product was delivered ----------
+CREATE TABLE IF NOT EXISTS product_reviews (
+  id         SERIAL PRIMARY KEY,
+  product_id VARCHAR(64) NOT NULL,  -- MongoDB product _id
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  rating     SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  title      VARCHAR(120) NOT NULL DEFAULT '',
+  body       TEXT NOT NULL DEFAULT '',
+  sentiment  REAL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (product_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS product_reviews_product_idx ON product_reviews (product_id, created_at DESC);
+
 -- ---------- Verification codes: signup email, phone (SMS / WhatsApp), payout changes ----------
 -- Codes are stored only as an HMAC. A signup is held here (payload) until its email code is confirmed.
 CREATE TABLE IF NOT EXISTS verification_codes (

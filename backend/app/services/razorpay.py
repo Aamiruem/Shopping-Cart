@@ -51,6 +51,11 @@ async def fetch_payment(payment_id: str) -> dict:
     return await _call("GET", f"/payments/{payment_id}")
 
 
+async def capture(payment_id: str, amount_paise: int) -> dict:
+    """Takes the money for a payment the bank only authorised (accounts without automatic capture)."""
+    return await _call("POST", f"/payments/{payment_id}/capture", {"amount": amount_paise, "currency": "INR"})
+
+
 async def refund(payment_id: str, amount_rupees: float | None = None) -> dict:
     """Full refund by default; the money goes back to the original UPI app / bank / card."""
     body = {"amount": round(amount_rupees * 100)} if amount_rupees is not None else {}

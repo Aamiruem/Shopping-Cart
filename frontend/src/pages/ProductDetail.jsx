@@ -4,14 +4,19 @@ import { api } from '../api/client';
 import { EmptyState, Spinner } from '../components/common/Feedback';
 import Icon from '../components/common/Icon';
 import Price from '../components/common/Price';
-import Rating from '../components/common/Rating';
+import Rating, { shownRating } from '../components/common/Rating';
 import ProductRail from '../components/product/ProductRail';
+import Reviews from '../components/product/Reviews';
 import Spin360 from '../components/product/Spin360';
 import { aisleLabel, categoryLabel, groupOf } from '../constants/catalog';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import useShopActions from '../hooks/useShopActions';
 import { deliveryDate } from '../utils/format';
+import { responsiveImage } from '../utils/image';
+import { PREVIEW } from '../config';
+import { productDescription, productTitle } from '../seo/copy';
+import { trackViewItem } from '../utils/analytics';
 import useSeo, { breadcrumbLd, productLd, productPath } from '../hooks/useSeo';
 import { addRecentlyViewed } from '../utils/recentlyViewed';
 
@@ -43,16 +48,30 @@ function ZoomImage({ src, alt }) {
 function DeliveryCheck() {
   const [pincode, setPincode] = useState('');
   const [result, setResult] = useState(null);
-  const check = (e) => {
+  const [busy, setBusy] = useState(false);
+
+  const check = async (e) => {
     e.preventDefault();
-    setResult(/^\d{6}$/.test(pincode) ? { ok: true, text: `Delivery by ${deliveryDate(Number(pincode[0]) % 3 + 2)}` } : { ok: false, text: 'Please enter a valid 6-digit pincode' });
+    if (!/^\d{6}$/.test(pincode)) return setResult({ ok: false, text: 'Please enter a valid 6-digit pincode' });
+    setBusy(true);
+    try {
+      const place = await api.pincode(pincode);
+      if (place.found === false) setResult({ ok: false, text: 'We couldn’t find this pincode. Please check it.' });
+      else if (place.deliverable === false) setResult({ ok: false, text: `Sorry, we don’t deliver to ${place.city} yet.` });
+      else setResult({ ok: true, text: `${place.city ? `${place.city}: delivery` : 'Delivery'} by ${deliveryDate(place.days.max)}` });
+    } catch (err) {
+      setResult({ ok: false, text: err.message });
+    } finally {
+      setBusy(false);
+    }
   };
+
   return (
     <form className="delivery-check" onSubmit={check}>
       <Icon name="mapPin" size={16} />
-      <input value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Enter delivery pincode" inputMode="numeric" aria-label="Delivery pincode" />
-      <button type="submit" className="btn-link">Check</button>
-      {result && <p className={result.ok ? 'text-success' : 'text-error'}>{result.text}</p>}
+      <input value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Enter delivery pincode" inputMode="numeric" autoComplete="postal-code" aria-label="Delivery pincode" />
+      <button type="submit" className="btn-link" disabled={busy}>{busy ? 'Checking…' : 'Check'}</button>
+      {result && <p className={result.ok ? 'text-success' : 'text-error'} role="status">{result.text}</p>}
     </form>
   );
 }
@@ -83,6 +102,7 @@ export default function ProductDetail() {
         setProduct(p);
         if (p.images360?.length >= 4) setActiveImage(SPIN_VIEW);
         addRecentlyViewed(p);
+        trackViewItem(p);
         // AI recommendations first; fall back to the same category if the AI service is down
         return api.recommend(id)
           .then((recs) => (recs?.length ? recs : Promise.reject()))
@@ -97,8 +117,8 @@ export default function ProductDetail() {
   }, [id]);
 
   useSeo(product ? {
-    title: `${product.name}${product.unit ? ` (${product.unit})` : ''} - Buy online at ₹${Math.round(product.price)}`,
-    description: `${product.name} by ${product.brand || 'Arvixa'} at ₹${Math.round(product.price)}${product.discount ? ` (${product.discount}% off)` : ''}. ${(product.description || '').slice(0, 110)} Free delivery over ₹499, easy returns.`,
+    title: productTitle(product, PREVIEW),
+    description: productDescription(product, PREVIEW),
     path: productPath(product),
     image: product.image,
     type: 'product',
@@ -113,6 +133,7 @@ export default function ProductDetail() {
   const show360 = frames360 && activeImage === SPIN_VIEW;
   const outOfStock = product.stock === 0;
   const wished = inWishlist(product._id);
+  const rating = shownRating(product);
 
   return (
     <div className="page-detail container">
@@ -127,7 +148,7 @@ export default function ProductDetail() {
             )}
             {images.map((src, i) => (
               <button key={src} type="button" className={i === activeImage ? 'active' : ''} onMouseEnter={() => setActiveImage(i)} onClick={() => setActiveImage(i)} aria-label={`Image ${i + 1}`}>
-                <img src={src} alt="" />
+                <img {...responsiveImage(src, '64px')} alt="" />
               </button>
             ))}
           </div>
@@ -138,21 +159,29 @@ export default function ProductDetail() {
                 <Icon name="rotate" size={14} /> View in 360°
               </button>
             )}
+            {!PREVIEW && (
             <button type="button" className={`wish-btn large ${wished ? 'active' : ''}`} onClick={() => toggleWishlist(product)} aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}>
               <Icon name="heart" size={20} filled={wished} />
             </button>
+            )}
           </div>
           <div className="detail-actions">
-            {inCart(product._id) ? (
-              <Link to="/cart" className="btn btn-cart btn-lg"><Icon name="cart" size={18} /> Go to cart</Link>
+            {PREVIEW ? (
+              <button type="button" className="btn btn-cart btn-lg coming-soon" disabled>Coming soon</button>
             ) : (
-              <button type="button" className="btn btn-cart btn-lg" disabled={outOfStock} onClick={() => addToCart(product)}>
-                <Icon name="cart" size={18} /> Add to cart
-              </button>
+              <>
+                {inCart(product._id) ? (
+                  <Link to="/cart" className="btn btn-cart btn-lg"><Icon name="cart" size={18} /> Go to cart</Link>
+                ) : (
+                  <button type="button" className="btn btn-cart btn-lg" disabled={outOfStock} onClick={() => addToCart(product)}>
+                    <Icon name="cart" size={18} /> Add to cart
+                  </button>
+                )}
+                <button type="button" className="btn btn-buy btn-lg" disabled={outOfStock} onClick={() => buyNow(product)}>
+                  <Icon name="zap" size={18} filled /> Buy now
+                </button>
+              </>
             )}
-            <button type="button" className="btn btn-buy btn-lg" disabled={outOfStock} onClick={() => buyNow(product)}>
-              <Icon name="zap" size={18} filled /> Buy now
-            </button>
           </div>
           {product.imageCredit && (
             <p className="image-credit">
@@ -176,39 +205,47 @@ export default function ProductDetail() {
           <h1>{product.name}</h1>
           {product.unit && <p className="detail-unit">Pack size: <strong>{product.unit}</strong></p>}
           <div className="detail-rating">
-            <Rating value={product.rating} />
-            <span className="muted">{product.ratingCount?.toLocaleString('en-IN')} ratings</span>
-            {product.featured && <span className="assured"><Icon name="shield" size={12} /> Arvixa Assured</span>}
+            {rating.count > 0 ? (
+              <>
+                <Rating value={rating.value} />
+                <span className="muted">{rating.count.toLocaleString('en-IN')} ratings</span>
+              </>
+            ) : <span className="muted">No ratings yet</span>}
+            {!PREVIEW && product.featured && <span className="assured"><Icon name="shield" size={12} /> Arvixa Assured</span>}
           </div>
-          {product.discount > 0 && <p className="text-success special">Special price</p>}
+          {!PREVIEW && product.discount > 0 && <p className="text-success special">Special price</p>}
           <Price price={product.price} mrp={product.mrp} size="lg" />
-          <p className={`stock ${outOfStock ? 'text-error' : product.stock < 10 ? 'text-warn' : 'text-success'}`}>
-            {outOfStock ? 'Currently out of stock' : product.stock < 10 ? `Hurry, only ${product.stock} left!` : 'In stock'}
-          </p>
+          {!PREVIEW && (
+            <>
+              <p className={`stock ${outOfStock ? 'text-error' : product.stock < 10 ? 'text-warn' : 'text-success'}`}>
+                {outOfStock ? 'Currently out of stock' : product.stock < 10 ? `Hurry, only ${product.stock} left!` : 'In stock'}
+              </p>
 
-          <div className="detail-section">
-            <h3>Available offers</h3>
-            <ul className="offer-list">
-              {OFFERS.map((o) => <li key={o}><Icon name="tag" size={14} /> {o}</li>)}
-            </ul>
-          </div>
+              <div className="detail-section">
+                <h3>Available offers</h3>
+                <ul className="offer-list">
+                  {OFFERS.map((o) => <li key={o}><Icon name="tag" size={14} /> {o}</li>)}
+                </ul>
+              </div>
 
-          <div className="detail-section detail-grid">
-            <h3>Delivery</h3>
-            <div>
-              <DeliveryCheck />
-              <p className="muted small">Usually delivered in 2–4 days · Cash on delivery available</p>
-            </div>
-          </div>
+              <div className="detail-section detail-grid">
+                <h3>Delivery</h3>
+                <div>
+                  <DeliveryCheck />
+                  <p className="muted small">Usually delivered in 2–4 days · Cash on delivery available</p>
+                </div>
+              </div>
 
-          <div className="detail-section detail-grid">
-            <h3>Services</h3>
-            <ul className="service-list">
-              <li><Icon name="returns" size={16} /> 7-day return policy</li>
-              <li><Icon name="truck" size={16} /> {product.price >= 499 ? 'Free delivery' : '₹40 delivery charge'}</li>
-              <li><Icon name="shield" size={16} /> 1-year warranty on eligible products</li>
-            </ul>
-          </div>
+              <div className="detail-section detail-grid">
+                <h3>Services</h3>
+                <ul className="service-list">
+                  <li><Icon name="returns" size={16} /> 7-day return policy</li>
+                  <li><Icon name="truck" size={16} /> {product.price >= 499 ? 'Free delivery' : '₹40 delivery charge'}</li>
+                  <li><Icon name="shield" size={16} /> 1-year warranty on eligible products</li>
+                </ul>
+              </div>
+            </>
+          )}
 
           {(product.videos?.length > 0 || product.audio) && (
             <div className="detail-section">
@@ -241,9 +278,11 @@ export default function ProductDetail() {
         </div>
       </div>
 
+      {!PREVIEW && <Reviews productId={product._id} />}
+
       <ProductRail
-        title={together.strategy === 'bought_together' ? 'Frequently bought together' : 'Customers also viewed'}
-        subtitle="Based on what other shoppers bought and browsed"
+        title={PREVIEW ? 'You may also like' : together.strategy === 'bought_together' ? 'Frequently bought together' : 'Customers also viewed'}
+        subtitle={PREVIEW ? undefined : 'Based on what other shoppers bought and browsed'}
         products={together.items}
       />
       <ProductRail title="Similar products" subtitle="You may also like" products={similar} viewAll={`/products?category=${product.category}`} />

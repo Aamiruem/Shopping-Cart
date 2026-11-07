@@ -15,16 +15,19 @@ import argparse
 import asyncio
 import json
 import random
+import sys
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
 
+from app.core.config import get_settings
 from app.core.security import hash_password
 from app.db.mongo import close_mongo, connect_mongo
 from app.db.postgres import close_postgres, connect_postgres
 from app.ml.support import triage
 from app.ml.support_data import TRAINING_TICKETS
+from app.services.catalog import stable_product_id
 
 PRODUCTS_FILE = Path(__file__).resolve().parents[1] / "app" / "data" / "products.json"
 
@@ -148,14 +151,16 @@ def log(msg: str) -> None:
 async def seed_catalog(db, seller_ids: dict[str, int], rng: random.Random) -> list[dict]:
     products = json.loads(PRODUCTS_FILE.read_text(encoding="utf-8"))
     now = datetime.now(UTC)
+    seen: dict[str, int] = {}
     for p in products:
+        occurrence = seen.get(p["name"], 0)
+        seen[p["name"]] = occurrence + 1
+        p["_id"] = stable_product_id(p["name"], occurrence)  # stable, so product URLs survive a re-seed
         p["sellerId"] = seller_ids[p["category"]]
         p["active"] = True
         p["createdAt"] = p["updatedAt"] = now - timedelta(days=rng.randint(150, 400))
     await db.products.delete_many({})
-    result = await db.products.insert_many(products)
-    for p, oid in zip(products, result.inserted_ids, strict=False):
-        p["_id"] = oid
+    await db.products.insert_many(products)
     await db.carts.delete_many({})
     await db.wishlists.delete_many({})
     log(f"Inserted {len(products)} products")
@@ -437,6 +442,11 @@ async def seed_tickets(pool, customers, orders, rng, pyrng, now, days) -> None:
 
 
 async def main(args) -> None:
+    if get_settings().is_production:
+        sys.exit(
+            "scripts.seed creates public demo logins and fake orders, so it won't run in production. "
+            "Use scripts.create_admin, then add real products in the Seller Hub."
+        )
     pool = await connect_postgres()
     db = await connect_mongo()
     try:

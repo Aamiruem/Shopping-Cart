@@ -26,6 +26,16 @@ class AnalystQuestion(BaseModel):
     sellerId: int | None = None  # admins only: one seller's data (sellers always see their own)
 
 
+class Review(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    title: str = ""
+    body: str = ""
+
+
+class ReviewBatch(BaseModel):
+    reviews: list[Review] = Field(max_length=100)
+
+
 class ListingRequest(BaseModel):
     name: str
     brand: str = ""

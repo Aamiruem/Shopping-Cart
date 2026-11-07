@@ -12,7 +12,8 @@ export function ToastProvider({ children }) {
   // type: 'success' | 'error' | 'info'
   const show = useCallback((message, type = 'success') => {
     const id = nextId++;
-    setToasts((list) => [...list.slice(-2), { id, message, type }]);
+    // The same message never stacks, however often it's triggered
+    setToasts((list) => [...list.filter((t) => t.message !== message).slice(-2), { id, message, type }]);
     setTimeout(() => dismiss(id), 3000);
   }, [dismiss]);
 

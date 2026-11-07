@@ -10,12 +10,14 @@ from ..deps import CurrentUser, get_optional_user
 from ..ml import cache
 from ..services.catalog import serialize_product, to_object_id
 
-# pandas / scikit-learn load on the first recommendation request, not at API startup
+# pandas / scikit-learn / xgboost load on the first recommendation request, not at API startup
 recommender = lazy_import("app.ml.recommender")
+ranker = lazy_import("app.ml.ranker")
 ml_data = lazy_import("app.ml.data")
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 TTL_SECONDS = 10 * 60
+CANDIDATE_FACTOR = 4  # collaborative filtering offers more than needed, and the ranker picks the best
 
 
 async def _model() -> "recommender.RecommenderModel":
@@ -26,6 +28,15 @@ async def _model() -> "recommender.RecommenderModel":
         return await asyncio.to_thread(recommender.build, events, ids)
 
     return await cache.cached("recommender", TTL_SECONDS, compute)
+
+
+async def _ranker() -> "ranker.Ranker":
+    async def compute():
+        products = await ml_data.load_products()
+        events = await ml_data.load_events(days=120)
+        return await asyncio.to_thread(ranker.train, events, products[products["active"]], ml_data.local_today())
+
+    return await cache.cached("for-you-ranker", TTL_SECONDS * 6, compute)
 
 
 async def _trending_ids(k: int) -> list[str]:
@@ -53,8 +64,10 @@ async def _popular(k: int, exclude: set[str] = frozenset(), category: str | None
 async def for_you(k: int = 12, user: CurrentUser | None = Depends(get_optional_user)):
     """Collaborative filtering for known shoppers; trending / popular for guests and new shoppers."""
     k = max(1, min(k, 24))
-    picks = recommender.for_user(await _model(), user.id if user else None, k)
+    model = await _model()
+    picks = recommender.for_user(model, user.id if user else None, k * CANDIDATE_FACTOR)
     if picks:
+        picks = ranker.rerank(await _ranker(), model, user.id, picks)[:k]
         names = {}
         reasons = {p["becauseOf"] for p in picks}
         async for doc in get_db().products.find({"_id": {"$in": [to_object_id(r) for r in reasons]}}, {"name": 1}):

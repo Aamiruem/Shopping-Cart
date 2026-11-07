@@ -7,7 +7,7 @@ from ...agents.shopping import ShoppingAgent
 from ...agents.sql_guard import UnsafeSQL
 from ...core.security import User, current_user, require_seller, seller_scope
 from ...llm import client as llm
-from ...ml.registry import models
+from ...ml.registry import models, semantic_index
 from ..schemas import AnalystQuestion, ChatRequest
 
 router = APIRouter(tags=["agents"])
@@ -20,7 +20,7 @@ def agent_chat(body: ChatRequest, user: User = Depends(current_user), authorizat
     if not body.messages or body.messages[-1].role != "user":
         raise HTTPException(400, "The last message must be from the user")
     recommender, rag = models()
-    agent = ShoppingAgent(recommender, rag, authorization)  # the shopper's own token: it can only touch their cart
+    agent = ShoppingAgent(recommender, rag, authorization, semantic_index())  # their own token: it can only touch their cart
     return agent.chat([m.model_dump() for m in body.messages])
 
 

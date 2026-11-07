@@ -6,13 +6,19 @@ service limits a seller's analytics to that seller's own sales.
 """
 
 import httpx
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import JSONResponse
 
+from ..core.cache import cached
 from ..core.config import get_settings
+from ..core.errors import ApiError
+from ..core.rate_limit import rate_limit
 from ..deps import get_current_user, require_seller
+from ..services.ai import MAX_IMAGE_BYTES, forward_image, summarize_reviews
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
+vision_limiter = rate_limit(30, message="Too many photo searches. Please try again in a few minutes.")
+SUMMARY_TTL = 3600
 
 
 async def _forward(request: Request, path: str, method: str = "GET", body: bytes | None = None, timeout: float = 60) -> JSONResponse:
@@ -29,6 +35,20 @@ async def _forward(request: Request, path: str, method: str = "GET", body: bytes
 @router.get("/recommend/{product_id}")
 async def recommend(product_id: str, request: Request, k: int = 4):
     return await _forward(request, f"/recommend/{product_id}?k={k}")
+
+
+@router.post("/visual-search", dependencies=[Depends(vision_limiter)])
+async def visual_search(file: UploadFile = File(...)):
+    """Find products that look like a photo."""
+    data = await file.read(MAX_IMAGE_BYTES + 1)
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ApiError(413, "Please use an image under 8 MB")
+    return await forward_image("/vision/search", file.filename or "photo", data)
+
+
+@router.get("/review-summary/{product_id}")
+async def review_summary(product_id: str):
+    return await cached(f"reviews:summary:{product_id}", SUMMARY_TTL, lambda: summarize_reviews(product_id))
 
 
 @router.post("/ask")

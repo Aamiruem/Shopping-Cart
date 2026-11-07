@@ -108,7 +108,7 @@
 }
 .chat-fab:hover { transform: translateY(-2px); }
 .chat-panel {
-  position: fixed; right: 20px; bottom: 20px; z-index: 200; width: min(370px, calc(100vw - 32px)); height: min(540px, calc(100vh - 100px));
+  position: fixed; right: 20px; bottom: 20px; z-index: 200; width: min(370px, calc(100vw - 32px)); height: min(540px, calc(100dvh - 100px));
   display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden;
   animation: toast-in 0.2s ease-out;
 }

@@ -17,9 +17,10 @@ from ..db.postgres import get_pool, rows
 from ..deps import CurrentUser, get_current_user, require_seller
 from ..schemas.product import ProductIn, ProductPatch
 from ..services import products as product_service
+from ..services.ai import check_photo
 from ..services.catalog import serialize_product
 from ..services.crypto import decrypt, encrypt
-from ..services.orders import FULFILMENT_STEPS
+from ..services.orders import FULFILMENT_STEPS, add_event
 from ..services.storage import MEDIA, save_media
 from ..services.validation import phone_error
 from ..services.verification import check_code, send_code
@@ -278,7 +279,9 @@ async def upload_media(
 ):
     """Uploads product media to S3 (production) or local storage: photos up to 15 MB (optimised to WebP), audio 10 MB, videos 50 MB."""
     content = await file.read(MEDIA[kind]["max"] + 1)
-    return {"url": await save_media(content, file.content_type or "", user.id, kind), "kind": kind}
+    url = await save_media(content, file.content_type or "", user.id, kind)
+    quality = await check_photo(file.filename or "photo", content) if kind == "image" else None
+    return {"url": url, "kind": kind, "quality": quality}
 
 
 # ---------- Orders containing the seller's products ----------
@@ -316,6 +319,15 @@ async def my_orders(
 
 class FulfilmentIn(BaseModel):
     fulfilment: Literal["pending", "packed", "shipped", "delivered"]
+    courier: str | None = Field(default=None, max_length=60)
+    trackingNumber: str | None = Field(default=None, max_length=60)
+
+
+def _timeline_note(body: FulfilmentIn) -> str:
+    note = body.fulfilment.capitalize()
+    if body.fulfilment == "shipped" and (body.courier or body.trackingNumber):
+        return f"{note} by {body.courier or 'courier'}" + (f", tracking number {body.trackingNumber}" if body.trackingNumber else "")
+    return note
 
 
 @router.patch("/orders/{order_id}")
@@ -325,19 +337,22 @@ async def update_fulfilment(order_id: int, body: FulfilmentIn, user: CurrentUser
     order = await pool.fetchrow("SELECT status FROM orders WHERE id = $1", order_id)
     if not order:
         raise ApiError(404, "Order not found")
-    if order["status"] == "cancelled":
-        raise ApiError(400, "This order was cancelled")
-    owner = "" if user.is_admin else " AND seller_id = $3"
-    args = [order_id, body.fulfilment] + ([] if user.is_admin else [user.id])
+    if order["status"] != "placed":
+        raise ApiError(400, f"This order was {order['status']}")
+    owner = "" if user.is_admin else " AND seller_id = $5"
+    args = [order_id, body.fulfilment, body.courier, body.trackingNumber] + ([] if user.is_admin else [user.id])
     updated = await pool.fetch(
         f"""UPDATE order_items
                SET fulfilment = $2::varchar,
-                   fulfilled_at = CASE WHEN $2::varchar = 'delivered' THEN NOW() ELSE fulfilled_at END
+                   fulfilled_at = CASE WHEN $2::varchar = 'delivered' THEN NOW() ELSE fulfilled_at END,
+                   courier = COALESCE($3, courier),
+                   tracking_number = COALESCE($4, tracking_number)
              WHERE order_id = $1{owner} RETURNING id""",
         *args,
     )
     if not updated:
         raise ApiError(404, "This order has none of your products")
+    await add_event(pool, order_id, body.fulfilment, _timeline_note(body))
     return {"orderId": order_id, "fulfilment": body.fulfilment, "lines": len(updated)}
 
 

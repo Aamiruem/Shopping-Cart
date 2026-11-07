@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 
 from app.db.mongo import close_mongo, connect_mongo
 from app.db.postgres import close_postgres, connect_postgres
+from app.services.catalog import stable_product_id
 from scripts.seed import PRODUCTS_FILE, SELLERS
 
 # Fields added to the catalog after the first seed; filled in on existing products when missing
@@ -48,7 +49,8 @@ async def main() -> None:
                 if item["category"] not in sellers:
                     print(f"Skipped {item['name']!r}: no seller for {item['category']!r} (run scripts.seed first)")
                     continue
-                doc = {**item, "sellerId": sellers[item["category"]], "active": True, "createdAt": now, "updatedAt": now}
+                product_id = stable_product_id(item["name"])
+                doc = {**item, "_id": product_id, "sellerId": sellers[item["category"]], "active": True, "createdAt": now, "updatedAt": now}
                 await db.products.insert_one(doc)
                 inserted += 1
                 continue

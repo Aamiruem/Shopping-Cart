@@ -111,7 +111,7 @@ function ContactForm() {
 }
 
 export default function Help() {
-  useSeo({ title: 'Help Center - Orders, Payments, Returns & Refunds', description: 'Get help with Arvixa orders, delivery, UPI and card payments, cancellations, returns and refunds, or contact 24x7 customer support.', path: '/help' });
+  useSeo({ title: 'Help Center - Orders, Payments, Returns & Refunds', description: 'Get help with Arvixa Store orders, delivery, UPI and card payments, cancellations, returns and refunds, or contact 24x7 customer support.', path: '/help' });
   return (
     <div className="page-orders container narrow">
       <h1 className="page-title">Help Center</h1>

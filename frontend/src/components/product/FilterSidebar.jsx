@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PREVIEW } from '../../config';
 import { AUDIENCES, CATEGORY_GROUPS, categoryLabel } from '../../constants/catalog';
 import Icon from '../common/Icon';
 
@@ -94,15 +95,17 @@ export default function FilterSidebar({ filters, facets, onChange, onClear, open
         </form>
       </div>
 
-      <div className="filter-group">
-        <h4>Customer Ratings</h4>
-        {[4, 3].map((r) => (
-          <label key={r} className="check-row">
-            <input type="checkbox" checked={Number(filters.minRating) === r} onChange={(e) => onChange({ minRating: e.target.checked ? r : '' })} />
-            {r}<Icon name="star" size={12} filled strokeWidth={0} /> & above
-          </label>
-        ))}
-      </div>
+      {!PREVIEW && (
+        <div className="filter-group">
+          <h4>Customer Ratings</h4>
+          {[4, 3].map((r) => (
+            <label key={r} className="check-row">
+              <input type="checkbox" checked={Number(filters.minRating) === r} onChange={(e) => onChange({ minRating: e.target.checked ? r : '' })} />
+              {r}<Icon name="star" size={12} filled strokeWidth={0} /> & above
+            </label>
+          ))}
+        </div>
+      )}
 
       {facets.brands.length > 0 && (
         <div className="filter-group">

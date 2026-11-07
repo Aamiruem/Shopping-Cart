@@ -32,11 +32,14 @@ from .routers import (
     ai,
     analytics,
     auth,
+    automation,
     cart,
+    location,
     orders,
     payments,
     products,
     recommendations,
+    reviews,
     seller,
     seller_import,
     seo,
@@ -92,7 +95,9 @@ def create_app() -> FastAPI:
 
     for module in (
         auth,
+        reviews,
         products,
+        location,
         cart,
         wishlist,
         addresses,
@@ -104,6 +109,7 @@ def create_app() -> FastAPI:
         analytics,
         recommendations,
         support,
+        automation,
         seo,
     ):
         app.include_router(module.router)

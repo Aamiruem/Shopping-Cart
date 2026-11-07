@@ -3,20 +3,25 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.6
 httpx==0.27.2
 python-dotenv==1.0.1
+python-multipart==0.0.19
 
-# LLM (Claude), authentication
+# LLM (Claude), agents, authentication
 anthropic>=1.0.0
+langgraph==1.2.20
 PyJWT==2.15.1
 
 # Data: SQL, NumPy, pandas, statistics
-psycopg[binary]==3.3.6
-sqlglot==30.24.0
+psycopg[binary]==3.3.8
+sqlglot==30.30.0
 numpy==2.5.4
 pandas==3.1.0
 scipy==1.18.1
 
-# Machine learning and the neural network (no PyTorch needed at this scale)
+# Machine learning and the neural network (PyTorch is optional: see requirements-ml.txt)
 scikit-learn==1.5.2
+
+# Images (photo search)
+pillow==11.0.0
 
 # Tests
 pytest==8.3.3
