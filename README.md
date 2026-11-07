@@ -11,7 +11,7 @@ analytics and machine learning that helps sellers sell more and helps shoppers g
 | Storefront & seller hub | React 18, Vite, React Router, Recharts | `frontend/` |
 | API | Python 3.12, FastAPI, asyncpg, PyMongo (async), JWT, bcrypt | `backend/` |
 | Analytics & ML | pandas, NumPy, scikit-learn | `backend/app/ml/` |
-| AI assistant | FastAPI + Claude: RAG Q&A and a tool-using shopping agent | `ai-service/` |
+| AI service | FastAPI + Claude: hybrid RAG, shopping and data-analyst agents (text-to-SQL), statistics, neural-network forecast | `ai-service/` ([README](ai-service/README.md)) |
 | Databases | PostgreSQL (users, sellers, orders, tickets) + MongoDB (catalog, carts, wishlists, behaviour events) | `backend/app/db/` |
 | Deploy | Docker Compose locally; AWS (CloudFront, S3, ECS Fargate, ALB, RDS, Secrets Manager) | `docker-compose.yml`, `infra/aws/` |
 | CI | GitHub Actions: lint, tests against real databases, build, template check | `.github/workflows/ci.yml` |
@@ -71,7 +71,7 @@ frontend/src/
   pages/                 store pages + pages/seller (layout, onboarding, dashboard, products, orders)
   components/            layout, product, cart, checkout, account, seller, chat, charts, analytics tabs
   context/ hooks/ utils/ styles/
-ai-service/              RAG, agent, content-based recommendations (unchanged API)
+ai-service/              RAG, agents, ML, deep learning, statistics, charts (layers: see ai-service/README.md)
 infra/aws/               cloudformation.yml, deploy.sh, seed.sh, guide
 ```
 
@@ -101,7 +101,7 @@ uvicorn app.main:app --reload --port 5000                # or: python app/main.p
 # Storefront (http://localhost:5173)
 cd frontend && npm install && npm run dev
 
-# AI assistant (optional)
+# AI service (optional) - first copy ai-service/.env.example to .env with the backend's DATABASE_URL, PG_SCHEMA, JWT_SECRET
 cd ai-service && python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt
 uvicorn app.main:app --port 8100                         # 8100: port 8000 is often used by other local apps
 ```
@@ -207,7 +207,7 @@ Full interactive docs at `/docs`. Errors always come back as `{"error": "message
 | Analytics | `GET /api/analytics/overview` · `/forecast` · `/bestsellers` · `/customers` · `/support` · `/export` · `POST /retrain` |
 | Recommendations | `GET /api/recommendations/for-you` · `/together/{productId}` · `/trending` |
 | Support | `POST/GET /api/support/tickets` · `PATCH /api/support/tickets/{id}` |
-| AI assistant | `POST /api/ai/ask` · `POST /api/ai/agent` · `GET /api/ai/recommend/{id}` |
+| AI service | `POST /api/ai/ask` · `POST /api/ai/agent` · `GET /api/ai/recommend/{id}` · `POST /api/ai/analyst` · `GET /api/ai/insights` · `GET /api/ai/forecast` |
 
 ## Deploy to AWS
 

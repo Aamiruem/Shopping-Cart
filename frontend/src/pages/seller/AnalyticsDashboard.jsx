@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, downloadFile } from '../../api/client';
+import AiInsightsTab from '../../components/analytics/AiInsightsTab';
 import CustomersTab from '../../components/analytics/CustomersTab';
 import ForecastTab from '../../components/analytics/ForecastTab';
 import GrowthTab from '../../components/analytics/GrowthTab';
@@ -19,14 +20,25 @@ const TABS = [
   { id: 'products', label: 'Best-seller prediction', load: (p) => api.analyticsBestsellers(p), Component: ProductsTab },
   { id: 'customers', label: 'Customers & churn', load: (p) => api.analyticsCustomers(p), Component: CustomersTab },
   { id: 'support', label: 'Support', load: () => api.analyticsSupport(), Component: SupportTab, adminOnly: true },
+  // AI service: ask-your-data analyst, statistical tests and the neural-network forecast
+  { id: 'ai', label: 'AI insights', load: loadAiInsights, Component: AiInsightsTab },
 ];
 const PERIODS = [7, 30, 90, 180];
+
+async function loadAiInsights(params) {
+  const [insights, forecast, suggestions] = await Promise.all([
+    api.aiInsights(params),
+    api.aiForecast(params),
+    api.aiAnalystSuggestions().catch(() => ({ questions: [], llm: false })),
+  ]);
+  return { insights, forecast, suggestions };
+}
 
 function TabPanel({ tab, params }) {
   const { data, error, loading, reload } = useApi(() => tab.load(params), [tab.id, params.days, params.sellerId]);
   if (loading) return <div className="tab-loading"><Spinner label="Crunching the numbers…" /><p className="muted small">Training models on your latest data…</p></div>;
   if (error) return <ErrorMessage message={error} onRetry={reload} />;
-  return <tab.Component data={data} />;
+  return <tab.Component data={data} params={params} />;
 }
 
 export default function AnalyticsDashboard() {

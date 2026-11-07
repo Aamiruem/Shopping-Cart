@@ -177,6 +177,11 @@ export const api = {
   analyticsCustomers: (params) => request(`/analytics/customers?${query(params)}`),
   analyticsSupport: () => request('/analytics/support'),
   analyticsRetrain: () => request('/analytics/retrain', { method: 'POST' }),
+  // AI service: data analyst (text-to-SQL), statistical insights, neural-network forecast
+  aiInsights: (params) => request(`/ai/insights?${query(params)}`),
+  aiForecast: (params) => request(`/ai/forecast?${query(params)}`),
+  aiAnalystSuggestions: () => request('/ai/analyst/suggestions'),
+  aiAnalyst: (body) => request('/ai/analyst', { method: 'POST', body }),
   exportUrl: (params) => `${BASE}/api/analytics/export?${query(params)}`,
 
   // Personalised recommendations

@@ -105,3 +105,11 @@ def test_neural_network_learns_the_weekly_pattern():
 def test_forecast_needs_enough_history():
     short = pd.DataFrame({"day": DAYS[:20].date, "units": 5})
     assert forecast_units(short)["ready"] is False
+
+
+def test_order_value_histogram_keeps_the_long_tail_in_one_bucket():
+    totals = pd.Series(np.r_[np.random.default_rng(5).uniform(500, 5000, 950), [250_000.0] * 50])
+    hist = statistics.order_value_histogram(totals)
+    assert hist["orders"].sum() == len(totals)  # every order counted once
+    assert hist["range"].iloc[-1].endswith("+") and (hist["orders"].iloc[:-1] > 0).sum() >= 10  # few empty bins
+    assert hist["range"].iloc[0].startswith("₹")

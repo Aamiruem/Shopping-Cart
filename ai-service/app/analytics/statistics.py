@@ -35,13 +35,34 @@ def _insight(id_: str, title: str, finding: str, method: str, significant: bool 
 # ---------- Exploratory data analysis ----------
 
 
+def _short(x: float) -> str:
+    """Compact Indian amount for axis labels: ₹850, ₹17k, ₹1.2L, ₹3Cr."""
+    if x >= 1e7:
+        return f"₹{x / 1e7:.1f}Cr".replace(".0Cr", "Cr")
+    if x >= 1e5:
+        return f"₹{x / 1e5:.1f}L".replace(".0L", "L")
+    return f"₹{x / 1e3:.0f}k" if x >= 1e3 else f"₹{x:.0f}"
+
+
+def order_value_histogram(totals: pd.Series, bins: int = 12) -> pd.DataFrame:
+    """Order values are long-tailed (a few big orders), so equal bins up to the 95th percentile plus one
+    open-ended bucket for the rest - otherwise most bars would be empty."""
+    cap = float(totals.quantile(0.95, interpolation="lower"))  # a real order value, not a point between outliers
+    if cap <= totals.min():
+        cap = float(totals.max())
+    counts, edges = np.histogram(totals[totals <= cap], bins=bins, range=(float(totals.min()), cap))
+    labels = [f"{_short(a)}–{_short(b)}" for a, b in zip(edges[:-1], edges[1:], strict=True)]
+    tail = int((totals > cap).sum())
+    if tail:
+        labels.append(f"{_short(cap)}+")
+        counts = np.append(counts, tail)
+    return pd.DataFrame({"range": labels, "orders": counts})
+
+
 def overview(orders: pd.DataFrame, daily: pd.DataFrame) -> dict:
     """Dataset profile: size, date range, missing values, and the shape of order values."""
     totals = orders["total"].astype(float)
-    counts, edges = np.histogram(totals, bins=min(20, max(totals.nunique(), 1)))
-    histogram = pd.DataFrame(
-        {"range": [f"{_rupees(a)}–{_rupees(b)}" for a, b in zip(edges[:-1], edges[1:], strict=True)], "orders": counts}
-    )
+    histogram = order_value_histogram(totals)
     days = daily.groupby("day", as_index=False).agg(revenue=("revenue", "sum"), orders=("orders", "sum")).sort_values("day")
     days["rolling_7d"] = days["revenue"].rolling(7, min_periods=1).mean().round(0)
     return {
@@ -57,7 +78,7 @@ def overview(orders: pd.DataFrame, daily: pd.DataFrame) -> dict:
             "p90": round(float(totals.quantile(0.9)), 2),
         },
         "charts": [
-            chart("bar", "Distribution of order values", histogram, "range", ["orders"]),
+            chart("bar", "Distribution of order values", histogram, "range", ["orders"], orientation="vertical"),
             chart("line", "Daily revenue with 7-day moving average", days, "day", ["revenue", "rolling_7d"]),
         ],
     }

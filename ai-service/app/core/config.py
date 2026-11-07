@@ -4,6 +4,7 @@ import os
 import re
 from dataclasses import dataclass
 from functools import lru_cache
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 
@@ -24,6 +25,12 @@ class Settings:
     # PostgreSQL: same database as the backend. Analytics only ever reads the read-only reporting views in
     # "<PG_SCHEMA>_analytics" (created by backend/app/db/schema.sql), never the raw tables.
     database_url: str = os.getenv("DATABASE_URL", "")
+    # ...or the parts separately (AWS ECS injects DB_PASSWORD from Secrets Manager), like the backend
+    db_host: str = os.getenv("DB_HOST", "")
+    db_port: int = int(os.getenv("DB_PORT", "5432"))
+    db_name: str = os.getenv("DB_NAME", "")
+    db_user: str = os.getenv("DB_USER", "")
+    db_password: str = os.getenv("DB_PASSWORD", "")
     pg_schema: str = os.getenv("PG_SCHEMA", "")
     timezone: str = os.getenv("TIMEZONE", "Asia/Kolkata")
 
@@ -37,6 +44,12 @@ class Settings:
     @property
     def llm_enabled(self) -> bool:
         return bool(self.anthropic_api_key)
+
+    @property
+    def postgres_dsn(self) -> str:
+        if not self.db_host:
+            return self.database_url
+        return f"postgresql://{quote(self.db_user)}:{quote(self.db_password, safe='')}@{self.db_host}:{self.db_port}/{self.db_name}"
 
     @property
     def analytics_schema(self) -> str:

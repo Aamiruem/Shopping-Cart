@@ -22,7 +22,7 @@ app = FastAPI(
 @app.get("/health", tags=["health"])
 def health():
     settings = get_settings()
-    return {"ok": True, "llm_enabled": llm.enabled(), "analytics_enabled": bool(settings.database_url), "model": settings.claude_model}
+    return {"ok": True, "llm_enabled": llm.enabled(), "analytics_enabled": bool(settings.postgres_dsn), "model": settings.claude_model}
 
 
 for module in (catalog, agents, analytics, content):

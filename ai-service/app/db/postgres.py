@@ -21,10 +21,10 @@ from ..core.config import get_settings
 @contextmanager
 def analytics_session(seller_id: int | None) -> Iterator[psycopg.Connection]:
     settings = get_settings()
-    if not settings.database_url:
+    if not settings.postgres_dsn:
         raise HTTPException(503, "Analytics needs DATABASE_URL (the backend's PostgreSQL) in ai-service/.env")
     try:
-        conn = psycopg.connect(settings.database_url, connect_timeout=5, options=f"-c search_path={settings.analytics_schema}")
+        conn = psycopg.connect(settings.postgres_dsn, connect_timeout=5, options=f"-c search_path={settings.analytics_schema}")
     except psycopg.OperationalError:
         raise HTTPException(503, "Can't reach the analytics database right now") from None
     with conn, conn.transaction():

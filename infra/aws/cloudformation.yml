@@ -346,8 +346,14 @@ Resources:
           PortMappings: [{ Name: ai-service, ContainerPort: 8000, AppProtocol: http }]
           Environment:
             - { Name: BACKEND_URL, Value: "http://backend:5000" }
+            # Data analyst / statistics: read-only reporting views in the same RDS database as the backend
+            - { Name: DB_HOST, Value: !GetAtt Database.Endpoint.Address }
+            - { Name: DB_NAME, Value: veyra }
+            - { Name: DB_USER, Value: veyra }
           Secrets:
             - { Name: ANTHROPIC_API_KEY, ValueFrom: !Sub "${AppSecrets}:ANTHROPIC_API_KEY::" }
+            - { Name: DB_PASSWORD, ValueFrom: !Sub "${DbSecret}:password::" }
+            - { Name: JWT_SECRET, ValueFrom: !Ref JwtSecret }
           LogConfiguration:
             LogDriver: awslogs
             Options:

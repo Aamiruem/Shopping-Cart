@@ -59,6 +59,9 @@ services:
     environment:
       BACKEND_URL: http://backend:5000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Same database and token secret as the backend: the data analyst reads its read-only reporting views
+      DATABASE_URL: postgres://shop:shop@postgres:5432/shop
+      JWT_SECRET: ${JWT_SECRET:-change-me}
     ports: ["8000:8000"]
     depends_on: [backend]
 
