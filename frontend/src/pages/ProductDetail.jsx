@@ -279,8 +279,8 @@ export default function ProductDetail() {
       {!PREVIEW && <Reviews productId={product._id} />}
 
       <ProductRail
-        title={together.strategy === 'bought_together' ? 'Frequently bought together' : 'Customers also viewed'}
-        subtitle="Based on what other shoppers bought and browsed"
+        title={PREVIEW ? 'You may also like' : together.strategy === 'bought_together' ? 'Frequently bought together' : 'Customers also viewed'}
+        subtitle={PREVIEW ? undefined : 'Based on what other shoppers bought and browsed'}
         products={together.items}
       />
       <ProductRail title="Similar products" subtitle="You may also like" products={similar} viewAll={`/products?category=${product.category}`} />
