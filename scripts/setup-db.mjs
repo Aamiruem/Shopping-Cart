@@ -2,23 +2,17 @@
 // same database later. Safe to run again. Run from the repository root: npm run db:setup
 import { readFileSync } from 'node:fs';
 import { Pool } from '@neondatabase/serverless';
+import { STORE_SCHEMA } from '../api/_schema.mjs';
 
 const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set. Run: npx vercel env pull .env.local');
 
 const schema = readFileSync(new URL('../backend/app/db/schema.sql', import.meta.url), 'utf8').replaceAll('{analytics}', 'analytics');
 
-// Login attempt counters: serverless instances share no memory, so they live in the database (see api/_auth.mjs)
-const rateLimits = `CREATE TABLE IF NOT EXISTS auth_rate_limits (
-  key      VARCHAR(64) PRIMARY KEY,
-  hits     INT         NOT NULL,
-  reset_at TIMESTAMPTZ NOT NULL
-);`;
-
 const pool = new Pool({ connectionString: url });
 try {
   await pool.query(schema);
-  await pool.query(rateLimits);
+  await pool.query(STORE_SCHEMA);
   const { rows } = await pool.query("SELECT count(*)::int AS tables FROM information_schema.tables WHERE table_schema = 'public'");
   console.log(`Database ready: ${rows[0].tables} tables`);
 } finally {

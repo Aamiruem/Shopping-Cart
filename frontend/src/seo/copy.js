@@ -9,7 +9,7 @@ export const SHARE_IMAGE_PATH = '/brand/arvixa-share.png';
 
 export const homeDescription = (preview) =>
   preview
-    ? `${SITE_NAME} is an online marketplace for India, opening soon. Browse mobiles, electronics, fashion for women and men, groceries, beauty, home and kitchen products.`
+    ? `${SITE_NAME} is an online marketplace for India. Browse mobiles, electronics, fashion for women and men, groceries, beauty, home and kitchen products.`
     : `Shop online at ${SITE_NAME}: mobiles, electronics, fashion for women and men, groceries, beauty, home and kitchen. Best prices, free delivery over ₹499, UPI, cards and cash on delivery.`;
 
 export const slugify = (text = '') =>
@@ -36,7 +36,7 @@ export const listingTitle = (heading, preview) => (preview ? `${heading} Online 
 
 export const listingDescription = (label, count, preview) =>
   preview
-    ? `Browse ${label} on ${SITE_NAME}, an online marketplace for India opening soon. ${count || 'Hundreds of'} products from top brands.`
+    ? `Browse ${label} on ${SITE_NAME}, an online marketplace for India. ${count || 'Hundreds of'} products from top brands.`
     : `Shop ${label} online at ${SITE_NAME}. ${count || 'Hundreds of'} products with top brands, great discounts, free delivery over ₹499 and easy returns.`;
 
 export const ABOUT_DESCRIPTION = `About ${SITE_NAME}, an online marketplace for shoppers and sellers in India.`;

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { PREVIEW } from '../config';
 import AddressForm from '../components/account/AddressForm';
 import PriceDetails from '../components/cart/PriceDetails';
 import PaymentOtp from '../components/checkout/PaymentOtp';
@@ -92,7 +93,8 @@ export default function Checkout() {
       })
       .catch(() => setGateway({ enabled: false }));
   }, []);
-  const options = gateway?.enabled ? LIVE_OPTIONS : DEMO_OPTIONS;
+  // Without the full API there's no OTP demo either, so the store takes cash on delivery only
+  const options = gateway?.enabled ? LIVE_OPTIONS : PREVIEW ? [COD] : DEMO_OPTIONS;
 
   useEffect(() => {
     api.addresses()
@@ -239,7 +241,7 @@ export default function Checkout() {
             ))}
           </ul>
           <div className="step-foot">
-            <p className="muted small">Order confirmation will be sent to <strong>{user.email}</strong></p>
+            {!PREVIEW && <p className="muted small">Order confirmation will be sent to <strong>{user.email}</strong></p>}
             <button type="button" className="btn btn-buy" onClick={() => setStep(4)}>Continue</button>
           </div>
         </Step>

@@ -19,8 +19,8 @@ const ALL_TABS = [
   { id: 'security', label: 'Change password', icon: 'lock' },
   { id: 'support', label: 'Support tickets', icon: 'message' },
 ];
-// Addresses and tickets need the full store
-const TABS = PREVIEW ? ALL_TABS.filter((t) => ['profile', 'security'].includes(t.id)) : ALL_TABS;
+// Support tickets need the full API
+const TABS = PREVIEW ? ALL_TABS.filter((t) => t.id !== 'support') : ALL_TABS;
 
 const STATUS_LABEL = { open: 'Open', in_progress: 'In progress', resolved: 'Resolved' };
 
@@ -259,8 +259,8 @@ export default function Account() {
           <div><span className="muted small">Hello,</span><strong>{user.name}</strong></div>
         </div>
         <nav className="panel account-nav">
-          {!PREVIEW && <Link to="/orders"><Icon name="package" size={18} /> My orders <Icon name="chevronRight" size={16} /></Link>}
-          {!PREVIEW && <Link to="/wishlist"><Icon name="heart" size={18} /> My wishlist <Icon name="chevronRight" size={16} /></Link>}
+          <Link to="/orders"><Icon name="package" size={18} /> My orders <Icon name="chevronRight" size={16} /></Link>
+          <Link to="/wishlist"><Icon name="heart" size={18} /> My wishlist <Icon name="chevronRight" size={16} /></Link>
           <p className="nav-group">Account settings</p>
           {TABS.map((t) => (
             <button key={t.id} type="button" className={tab === t.id ? 'active' : ''} onClick={() => setParams({ tab: t.id })}>

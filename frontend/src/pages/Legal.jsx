@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { EmptyState } from '../components/common/Feedback';
-import { ACCOUNTS, CONTACT_EMAIL, PREVIEW } from '../config';
+import { CONTACT_EMAIL, SHOPPING } from '../config';
 import useSeo from '../hooks/useSeo';
 import { ABOUT_DESCRIPTION, PRIVACY_DESCRIPTION } from '../seo/copy';
 
@@ -12,7 +12,7 @@ export function About() {
     <article className="legal-page container panel">
       <h1>About Arvixa Store</h1>
       <p>Arvixa Store is an online marketplace being built for shoppers and sellers in India, bringing mobiles, electronics, fashion, beauty, home, kitchen and grocery products together in one place.</p>
-      {PREVIEW && <p>You can browse the catalog today. Ordering opens shortly, and prices may change.</p>}
+      {!SHOPPING && <p>You can browse the catalog today. Ordering opens shortly, and prices may change.</p>}
       <p>We plan to serve India first and to expand to other countries in future. Sellers can read about the programme on our <Link to="/sell">Sell on Arvixa Store</Link> page.</p>
       <h2>Contact</h2>
       <p>{contactLine}</p>
@@ -46,8 +46,8 @@ export function OpeningSoon() {
     <div className="container">
       <EmptyState
         icon="shield"
-        title={ACCOUNTS ? 'Opening soon' : 'Accounts are opening soon'}
-        message={`Arvixa Store is in preview, so ${ACCOUNTS ? '' : 'sign-in, '}cart and checkout aren’t available yet. You can still browse the whole catalog.`}
+        title={SHOPPING ? 'Seller accounts are opening soon' : 'Accounts are opening soon'}
+        message={SHOPPING ? 'Selling on Arvixa Store isn’t available yet. You can still shop the whole catalog.' : 'Arvixa Store is in preview, so sign-in, cart and checkout aren’t available yet. You can still browse the whole catalog.'}
         action={{ to: '/products', label: 'Browse products' }}
       />
     </div>

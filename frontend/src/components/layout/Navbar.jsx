@@ -8,7 +8,6 @@ import { soundStore } from '../../utils/sound';
 import Icon from '../common/Icon';
 import { OPEN_CHAT_EVENT } from '../chat/ChatWidget';
 import SearchBar from './SearchBar';
-import { PREVIEW } from '../../config';
 
 export const isSellerRole = (user) => ['seller', 'admin'].includes(user?.role);
 
@@ -24,15 +23,13 @@ export function Logo() {
   );
 }
 
-const NEEDS_FULL_STORE = ['/orders', '/wishlist', '/cart', '/account?tab=addresses'];
-
 // Account pages, shared by the Login dropdown and the home page shortcuts. Seller Hub is not here:
 // it lives only in the More menu, and only for sellers.
 export function useAccountLinks() {
   const { user } = useAuth();
   const { count: cartCount } = useCart();
   const { count: wishCount } = useWishlist();
-  const links = [
+  return [
     { to: '/products', icon: 'grid', label: 'Shop all products' },
     { to: '/account', icon: 'user', label: 'My Profile' },
     { to: '/orders', icon: 'package', label: 'Orders' },
@@ -41,7 +38,6 @@ export function useAccountLinks() {
     { to: '/account?tab=addresses', icon: 'mapPin', label: 'Saved Addresses' },
     { to: '/help', icon: 'help', label: 'Help Center' },
   ];
-  return PREVIEW ? links.filter((l) => !NEEDS_FULL_STORE.includes(l.to)) : links;
 }
 
 // Hover to open on desktop, click/tap to toggle everywhere, Esc or a click outside to close

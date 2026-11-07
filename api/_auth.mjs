@@ -71,7 +71,7 @@ function jwtSecret() {
 
 export const createToken = (u) => jwt.sign({ id: u.id, email: u.email, role: u.role }, jwtSecret(), { algorithm: 'HS256', expiresIn: TOKEN_SECONDS });
 
-function currentUserId(header) {
+export function currentUserId(header) {
   if (!text(header).startsWith('Bearer ')) throw new ApiError(401, 'Login required');
   try {
     return jwt.verify(header.slice(7), jwtSecret(), { algorithms: ['HS256'] }).id;
@@ -100,10 +100,10 @@ async function publicUser(u, store) {
 
 const session = async (u, store) => ({ token: createToken(u), user: await publicUser(u, store) });
 
-async function limit(store, key, max) {
+export async function limit(store, key, max, message = 'Too many login attempts. Please try again in 15 minutes.') {
   const digest = createHash('sha256').update(key).digest('hex'); // the table never holds a raw IP or email
   const { hits, retryAfter } = await store.hit(digest, RATE_WINDOW_SECONDS);
-  if (hits > max) throw new ApiError(429, 'Too many login attempts. Please try again in 15 minutes.', { 'Retry-After': String(retryAfter) });
+  if (hits > max) throw new ApiError(429, message, { 'Retry-After': String(retryAfter) });
 }
 
 async function register(body, ctx) {
@@ -172,22 +172,28 @@ const ROUTES = {
 /** The routes above; anything else (one-time codes, Google, phone) needs a service this deployment doesn't have. */
 export const isAuthRoute = (method, rest) => `${method} ${rest}` in ROUTES;
 
-export async function handleAuth({ method, rest, body, ip, authorization }, { store = postgresStore(), domainError = emailDomainError } = {}) {
+/** Runs a route: expected errors become their status and message, anything else a plain 500 with no details. */
+export async function safely(route) {
   try {
     jwtSecret(); // before any write: a signup must not create an account it can't then sign in
-    const { status = 200, body: result } = await ROUTES[`${method} ${rest}`](body ?? {}, { store, ip, authorization, domainError });
-    return { status, body: result, headers: {} };
+    const { status = 200, body } = await route();
+    return { status, body, headers: {} };
   } catch (err) {
     if (err instanceof ApiError) return { status: err.status, body: { error: err.message }, headers: err.headers };
-    console.error('auth error', err);
+    console.error('store API error', err);
     return { status: 500, body: { error: 'Something went wrong. Please try again.' }, headers: {} };
   }
 }
 
-let sql;
-function postgresStore() {
-  sql ??= neon(process.env.DATABASE_URL);
-  const one = async (query, params) => (await sql.query(query, params))[0] ?? null;
+export function handleAuth({ method, rest, body, ip, authorization }, { store = postgresStore(), domainError = emailDomainError } = {}) {
+  return safely(() => ROUTES[`${method} ${rest}`](body ?? {}, { store, ip, authorization, domainError }));
+}
+
+let client;
+export const query = (statement, params = []) => (client ??= neon(process.env.DATABASE_URL)).query(statement, params);
+
+export function postgresStore(db = query) {
+  const one = async (statement, params) => (await db(statement, params))[0] ?? null;
   return {
     findByEmail: (email) => one('SELECT * FROM users WHERE email = $1', [email]),
     findById: (id) => one('SELECT * FROM users WHERE id = $1', [id]),

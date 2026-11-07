@@ -15,7 +15,7 @@ import { siteUrl } from './site-url.mjs';
 
 const DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const SITE = siteUrl();
-const PREVIEW = ['preview', 'accounts'].includes(process.env.VITE_STORE_MODE);
+const PREVIEW = ['preview', 'store'].includes(process.env.VITE_STORE_MODE);
 const template = readFileSync(join(DIST, 'index.html'), 'utf8');
 
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -96,7 +96,7 @@ function write(file, content) {
 const page = (file, options, body) => write(file, render(head(options), body));
 
 const NAV = `<nav aria-label="Categories"><a href="/">Home</a>${CATEGORIES.map((c) => ` · <a href="/products?category=${c.id}">${esc(c.label)}</a>`).join('')}</nav>`;
-const PREVIEW_NOTE = PREVIEW ? '<p><strong>Coming soon.</strong> Ordering opens shortly, and prices may change.</p>' : '';
+const PREVIEW_NOTE = process.env.VITE_STORE_MODE === 'preview' ? '<p><strong>Coming soon.</strong> Ordering opens shortly, and prices may change.</p>' : '';
 const links = (products) => `<ul>${products.map((p) => `<li><a href="${esc(productPath(p))}">${esc(p.name)}</a> ${esc(priceLabel(p))}</li>`).join('')}</ul>`;
 
 function listingPage(file, { heading, path, intro, products, crumbs = [] }) {
@@ -262,4 +262,4 @@ write('manifest.webmanifest', JSON.stringify({
   ],
 }, null, 2));
 
-console.log(`Prerendered ${products.length} products + ${staticPaths.length} pages for ${SITE} (${PREVIEW ? 'preview' : 'live'} mode)`);
+console.log(`Prerendered ${products.length} products + ${staticPaths.length} pages for ${SITE} (${process.env.VITE_STORE_MODE || 'live'} mode)`);

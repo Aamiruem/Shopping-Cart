@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../../api/client';
+import { PREVIEW } from '../../config';
 import Icon from '../common/Icon';
 
 const STATES = [
@@ -29,7 +30,7 @@ export default function AddressForm({ defaults = {}, onSaved, onCancel }) {
   const onPincode = async (e) => {
     const pincode = e.target.value.replace(/\D/g, '').slice(0, 6);
     setForm((f) => ({ ...f, pincode }));
-    if (pincode.length !== 6) return;
+    if (pincode.length !== 6 || PREVIEW) return; // the lookup is part of the full API
     const place = await api.pincode(pincode).catch(() => null);
     if (place?.found) setForm((f) => ({ ...f, city: f.city || place.city, state: matchState(place.state) || f.state }));
     else if (place?.found === false) setError('We couldn’t find this pincode. Please check it.');
@@ -73,9 +74,11 @@ export default function AddressForm({ defaults = {}, onSaved, onCancel }) {
 
   return (
     <form className="address-form" onSubmit={submit}>
-      <button type="button" className="btn btn-outline locate-btn" onClick={useMyLocation} disabled={locating}>
-        <Icon name="mapPin" size={16} /> {locating ? 'Finding your location…' : 'Use my current location'}
-      </button>
+      {!PREVIEW && (
+        <button type="button" className="btn btn-outline locate-btn" onClick={useMyLocation} disabled={locating}>
+          <Icon name="mapPin" size={16} /> {locating ? 'Finding your location…' : 'Use my current location'}
+        </button>
+      )}
       <div className="form-grid">
         <label className="field">Full name<input name="name" value={form.name} onChange={set} required autoComplete="name" /></label>
         <label className="field">10-digit mobile number<input name="phone" value={form.phone} onChange={digits(10)} required inputMode="numeric" autoComplete="tel-national" /></label>

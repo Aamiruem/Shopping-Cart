@@ -67,7 +67,7 @@ export default function Footer() {
           <span><Icon name="gift" size={14} /> Gift Cards</span>
           <span><Icon name="headphones" size={14} /> Help Center</span>
           <span>© {new Date().getFullYear()} Arvixa Store. All rights reserved.</span>
-          <span className="pay-methods">UPI · VISA · Mastercard · RuPay · COD</span>
+          <span className="pay-methods">{PREVIEW ? 'Cash on Delivery' : 'UPI · VISA · Mastercard · RuPay · COD'}</span>
         </div>
       </div>
     </footer>

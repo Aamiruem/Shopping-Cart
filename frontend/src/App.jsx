@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Spinner } from './components/common/Feedback';
 import ChatWidget from './components/chat/ChatWidget';
-import { ACCOUNTS, PREVIEW } from './config';
+import { PREVIEW, SHOPPING } from './config';
 import CategoryBar from './components/layout/CategoryBar';
 import Footer from './components/layout/Footer';
 import Navbar from './components/layout/Navbar';
@@ -43,8 +43,9 @@ const SellerSettings = lazy(() => import('./pages/seller/SellerSettings'));
 const WITH_CATEGORY_BAR = ['/', '/products', '/grocery'];
 
 const privateRoute = (element) => <ProtectedRoute>{element}</ProtectedRoute>;
-// Pages that need the full store: shown to nobody until ordering opens
-const storeRoute = (element) => (PREVIEW ? <OpeningSoon /> : privateRoute(element));
+const shopRoute = (element) => (SHOPPING ? privateRoute(element) : <OpeningSoon />);
+// The Seller Hub needs the full API
+const sellerRoute = (element) => (PREVIEW ? <OpeningSoon /> : privateRoute(element));
 
 export default function App() {
   const { pathname, search } = useLocation();
@@ -71,8 +72,8 @@ export default function App() {
             <Route path="/products/:id" element={<ProductDetail />} />
             <Route path="/products/:id/:slug" element={<ProductDetail />} />
             <Route path="/grocery" element={<Grocery />} />
-            <Route path="/login" element={ACCOUNTS ? <Login /> : <OpeningSoon />} />
-            <Route path="/register" element={ACCOUNTS ? <Login mode="register" /> : <OpeningSoon />} />
+            <Route path="/login" element={SHOPPING ? <Login /> : <OpeningSoon />} />
+            <Route path="/register" element={SHOPPING ? <Login mode="register" /> : <OpeningSoon />} />
             <Route path="/help" element={<Help />} />
             <Route path="/sell" element={<Sell />} />
             <Route path="/visual-search" element={<VisualSearch />} />
@@ -80,16 +81,16 @@ export default function App() {
             <Route path="/privacy" element={<Privacy />} />
 
             {/* Logged-in users only */}
-            <Route path="/cart" element={storeRoute(<Cart />)} />
-            <Route path="/checkout" element={storeRoute(<Checkout />)} />
-            <Route path="/orders" element={storeRoute(<Orders />)} />
-            <Route path="/orders/:id" element={storeRoute(<OrderDetail />)} />
-            <Route path="/wishlist" element={storeRoute(<Wishlist />)} />
-            <Route path="/account" element={privateRoute(<Account />)} />
+            <Route path="/cart" element={shopRoute(<Cart />)} />
+            <Route path="/checkout" element={shopRoute(<Checkout />)} />
+            <Route path="/orders" element={shopRoute(<Orders />)} />
+            <Route path="/orders/:id" element={shopRoute(<OrderDetail />)} />
+            <Route path="/wishlist" element={shopRoute(<Wishlist />)} />
+            <Route path="/account" element={shopRoute(<Account />)} />
 
             {/* Seller hub (sellers & admins; customers are sent to onboarding) */}
-            <Route path="/seller/register" element={storeRoute(<SellerOnboarding />)} />
-            <Route path="/seller" element={storeRoute(<SellerLayout />)}>
+            <Route path="/seller/register" element={sellerRoute(<SellerOnboarding />)} />
+            <Route path="/seller" element={sellerRoute(<SellerLayout />)}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<AnalyticsDashboard />} />
               <Route path="products" element={<SellerProducts />} />

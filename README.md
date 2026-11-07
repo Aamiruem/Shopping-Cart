@@ -249,15 +249,19 @@ npx vercel deploy --prod
 - **Pages:** `frontend/scripts/prerender.mjs` writes real HTML for every public page, plus `sitemap.xml`, `robots.txt`
   and the web app manifest. Crawlers need neither JavaScript nor an API.
 - **API:** `api/catalog.mjs` serves `backend/app/data/products.json` with the same response shapes as the FastAPI
-  backend. `api/_auth.mjs` handles sign-up, login, profile and password. Cart and checkout routes answer 503 with an
-  "opening soon" message.
-- **Accounts mode** (`VITE_STORE_MODE=accounts`, the Vercel default): real accounts, with ordering off and a short
-  notice saying so. Sample ratings, discounts, offers, delivery promises and `Product` structured data are left out.
-  `VITE_STORE_MODE=preview` turns accounts off too. Run the store with the full API and databases, and a real catalog,
-  before setting `VITE_STORE_MODE=live`.
-- **Accounts** use the backend's `users` table, bcrypt hashes and token format, so they carry over to the full API
-  when it uses the same database and `JWT_SECRET`. With no email service yet, sign-up doesn't verify the address, and
-  there is no password reset, one-time-code login or Google sign-in.
+  backend. `api/_auth.mjs` handles sign-up, login, profile and password, and `api/_shop.mjs` handles the cart, wishlist,
+  saved addresses and cash-on-delivery orders. Seller, support and review routes answer 503 with an "opening soon"
+  message.
+- **Store mode** (`VITE_STORE_MODE=store`, the Vercel default): people can register and order, paying cash on delivery.
+  Sample ratings, discounts, offers, delivery promises and `Product` structured data stay hidden until there's real data
+  behind them. `VITE_STORE_MODE=preview` is browse-only. Run the store with the full API and databases, and a real
+  catalog, before setting `VITE_STORE_MODE=live`.
+- **Accounts and orders** use the backend's tables, bcrypt hashes and token format, so they carry over to the full API
+  when it uses the same database and `JWT_SECRET`. Carts and wishlists are PostgreSQL tables here (`api/_schema.mjs`) and
+  MongoDB in the full API. With no email service yet, sign-up doesn't verify the address, and there is no password reset,
+  one-time-code login, Google sign-in or order email.
+- **Limits of store mode:** stock doesn't go down as orders are placed, because the catalog is a read-only file, and
+  there's no Seller Hub. Read new orders in the Neon dashboard (Tables -> `orders`, `order_items`).
 - **Product URLs** use ids derived from the product name (`stable_product_id`), so they stay the same after moving
   to MongoDB. Marked-up ratings stay off until real customer reviews exist.
 

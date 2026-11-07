@@ -15,14 +15,14 @@ import useSeo from '../hooks/useSeo';
 const COPY = {
   login: {
     title: 'Welcome back',
-    blurb: PREVIEW ? 'Log in to your Arvixa Store account.' : 'Log in to track orders, save your wishlist and get picks made for you.',
+    blurb: PREVIEW ? 'Log in to shop, track your orders and save your wishlist.' : 'Log in to track orders, save your wishlist and get picks made for you.',
     submit: 'Login',
     switchText: 'New to Arvixa Store?',
     switchLink: { to: '/register', label: 'Create an account' },
   },
   register: {
     title: 'Looks like you’re new here!',
-    blurb: PREVIEW ? 'Create your account now and be ready when ordering opens.' : 'Create your account in a minute and start shopping with India’s best prices.',
+    blurb: PREVIEW ? 'Create your account in a minute and start shopping.' : 'Create your account in a minute and start shopping with India’s best prices.',
     submit: 'Create account',
     switchText: 'Existing user?',
     switchLink: { to: '/login', label: 'Log in' },

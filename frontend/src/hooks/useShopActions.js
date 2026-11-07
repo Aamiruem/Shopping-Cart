@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { useWishlist } from '../context/WishlistContext';
-import { OPENING_SOON_MESSAGE, PREVIEW } from '../config';
+import { OPENING_SOON_MESSAGE, SHOPPING } from '../config';
 import { trackAddToCart, trackWishlist } from '../utils/analytics';
 import { playSound } from '../utils/sound';
 
@@ -18,7 +18,7 @@ export default function useShopActions() {
   const location = useLocation();
 
   const requireLogin = () => {
-    if (PREVIEW) {
+    if (!SHOPPING) {
       toast.show(OPENING_SOON_MESSAGE, 'info');
       return false;
     }

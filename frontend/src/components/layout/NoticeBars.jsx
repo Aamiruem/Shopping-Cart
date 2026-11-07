@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PREVIEW } from '../../config';
+import { SHOPPING } from '../../config';
 import { needsConsent, setConsent } from '../../utils/analytics';
 
 // Shown on every page until the store can take orders
 export function PreviewBanner() {
-  if (!PREVIEW) return null;
+  if (SHOPPING) return null;
   return (
     <p className="preview-banner" role="status">
       <strong>Coming soon.</strong> Ordering opens shortly, and prices may change.

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
+import { PREVIEW } from '../config';
 import Icon from '../components/common/Icon';
 import { useAuth } from '../context/AuthContext';
 import useSeo from '../hooks/useSeo';
@@ -12,7 +13,7 @@ const SECTIONS = [
     icon: 'card',
     title: 'Payments',
     items: [
-      ['Which payment methods are accepted?', 'UPI, credit/debit cards and Cash on Delivery. In this demo store, UPI and card payments are simulated and nothing is charged.'],
+      ['Which payment methods are accepted?', PREVIEW ? 'Cash on Delivery: you pay when your order arrives.' : 'UPI, credit/debit cards and Cash on Delivery. In this demo store, UPI and card payments are simulated and nothing is charged.'],
       ['Is it safe to pay online?', 'Payments are processed over encrypted connections and card details are never stored on our servers.'],
     ],
   },
@@ -115,7 +116,7 @@ export default function Help() {
   return (
     <div className="page-orders container narrow">
       <h1 className="page-title">Help Center</h1>
-      <ContactForm />
+      {!PREVIEW && <ContactForm />}
       {SECTIONS.map((s) => (
         <section key={s.id} id={s.id} className="panel help-section">
           <h2><Icon name={s.icon} size={20} /> {s.title}</h2>

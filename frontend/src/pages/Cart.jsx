@@ -7,6 +7,7 @@ import Price from '../components/common/Price';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import useShopActions from '../hooks/useShopActions';
+import { PREVIEW } from '../config';
 import { deliveryDate } from '../utils/format';
 import { playSound } from '../utils/sound';
 import useSeo from '../hooks/useSeo';
@@ -45,7 +46,7 @@ function CartItem({ item }) {
         <Price price={item.price} mrp={item.mrp} />
         {item.stock < item.qty && <p className="text-error small">Only {item.stock} left in stock</p>}
       </div>
-      <p className="cart-item-delivery small">Delivery by {deliveryDate(3)} | <span className="text-success">{item.subtotal >= 499 ? 'Free' : '₹40'}</span></p>
+      <p className="cart-item-delivery small">{!PREVIEW && `Delivery by ${deliveryDate(3)} | `}<span className="text-success">{item.subtotal >= 499 ? 'Free' : '₹40'}</span></p>
 
       <div className="cart-item-actions">
         <div className="qty-stepper" aria-label={`Quantity for ${item.name}`}>

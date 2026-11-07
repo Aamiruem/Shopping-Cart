@@ -1,12 +1,15 @@
 // Build-time store settings (see frontend/.env.example)
 
 // VITE_STORE_MODE:
-//   preview   browse only: accounts, cart and checkout are off, and prices are samples
-//   accounts  preview plus real sign-up, login and profile, on the small API in api/ (cart and checkout stay off)
-//   live      everything on: needs the full API with its databases and a real catalog
+//   preview  browse only, no accounts or ordering
+//   store    accounts, cart, wishlist and cash-on-delivery orders on the small API in api/
+//   live     everything on: needs the full API with its databases and a real catalog
 const MODE = import.meta.env.VITE_STORE_MODE;
-export const PREVIEW = MODE === 'preview' || MODE === 'accounts'; // ordering is off, sample claims are hidden
-export const ACCOUNTS = MODE !== 'preview';
+// People can sign in and order
+export const SHOPPING = MODE !== 'preview';
+// The catalog is sample data and there's no full API: ratings, discounts and offers stay hidden because nothing backs
+// them yet, and so do the features only the full API has
+export const PREVIEW = MODE === 'preview' || MODE === 'store';
 
 // Public address for canonical links, set at build time (vite.config.js). Falls back to the current origin locally.
 export const SITE_URL = (import.meta.env.VITE_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');

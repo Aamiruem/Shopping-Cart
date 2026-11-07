@@ -14,7 +14,7 @@ import { useWishlist } from '../context/WishlistContext';
 import useShopActions from '../hooks/useShopActions';
 import { deliveryDate } from '../utils/format';
 import { responsiveImage } from '../utils/image';
-import { PREVIEW } from '../config';
+import { PREVIEW, SHOPPING } from '../config';
 import { productDescription, productTitle } from '../seo/copy';
 import { trackViewItem } from '../utils/analytics';
 import useSeo, { breadcrumbLd, productLd, productPath } from '../hooks/useSeo';
@@ -159,14 +159,14 @@ export default function ProductDetail() {
                 <Icon name="rotate" size={14} /> View in 360°
               </button>
             )}
-            {!PREVIEW && (
+            {SHOPPING && (
             <button type="button" className={`wish-btn large ${wished ? 'active' : ''}`} onClick={() => toggleWishlist(product)} aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}>
               <Icon name="heart" size={20} filled={wished} />
             </button>
             )}
           </div>
           <div className="detail-actions">
-            {PREVIEW ? (
+            {!SHOPPING ? (
               <button type="button" className="btn btn-cart btn-lg coming-soon" disabled>Coming soon</button>
             ) : (
               <>

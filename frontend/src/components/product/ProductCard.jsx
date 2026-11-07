@@ -1,6 +1,6 @@
 import { responsiveImage } from '../../utils/image';
 import { Link } from 'react-router-dom';
-import { PREVIEW } from '../../config';
+import { PREVIEW, SHOPPING } from '../../config';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { productPath } from '../../hooks/useSeo';
@@ -24,7 +24,7 @@ export default function ProductCard({ product, variant = 'grid' }) {
 
   return (
     <article className={`product-card product-card-${variant} ${portrait ? 'product-card-portrait' : ''}`}>
-      {!PREVIEW && (
+      {SHOPPING && (
       <button
         type="button"
         className={`wish-btn ${wished ? 'active' : ''}`}
@@ -58,8 +58,8 @@ export default function ProductCard({ product, variant = 'grid' }) {
         inCart(product._id) ? (
           <Link to="/cart" className="btn btn-outline btn-block btn-sm"><Icon name="cart" size={14} /> Go to cart</Link>
         ) : (
-          <button type="button" className="btn btn-cart btn-block btn-sm" disabled={outOfStock || PREVIEW} onClick={() => addToCart(product)}>
-            <Icon name="cart" size={14} /> {PREVIEW ? 'Coming soon' : outOfStock ? 'Out of stock' : 'Add to cart'}
+          <button type="button" className="btn btn-cart btn-block btn-sm" disabled={outOfStock || !SHOPPING} onClick={() => addToCart(product)}>
+            <Icon name="cart" size={14} /> {!SHOPPING ? 'Coming soon' : outOfStock ? 'Out of stock' : 'Add to cart'}
           </button>
         )
       )}
