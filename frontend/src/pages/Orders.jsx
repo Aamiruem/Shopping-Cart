@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { EmptyState, ErrorMessage, Spinner } from '../components/common/Feedback';
 import Icon from '../components/common/Icon';
 import { formatDate, formatPrice } from '../utils/format';
+import { paymentStatus } from '../utils/orders';
 import useSeo from '../hooks/useSeo';
 
 export function StatusBadge({ status }) {
@@ -37,7 +38,7 @@ export default function Orders() {
               </div>
               <div className="order-main">
                 <p className="order-title">{o.items[0]?.name}{o.items.length > 1 && <span className="muted"> + {o.items.length - 1} more</span>}</p>
-                <p className="muted small">Order #{o.id} · {formatDate(o.created_at)}</p>
+                <p className="muted small">Order ID #{o.id} · {formatDate(o.created_at)} · {paymentStatus(o, o.items.every((i) => i.fulfilment === 'delivered'))}</p>
               </div>
               <strong className="order-total">{formatPrice(o.total)}</strong>
               <StatusBadge status={o.status} />

@@ -269,6 +269,7 @@ export default function ProductDetail() {
             <p className="description">{product.description}</p>
             <table className="spec-table">
               <tbody>
+                <tr><th>Product ID</th><td className="id-line">{product._id}</td></tr>
                 <tr><th>Brand</th><td>{product.brand || '—'}</td></tr>
                 <tr><th>Category</th><td>{categoryLabel(product.category)}</td></tr>
                 {product.tags?.length > 0 && <tr><th>Tags</th><td>{product.tags.join(', ')}</td></tr>}

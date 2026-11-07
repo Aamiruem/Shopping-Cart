@@ -114,3 +114,5 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 }
 
 .coming-soon { grid-column: 1 / -1; }
+
+.id-line { overflow-wrap: anywhere; }

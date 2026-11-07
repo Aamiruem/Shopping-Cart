@@ -136,6 +136,10 @@ function ProfileTab() {
           </span>
           <input value={user.email} disabled />
         </label>
+        <label className="field">
+          Customer ID
+          <input value={user.id} disabled />
+        </label>
       </div>
       {error && <p className="alert alert-error" role="alert">{error}</p>}
       {editing && (
