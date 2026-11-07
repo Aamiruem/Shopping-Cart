@@ -22,3 +22,9 @@ Thumbs.db
 # AWS deploy parameters (contain secrets)
 infra/aws/params.json
 *.backup
+
+# Vercel CLI
+.vercel
+
+.vercel
+.env*

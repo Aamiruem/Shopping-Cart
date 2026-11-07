@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { api } from '../../api/client';
+import { useToast } from '../../context/ToastContext';
 import { AUDIENCES, CATEGORIES } from '../../constants/catalog';
 import { discountPercent } from '../../utils/format';
 import Icon from '../common/Icon';
@@ -28,6 +29,7 @@ function validate(f) {
 
 // Create / edit dialog. `product` = null for a new product.
 export default function ProductForm({ product, onSaved, onClose }) {
+  const toast = useToast();
   const [form, setForm] = useState(product ? fromProduct(product) : EMPTY);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -49,7 +51,11 @@ export default function ProductForm({ product, onSaved, onClose }) {
       const urls = [];
       const ordered = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
       const kind = key === 'videos' ? 'video' : 'image';
-      for (const file of ordered.slice(0, MAX_IMAGES[key] - form[key].length)) urls.push((await api.uploadMedia(file, kind)).url);
+      for (const file of ordered.slice(0, MAX_IMAGES[key] - form[key].length)) {
+        const { url, quality } = await api.uploadMedia(file, kind);
+        urls.push(url);
+        quality?.issues.forEach((issue) => toast.show(`${file.name}: ${issue}`, 'info')); // advice only: the seller decides
+      }
       setForm((f) => ({ ...f, [key]: [...f[key], ...urls] }));
     } catch (err) {
       setError(err.message);

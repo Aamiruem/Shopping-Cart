@@ -20,8 +20,8 @@ class Settings(BaseSettings):
     # Alternative to DATABASE_URL (used on AWS, where ECS injects the password from Secrets Manager)
     db_host: str = ""
     db_port: int = 5432
-    db_name: str = "veyra"
-    db_user: str = "veyra"
+    db_name: str = "arvixa"
+    db_user: str = "arvixa"
     db_password: str = ""
     mongo_uri: str = "mongodb://localhost:27017/shop"
     # Optional: keep all tables in their own schema, e.g. when sharing a database with another app
@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # The built storefront's index.html (e.g. http://frontend/index.html in Docker). Lets /api/seo/page serve
     # product and category pages with their title, description, preview card and content already in the HTML.
     frontend_index_url: str = ""
+
+    # Where orders ship from, for delivery estimates. Without it shoppers see a general 3-7 day estimate.
+    warehouse_pincode: str = ""
 
     # Email (payment OTPs, support replies). Without SMTP_HOST emails are logged instead.
     smtp_host: str = ""
@@ -74,6 +77,9 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     s3_public_url: str = ""  # e.g. a CloudFront domain in front of the bucket
     upload_dir: str = str(BASE_DIR / "uploads")
+
+    # Shared key for the scheduler that calls /api/automation/run. Empty turns the endpoint off.
+    automation_key: str = ""
 
     # Analytics
     timezone: str = "Asia/Kolkata"

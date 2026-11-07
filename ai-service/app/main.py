@@ -8,14 +8,14 @@ Layers (see README.md):  api/routes -> agents, rag, ml, dl, analytics, services 
 
 from fastapi import FastAPI
 
-from .api.routes import agents, analytics, catalog, content
+from .api.routes import agents, analytics, catalog, content, intelligence
 from .core.config import get_settings
 from .llm import client as llm
 
 app = FastAPI(
     title="Arvixa AI Service",
     version="2.0.0",
-    description="Recommendations, RAG Q&A, shopping and data-analyst agents, statistics and neural-network forecasting.",
+    description="Recommendations, semantic and photo search, RAG Q&A, LangGraph agents, review NLP and neural forecasting.",
 )
 
 
@@ -25,5 +25,5 @@ def health():
     return {"ok": True, "llm_enabled": llm.enabled(), "analytics_enabled": bool(settings.database_url), "model": settings.claude_model}
 
 
-for module in (catalog, agents, analytics, content):
+for module in (catalog, agents, analytics, content, intelligence):
     app.include_router(module.router)

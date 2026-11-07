@@ -52,7 +52,7 @@
 .order-items-cell img { width: 24px; height: 24px; object-fit: contain; }
 
 /* ---------- Product form dialog ---------- */
-.product-form { width: min(100%, 760px); max-height: calc(100vh - 32px); display: flex; flex-direction: column; border-radius: var(--radius-lg); }
+.product-form { width: min(100%, 760px); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; border-radius: var(--radius-lg); }
 .product-form header, .product-form footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border-light); }
 .product-form footer { border-top: 1px solid var(--border-light); border-bottom: 0; justify-content: flex-end; }
 .product-form-body { padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }

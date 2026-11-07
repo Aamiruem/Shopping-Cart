@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { responsiveImage } from '../../utils/image';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { SEASONS } from '../../constants/catalog';
@@ -28,7 +29,7 @@ export default function SeasonCollections() {
               <span>{s.note}</span>
               <span className="season-cta">Explore <Icon name="arrowRight" size={14} /></span>
             </div>
-            {covers[s.id] && <img src={covers[s.id]} alt="" loading="lazy" />}
+            {covers[s.id] && <img {...responsiveImage(covers[s.id])} alt="" loading="lazy" />}
           </Link>
         ))}
       </div>

@@ -2,8 +2,11 @@
 
 import json
 import re
+from pathlib import Path
 
+from app.routers import seo
 from app.routers.seo import _head, _ld, _render
+from app.services.catalog import stable_product_id
 
 TEMPLATE = """<!doctype html>
 <html lang="en">
@@ -25,7 +28,7 @@ TEMPLATE = """<!doctype html>
 def test_render_replaces_generic_title_and_description_once():
     head = _head("Puma Trainers - Buy online at ₹7469", "Puma Trainers at ₹7469.", "/products/abc/puma-trainers", og_type="product")
     page = _render(TEMPLATE, head, "<h1>Puma Trainers</h1>")
-    assert page.count("<title>") == 1 and "<title>Puma Trainers - Buy online at ₹7469 | Arvixa</title>" in page
+    assert page.count("<title>") == 1 and "<title>Puma Trainers - Buy online at ₹7469 | Arvixa Store</title>" in page
     assert page.count('name="description"') == 1 and "Generic store description" not in page
     assert '<meta property="og:type" content="product" />' in page and page.count('property="og:type"') == 1
     assert "Generic store title" not in page and page.count('name="twitter:card"') == 1
@@ -48,3 +51,15 @@ def test_json_ld_cannot_break_out_of_its_script_tag():
 def test_filtered_listing_is_noindex():
     assert 'content="noindex, nofollow"' in _head("Beauty", "d", "/products?category=beauty", noindex=True)
     assert 'content="index, follow, max-image-preview:large"' in _head("Beauty", "d", "/products?category=beauty")
+
+
+def test_stable_product_id_matches_the_static_catalog():
+    # Same value as stableId() in api/_catalog.mjs (frontend/scripts/catalog.test.mjs checks that side)
+    assert str(stable_product_id("Rolex Cellini Moonphase")) == "237c9d07351f778f746dd905"
+    assert stable_product_id("Rolex Cellini Moonphase", 1) != stable_product_id("Rolex Cellini Moonphase")
+
+
+def test_ratings_are_not_marked_up_and_public_api_is_crawlable():
+    source = Path(seo.__file__).read_text(encoding="utf-8")
+    assert 'p["reviewRating"]' in source and 'p["rating"]' not in source  # real reviews only, never sample ratings
+    assert "/api/products" in seo.PUBLIC_API

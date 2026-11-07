@@ -1,27 +1,34 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Spinner } from './components/common/Feedback';
 import ChatWidget from './components/chat/ChatWidget';
+import { PREVIEW } from './config';
 import CategoryBar from './components/layout/CategoryBar';
 import Footer from './components/layout/Footer';
 import Navbar from './components/layout/Navbar';
+import { ConsentBanner, PreviewBanner } from './components/layout/NoticeBars';
 import SiteHeader from './components/layout/SiteHeader';
 import ProtectedRoute from './components/routing/ProtectedRoute';
 import ScrollToTop from './components/routing/ScrollToTop';
-import Account from './pages/Account';
-import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
-import Grocery from './pages/Grocery';
-import Help from './pages/Help';
+import { About, OpeningSoon, Privacy } from './pages/Legal';
 import Home from './pages/Home';
-import Login from './pages/Login';
 import NotFound from './pages/NotFound';
-import OrderDetail from './pages/OrderDetail';
-import Orders from './pages/Orders';
 import ProductDetail from './pages/ProductDetail';
 import Products from './pages/Products';
-import Sell from './pages/Sell';
-import Wishlist from './pages/Wishlist';
+import { initAnalytics, pageView } from './utils/analytics';
+
+// Only the browsing pages ship in the main bundle; everything else loads when it's opened
+const Account = lazy(() => import('./pages/Account'));
+const Cart = lazy(() => import('./pages/Cart'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const Grocery = lazy(() => import('./pages/Grocery'));
+const Help = lazy(() => import('./pages/Help'));
+const Login = lazy(() => import('./pages/Login'));
+const OrderDetail = lazy(() => import('./pages/OrderDetail'));
+const Orders = lazy(() => import('./pages/Orders'));
+const Sell = lazy(() => import('./pages/Sell'));
+const Wishlist = lazy(() => import('./pages/Wishlist'));
+const VisualSearch = lazy(() => import('./pages/VisualSearch'));
 
 // Seller hub pages load on demand, so shoppers never download the charting library
 const SellerLayout = lazy(() => import('./pages/seller/SellerLayout'));
@@ -38,11 +45,16 @@ const WITH_CATEGORY_BAR = ['/', '/products', '/grocery'];
 const privateRoute = (element) => <ProtectedRoute>{element}</ProtectedRoute>;
 
 export default function App() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+
+  useEffect(initAnalytics, []);
+  // Runs after the page's own useSeo effect (a child's effects run first), so the new title is reported
+  useEffect(() => pageView(`${pathname}${search}`), [pathname, search]);
 
   return (
     <div className="app">
       <ScrollToTop />
+      <PreviewBanner />
       <SiteHeader>
         <Navbar />
         {WITH_CATEGORY_BAR.includes(pathname) && <CategoryBar />}
@@ -57,10 +69,13 @@ export default function App() {
             <Route path="/products/:id" element={<ProductDetail />} />
             <Route path="/products/:id/:slug" element={<ProductDetail />} />
             <Route path="/grocery" element={<Grocery />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Login mode="register" />} />
+            <Route path="/login" element={PREVIEW ? <OpeningSoon /> : <Login />} />
+            <Route path="/register" element={PREVIEW ? <OpeningSoon /> : <Login mode="register" />} />
             <Route path="/help" element={<Help />} />
             <Route path="/sell" element={<Sell />} />
+            <Route path="/visual-search" element={<VisualSearch />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/privacy" element={<Privacy />} />
 
             {/* Logged-in users only */}
             <Route path="/cart" element={privateRoute(<Cart />)} />
@@ -87,7 +102,8 @@ export default function App() {
       </main>
 
       <Footer />
-      <ChatWidget />
+      {!PREVIEW && <ChatWidget />}
+      <ConsentBanner />
     </div>
   );
 }

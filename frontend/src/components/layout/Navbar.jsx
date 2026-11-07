@@ -13,7 +13,7 @@ export const isSellerRole = (user) => ['seller', 'admin'].includes(user?.role);
 
 export function Logo() {
   return (
-    <Link to="/" className="logo" aria-label="Arvixa home">
+    <Link to="/" className="logo" aria-label="Arvixa Store home">
       <img className="logo-mark" src="/brand/arvixa-mark-192.png" alt="" width="42" height="42" />
       <span className="logo-text">
         <span className="logo-word">Arvixa</span>
@@ -91,7 +91,7 @@ function AccountMenu() {
 
   return (
     <div className="nav-dropdown" {...wrapper}>
-      <button type="button" className={`nav-item nav-account ${open ? 'open' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="true">
+      <button type="button" className={`nav-item nav-account ${open ? 'open' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="true" aria-label="Account">
         <Icon name="user" size={20} />
         {/* Until the saved session is checked, say 'Account' rather than flashing 'Login' at signed-in users */}
         <span className="nav-label">{user ? user.name.split(' ')[0] : ready ? 'Login' : 'Account'}</span>

@@ -1,4 +1,4 @@
-# Deploying Veyra to AWS
+# Deploying Arvixa Store to AWS
 
 One CloudFormation stack (`cloudformation.yml`) plus two scripts. Everything is served from a single
 CloudFront HTTPS domain, so there is no CORS setup and no certificate to manage for a first launch.
@@ -43,15 +43,15 @@ CloudFront HTTPS domain, so there is no CORS setup and no certificate to manage 
 
 ```bash
 cp infra/aws/params.example.json infra/aws/params.json   # fill in VPC, subnets, MongoUri (gitignored)
-./infra/aws/deploy.sh ap-south-1 veyra-prod infra/aws/params.json
-./infra/aws/seed.sh  ap-south-1 veyra-prod               # once: catalog, demo accounts, demo history
+./infra/aws/deploy.sh ap-south-1 arvixa-prod infra/aws/params.json
+./infra/aws/seed.sh  ap-south-1 arvixa-prod               # once: catalog, demo accounts, demo history
 ```
 
 `deploy.sh` builds and pushes both images to ECR (tagged with the git commit), creates/updates the stack,
 uploads the frontend to S3, invalidates CloudFront and waits for the backend to become healthy. Re-run it
 for every release; failed deployments roll back automatically (ECS deployment circuit breaker).
 
-Use `./infra/aws/seed.sh ap-south-1 veyra-prod --no-history` for a clean store without demo orders.
+Use `./infra/aws/seed.sh ap-south-1 arvixa-prod --no-history` for a clean store without demo orders.
 
 ## After deploying
 
@@ -73,7 +73,7 @@ Use `./infra/aws/seed.sh ap-south-1 veyra-prod --no-history` for a clean store w
 | CloudFront, S3, Secrets Manager, CloudWatch | 3–5 at low traffic |
 | MongoDB Atlas M0 | 0 (DocumentDB starts around 60) |
 
-Delete everything with `aws cloudformation delete-stack --stack-name veyra-prod` (the database is kept as a
+Delete everything with `aws cloudformation delete-stack --stack-name arvixa-prod` (the database is kept as a
 final snapshot; S3 buckets must be emptied first; ECR repositories created by `deploy.sh` are deleted separately).
 
 ## Hardening for real production traffic

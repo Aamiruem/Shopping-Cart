@@ -12,7 +12,7 @@ TTL_SECONDS = 300
 
 def get_products(force: bool = False) -> list[dict]:
     if force or time.time() - _cache["loaded_at"] > TTL_SECONDS:
-        response = httpx.get(f"{get_settings().backend_url}/api/products", timeout=10)
+        response = httpx.get(f"{get_settings().backend_url}/api/products/feed", timeout=30)
         response.raise_for_status()
         _cache["products"] = response.json()
         _cache["loaded_at"] = time.time()

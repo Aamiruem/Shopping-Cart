@@ -1,4 +1,4 @@
-// Form rules - keep in sync with backend/src/utils/validation.js (the server re-checks everything)
+// Form rules - keep in sync with backend/app/services/validation.py (the server re-checks everything)
 const EMAIL_RE = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
 const PHONE_RE = /^[6-9]\d{9}$/;
 export const PASSWORD_MIN = 8;

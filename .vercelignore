@@ -1,0 +1,19 @@
+# Vercel needs the storefront, the /api function and the catalog data; everything else stays out of the upload
+ai-service
+infra
+.github
+.vscode
+README.md
+docker-compose.yml
+start-dev.*
+frontend/brand-source
+frontend/node_modules
+frontend/dist
+backend/*
+!backend/app
+backend/app/*
+!backend/app/data
+
+# Local secrets (the Vercel CLI writes a token to .env.local)
+.env*
+!.env.example

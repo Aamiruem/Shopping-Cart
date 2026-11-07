@@ -39,7 +39,7 @@ export default function Sell() {
       .catch(() => setStats(null));
   }, []);
 
-  useSeo({ title: 'Sell Online on Arvixa - Become a Seller', description: 'Open your online store on Arvixa in minutes. List products with photos, videos and 360° views, get paid by UPI and bank transfer, and grow with AI sales insights.', path: '/sell' });
+  useSeo({ title: 'Sell Online on Arvixa Store - Become a Seller', description: 'Open your online store on Arvixa Store in minutes. List products with photos, videos and 360° views, get paid by UPI and bank transfer, and grow with AI sales insights.', path: '/sell' });
   const isSeller = ['seller', 'admin'].includes(user?.role);
   const cta = isSeller
     ? { to: '/seller/dashboard', label: 'Go to Seller Hub' }

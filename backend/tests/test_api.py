@@ -28,26 +28,6 @@ def _fresh_rate_limits():
     reset_all()
 
 
-@pytest.fixture(scope="module")
-def client():
-    os.environ.update(
-        DATABASE_URL=os.environ["TEST_DATABASE_URL"],
-        MONGO_URI=os.environ["TEST_MONGO_URI"],
-        PG_STATEMENT_CACHE_SIZE=os.getenv("TEST_PG_STATEMENT_CACHE_SIZE", "100"),
-        SMTP_HOST="",
-        AI_SERVICE_URL="http://127.0.0.1:9",  # unreachable on purpose: features must degrade gracefully
-    )
-    from fastapi.testclient import TestClient
-
-    from app.core.config import get_settings
-
-    get_settings.cache_clear()
-    from app.main import create_app
-
-    with TestClient(create_app()) as test_client:
-        yield test_client
-
-
 def _register(client, name="Test Shopper"):
     email = f"pytest{time.time_ns()}@gmail.com"
     r = client.post("/api/auth/register", json={"name": name, "email": email, "password": PASSWORD})
@@ -300,7 +280,7 @@ def test_razorpay_flow_with_mocked_gateway(client, monkeypatch):
         return {"id": f"order_{time.time_ns()}", "amount": created["paise"], "currency": "INR"}
 
     async def fake_fetch(payment_id):
-        return {"id": payment_id, "method": "netbanking", "amount": created["paise"]}
+        return {"id": payment_id, "method": "netbanking", "amount": created["paise"], "status": "captured"}
 
     async def fake_refund(payment_id, amount=None):
         refunds.append(payment_id)

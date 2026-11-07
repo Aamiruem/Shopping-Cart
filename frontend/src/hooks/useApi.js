@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 export default function useApi(fetcher, deps = []) {
   const [state, setState] = useState({ data: null, error: '', loading: true });
 
-  const load = useCallback(fetcher, deps); // the caller lists what the fetcher depends on
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the caller lists what the fetcher depends on
+  const load = useCallback(fetcher, deps);
 
   const reload = useCallback(() => {
     let cancelled = false;

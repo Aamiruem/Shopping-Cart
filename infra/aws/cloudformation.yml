@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  Veyra marketplace - FastAPI backend + AI service on ECS Fargate behind an ALB, PostgreSQL on RDS,
+  Arvixa Store marketplace - FastAPI backend + AI service on ECS Fargate behind an ALB, PostgreSQL on RDS,
   product images in S3, React frontend in S3, everything served through one CloudFront domain.
   MongoDB is external (MongoDB Atlas on AWS or Amazon DocumentDB) and passed in as a connection string.
 
@@ -18,10 +18,10 @@ Parameters:
   MongoUri:
     Type: String
     NoEcho: true
-    Description: MongoDB connection string, e.g. mongodb+srv://user:pass@cluster.mongodb.net/veyra (Atlas) or a DocumentDB URI
+    Description: MongoDB connection string, e.g. mongodb+srv://user:pass@cluster.mongodb.net/arvixa (Atlas) or a DocumentDB URI
   BackendImage:
     Type: String
-    Description: Full image URI pushed by deploy.sh, e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com/veyra-backend:abc123
+    Description: Full image URI pushed by deploy.sh, e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com/arvixa-backend:abc123
   AiServiceImage:
     Type: String
     Description: Full image URI of the AI service
@@ -77,7 +77,7 @@ Parameters:
     Description: Fernet key that encrypts seller bank details (python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
   MailFrom:
     Type: String
-    Default: "Veyra <no-reply@example.com>"
+    Default: "Arvixa Store <no-reply@example.com>"
   DbInstanceClass:
     Type: String
     Default: db.t4g.micro
@@ -92,7 +92,7 @@ Resources:
   JwtSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: !Sub veyra/${Environment}/jwt-secret
+      Name: !Sub arvixa/${Environment}/jwt-secret
       GenerateSecretString:
         PasswordLength: 64
         ExcludePunctuation: true
@@ -100,9 +100,9 @@ Resources:
   DbSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: !Sub veyra/${Environment}/postgres
+      Name: !Sub arvixa/${Environment}/postgres
       GenerateSecretString:
-        SecretStringTemplate: '{"username": "veyra"}'
+        SecretStringTemplate: '{"username": "arvixa"}'
         GenerateStringKey: password
         PasswordLength: 32
         ExcludeCharacters: "\"@/\\' "
@@ -110,7 +110,7 @@ Resources:
   AppSecrets:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: !Sub veyra/${Environment}/app
+      Name: !Sub arvixa/${Environment}/app
       SecretString: !Sub '{"MONGO_URI": "${MongoUri}", "ANTHROPIC_API_KEY": "${AnthropicApiKey}", "SMTP_PASS": "${SmtpPass}", "RAZORPAY_KEY_SECRET": "${RazorpayKeySecret}", "RAZORPAY_WEBHOOK_SECRET": "${RazorpayWebhookSecret}", "TWILIO_AUTH_TOKEN": "${TwilioAuthToken}", "DATA_ENCRYPTION_KEY": "${DataEncryptionKey}"}'
 
   # ---------------------------------------------------------------- Networking
@@ -151,7 +151,7 @@ Resources:
   DbSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupDescription: Veyra database subnets
+      DBSubnetGroupDescription: Arvixa Store database subnets
       SubnetIds: !Ref SubnetIds
 
   Database:
@@ -165,7 +165,7 @@ Resources:
       AllocatedStorage: "20"
       StorageType: gp3
       StorageEncrypted: true
-      DBName: veyra
+      DBName: arvixa
       MasterUsername: !Sub "{{resolve:secretsmanager:${DbSecret}:SecretString:username}}"
       MasterUserPassword: !Sub "{{resolve:secretsmanager:${DbSecret}:SecretString:password}}"
       DBSubnetGroupName: !Ref DbSubnetGroup
@@ -203,7 +203,7 @@ Resources:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: !Sub veyra-${Environment}-oac
+        Name: !Sub arvixa-${Environment}-oac
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
@@ -240,15 +240,15 @@ Resources:
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Sub veyra-${Environment}
+      ClusterName: !Sub arvixa-${Environment}
       ClusterSettings: [{ Name: containerInsights, Value: enabled }]
       ServiceConnectDefaults:
-        Namespace: !Sub veyra-${Environment}.local
+        Namespace: !Sub arvixa-${Environment}.local
 
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub /ecs/veyra-${Environment}
+      LogGroupName: !Sub /ecs/arvixa-${Environment}
       RetentionInDays: 30
 
   # Used by ECS itself: pull images, write logs, read secrets
@@ -283,7 +283,7 @@ Resources:
   BackendTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
-      Family: !Sub veyra-${Environment}-backend
+      Family: !Sub arvixa-${Environment}-backend
       RequiresCompatibilities: [FARGATE]
       NetworkMode: awsvpc
       Cpu: "512"
@@ -298,8 +298,8 @@ Resources:
           Environment:
             - { Name: APP_ENV, Value: production }
             - { Name: DB_HOST, Value: !GetAtt Database.Endpoint.Address }
-            - { Name: DB_NAME, Value: veyra }
-            - { Name: DB_USER, Value: veyra }
+            - { Name: DB_NAME, Value: arvixa }
+            - { Name: DB_USER, Value: arvixa }
             - { Name: AI_SERVICE_URL, Value: "http://ai-service:8000" }
             - { Name: CORS_ORIGIN, Value: !Sub "https://${Distribution.DomainName}" }
             - { Name: AWS_REGION, Value: !Ref AWS::Region }
@@ -333,11 +333,12 @@ Resources:
   AiServiceTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
-      Family: !Sub veyra-${Environment}-ai-service
+      Family: !Sub arvixa-${Environment}-ai-service
       RequiresCompatibilities: [FARGATE]
       NetworkMode: awsvpc
-      Cpu: "512"
-      Memory: "1024"
+      # Sentence embeddings, CLIP and the sentiment model all load into memory
+      Cpu: "1024"
+      Memory: "4096"
       ExecutionRoleArn: !GetAtt ExecutionRole.Arn
       ContainerDefinitions:
         - Name: ai-service
@@ -346,6 +347,7 @@ Resources:
           PortMappings: [{ Name: ai-service, ContainerPort: 8000, AppProtocol: http }]
           Environment:
             - { Name: BACKEND_URL, Value: "http://backend:5000" }
+            - { Name: STOREFRONT_URL, Value: !Sub "https://${Distribution.DomainName}" }
           Secrets:
             - { Name: ANTHROPIC_API_KEY, ValueFrom: !Sub "${AppSecrets}:ANTHROPIC_API_KEY::" }
           LogConfiguration:
@@ -458,7 +460,7 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: !Sub Veyra ${Environment}
+        Comment: !Sub Arvixa Store ${Environment}
         HttpVersion: http2and3
         DefaultRootObject: index.html
         Origins:

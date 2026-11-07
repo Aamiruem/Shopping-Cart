@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Builds, pushes and deploys the whole Veyra stack to AWS.
+# Builds, pushes and deploys the whole Arvixa Store stack to AWS.
 #
 #   ./infra/aws/deploy.sh <region> <stack-name> <params-file>
-#   e.g. ./infra/aws/deploy.sh ap-south-1 veyra-prod infra/aws/params.json
+#   e.g. ./infra/aws/deploy.sh ap-south-1 arvixa-prod infra/aws/params.json
 #
 # params-file is a CloudFormation parameters JSON (copy params.example.json). Requires: aws CLI v2,
 # docker, node 20+. Creates real, billable AWS resources - see infra/aws/README.md for costs.

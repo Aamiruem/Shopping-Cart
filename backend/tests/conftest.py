@@ -1,5 +1,7 @@
 """Shared fixtures: a small simulated shop (pure pandas, no database) for the ML unit tests."""
 
+import os
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -86,3 +88,23 @@ def shop():
         }
     )
     return {"sales": sales, "products": products, "events": events, "users": users, "today": today}
+
+
+@pytest.fixture(scope="module")
+def client():
+    os.environ.update(
+        DATABASE_URL=os.environ["TEST_DATABASE_URL"],
+        MONGO_URI=os.environ["TEST_MONGO_URI"],
+        PG_STATEMENT_CACHE_SIZE=os.getenv("TEST_PG_STATEMENT_CACHE_SIZE", "100"),
+        SMTP_HOST="",
+        AI_SERVICE_URL="http://127.0.0.1:9",  # unreachable on purpose: features must degrade gracefully
+    )
+    from fastapi.testclient import TestClient
+
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    from app.main import create_app
+
+    with TestClient(create_app()) as test_client:
+        yield test_client

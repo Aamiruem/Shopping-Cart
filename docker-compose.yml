@@ -32,6 +32,9 @@ services:
       DATABASE_URL: postgres://shop:shop@postgres:5432/shop
       JWT_SECRET: ${JWT_SECRET:-change-me}
       AI_SERVICE_URL: http://ai-service:8000
+      WAREHOUSE_PINCODE: ${WAREHOUSE_PINCODE:-}
+      AUTOMATION_KEY: ${AUTOMATION_KEY:-}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
       CORS_ORIGIN: http://localhost:8080
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       SMTP_HOST: ${SMTP_HOST:-}
@@ -59,8 +62,18 @@ services:
     environment:
       BACKEND_URL: http://backend:5000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      STOREFRONT_URL: http://frontend
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     ports: ["8000:8000"]
+    volumes: [model-cache:/root/.cache/huggingface]  # Hugging Face models download once
     depends_on: [backend]
+
+  # Experiment tracking UI: every training run's settings and scores, at http://localhost:5050
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.18.0
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root /mlflow/artifacts
+    ports: ["5050:5000"]
+    volumes: [mlflow-data:/mlflow]
 
   frontend:
     build: ./frontend
@@ -71,3 +84,5 @@ volumes:
   mongo-data:
   pg-data:
   uploads:
+  model-cache:
+  mlflow-data:

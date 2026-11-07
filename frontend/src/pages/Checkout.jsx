@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import AddressForm from '../components/account/AddressForm';
@@ -11,6 +11,7 @@ import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { formatPrice } from '../utils/format';
 import { playSound } from '../utils/sound';
+import { trackBeginCheckout, trackPurchase } from '../utils/analytics';
 import useSeo from '../hooks/useSeo';
 
 const COD = { id: 'cod', icon: 'truck', label: 'Cash on Delivery', note: 'Pay when your order arrives' };
@@ -75,6 +76,13 @@ export default function Checkout() {
   const [placing, setPlacing] = useState(false);
   const [otpOpen, setOtpOpen] = useState(false);
   const [gateway, setGateway] = useState(null); // { enabled, keyId } from the API
+  const checkoutTracked = useRef(false);
+
+  useEffect(() => {
+    if (checkoutTracked.current || !cart.items.length) return;
+    checkoutTracked.current = true;
+    trackBeginCheckout(cart);
+  }, [cart]);
 
   useEffect(() => {
     api.paymentsConfig()
@@ -111,6 +119,7 @@ export default function Checkout() {
 
   const submitOrder = async (otp) => {
     const order = await api.checkout({ addressId, paymentMethod: payment, ...(otp ? { otp } : {}) });
+    trackPurchase(order.id, cart);
     await refresh();
     playSound('success');
     navigate(`/orders/${order.id}`, { replace: true, state: { justPlaced: true } });
@@ -135,6 +144,7 @@ export default function Checkout() {
         handler: async (response) => {
           try {
             const { orderId } = await api.verifyPayment(response);
+            trackPurchase(orderId, cart);
             await refresh();
             playSound('success');
             navigate(`/orders/${orderId}`, { replace: true, state: { justPlaced: true } });

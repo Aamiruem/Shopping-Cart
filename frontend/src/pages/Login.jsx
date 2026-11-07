@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { playSound } from '../utils/sound';
 import { passwordStrength, PASSWORD_MIN, validateEmail, validateName, validatePassword, validatePhone } from '../utils/validation';
+import { trackLogin } from '../utils/analytics';
 import useSeo from '../hooks/useSeo';
 
 const COPY = {
@@ -15,7 +16,7 @@ const COPY = {
     title: 'Welcome back',
     blurb: 'Log in to track orders, save your wishlist and get picks made for you.',
     submit: 'Login',
-    switchText: 'New to Arvixa?',
+    switchText: 'New to Arvixa Store?',
     switchLink: { to: '/register', label: 'Create an account' },
   },
   register: {
@@ -118,7 +119,7 @@ export default function Login({ mode = 'login' }) {
 
   const finish = useCallback((signedIn, isNew) => {
     playSound('success');
-    toast.show(isNew ? `Welcome to Arvixa, ${signedIn.name}!` : `Welcome back, ${signedIn.name}!`);
+    toast.show(isNew ? `Welcome to Arvixa Store, ${signedIn.name}!` : `Welcome back, ${signedIn.name}!`);
     navigate(redirectTo, { replace: true });
   }, [toast, navigate, redirectTo]);
 
@@ -127,6 +128,7 @@ export default function Login({ mode = 'login' }) {
     setBusy(true);
     try {
       finish(await googleLogin(credential), false);
+      trackLogin('google');
     } catch (err) {
       playSound('error');
       setError(err.message);
@@ -323,7 +325,7 @@ export default function Login({ mode = 'login' }) {
             <button type="submit" className="btn btn-buy btn-lg btn-block" disabled={busy}>
               {busy ? 'Please wait…' : usingOtp ? 'Request OTP' : copy.submit}
             </button>
-            <p className="auth-terms">By continuing, you agree to Arvixa’s <Link to="/help">Terms of Use</Link> and <Link to="/help">Privacy Policy</Link>.</p>
+            <p className="auth-terms">By continuing, you agree to Arvixa Store’s <Link to="/help">Terms of Use</Link> and <Link to="/help">Privacy Policy</Link>.</p>
 
             <GoogleButton onCredential={onGoogle} onError={setError} />
 

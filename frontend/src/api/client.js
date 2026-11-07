@@ -117,6 +117,13 @@ export const api = {
   subcategories: (category) => request(`/products/subcategories?category=${category}`),
   facets: (params = {}) => request(`/products/facets?${query(params)}`),
 
+  reviews: (id) => request(`/products/${id}/reviews`),
+  saveReview: (id, body) => request(`/products/${id}/reviews`, { method: 'POST', body }),
+
+  // Delivery location
+  pincode: (pin) => request(`/location/pincode/${pin}`),
+  reverseGeocode: (lat, lon) => request(`/location/reverse?lat=${lat}&lon=${lon}`),
+
   // Cart
   cart: () => request('/cart'),
   addToCart: (productId, qty = 1) => request('/cart', { method: 'POST', body: { productId, qty } }),
@@ -139,6 +146,9 @@ export const api = {
   orders: () => request('/orders'),
   order: (id) => request(`/orders/${id}`),
   cancelOrder: (id) => request(`/orders/${id}/cancel`, { method: 'PATCH' }),
+  requestReturn: (id, reason) => request(`/orders/${id}/return`, { method: 'POST', body: { reason } }),
+  pendingReturns: () => request('/orders/returns/pending'),
+  resolveReturn: (id, approve) => request(`/orders/${id}/return`, { method: 'PATCH', body: { approve } }),
 
   // Online payments (Razorpay: UPI, net banking, cards, wallets)
   paymentsConfig: () => request('/payments/config'),
@@ -155,7 +165,7 @@ export const api = {
   sellerPatchProduct: (id, body) => request(`/seller/products/${id}`, { method: 'PATCH', body }),
   sellerDeleteProduct: (id) => request(`/seller/products/${id}`, { method: 'DELETE' }),
   sellerOrders: (params = {}) => request(`/seller/orders?${query(params)}`),
-  sellerUpdateFulfilment: (orderId, fulfilment) => request(`/seller/orders/${orderId}`, { method: 'PATCH', body: { fulfilment } }),
+  sellerUpdateFulfilment: (orderId, fulfilment, shipment = {}) => request(`/seller/orders/${orderId}`, { method: 'PATCH', body: { fulfilment, ...shipment } }),
   sellerUpdateProfile: (body) => request('/seller/profile', { method: 'PUT', body }),
   sellerPayoutOtp: () => request('/seller/profile/otp', { method: 'POST' }),
   sellerBulk: (ids, action, extra = {}) => request('/seller/products/bulk', { method: 'POST', body: { ids, action, ...extra } }),
@@ -182,6 +192,10 @@ export const api = {
   // Personalised recommendations
   forYou: () => request('/recommendations/for-you'),
   together: (productId) => request(`/recommendations/together/${productId}`),
+
+  // Search with a photo, review summaries
+  visualSearch: (file) => upload('/ai/visual-search', file),
+  reviewSummary: (id) => request(`/ai/review-summary/${id}`),
 
   // Support
   createTicket: (body) => request('/support/tickets', { method: 'POST', body }),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { EmptyState, Spinner } from '../components/common/Feedback';
@@ -10,6 +10,9 @@ import { StatusBadge } from './Orders';
 const PAYMENT_LABELS = { cod: 'Cash on Delivery', upi: 'UPI', card: 'Card', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI' };
 const TRACK_STEPS = ['Ordered', 'Packed', 'Shipped', 'Delivered'];
 const STEP_OF = { pending: 0, packed: 1, shipped: 2, delivered: 3 };
+const RETURN_WINDOW_DAYS = 7;
+const RETURN_LABELS = { requested: 'Return requested. We’ll update you soon.', approved: 'Return approved.', rejected: 'This return wasn’t approved.' };
+const REFUND_LABELS = { refunded: 'Your refund is on its way (usually 5–7 working days).', refund_pending: 'Your refund is being processed.', cod_manual: 'We’ll contact you to arrange your refund.' };
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -18,10 +21,25 @@ export default function OrderDetail() {
   const [order, setOrder] = useState(null);
   const [error, setError] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [returning, setReturning] = useState(false);
+  const [reason, setReason] = useState('');
 
+  const load = useCallback(() => api.order(id).then(setOrder).catch((err) => setError(err.message)), [id]);
   useEffect(() => {
-    api.order(id).then(setOrder).catch((err) => setError(err.message));
-  }, [id]);
+    load();
+  }, [load]);
+
+  const submitReturn = async (e) => {
+    e.preventDefault();
+    try {
+      await api.requestReturn(id, reason);
+      toast.show('Return requested');
+      setReturning(false);
+      load();
+    } catch (err) {
+      toast.show(err.message, 'error');
+    }
+  };
 
   const cancel = async () => {
     if (!window.confirm('Cancel this order?')) return;
@@ -48,6 +66,10 @@ export default function OrderDetail() {
   // The order is as far along as its least-advanced item (items from several sellers ship separately)
   const step = Math.min(...order.items.map((i) => STEP_OF[i.fulfilment] ?? 0));
   const shipped = step >= STEP_OF.shipped;
+  const delivered = step === STEP_OF.delivered;
+  const deliveredAt = Math.max(...order.items.map((i) => new Date(i.fulfilled_at || 0).getTime()));
+  const canReturn = order.status === 'placed' && delivered && !order.return && Date.now() - deliveredAt < RETURN_WINDOW_DAYS * 86400000;
+  const shipment = order.items.find((i) => i.tracking_number);
 
   return (
     <div className="page-orders container narrow">
@@ -56,7 +78,7 @@ export default function OrderDetail() {
           <div className="success-check"><Icon name="check" size={36} strokeWidth={3} /></div>
           <div>
             <h1>Order placed successfully!</h1>
-            <p>Thank you for shopping with Arvixa. Expected delivery by <strong>{deliveryDate(4)}</strong>.</p>
+            <p>Thank you for shopping with Arvixa Store. Expected delivery by <strong>{deliveryDate(4)}</strong>.</p>
           </div>
         </div>
       )}
@@ -81,6 +103,27 @@ export default function OrderDetail() {
             </ol>
           )}
 
+          {shipment && (
+            <p className="tracking-line">
+              <Icon name="truck" size={16} /> {shipment.courier || 'Courier'} · Tracking number <strong>{shipment.tracking_number}</strong>
+            </p>
+          )}
+
+          {order.events?.length > 0 && (
+            <ol className="order-timeline">
+              {order.events.map((e) => (
+                <li key={`${e.status}-${e.created_at}`}>
+                  <strong>{e.note || e.status}</strong>
+                  <span className="muted small">{formatDate(e.created_at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {order.return && (
+            <p className="alert">{RETURN_LABELS[order.return.status]} {REFUND_LABELS[order.return.refund] || ''}</p>
+          )}
+
           <ul className="summary-list">
             {order.items.map((i) => (
               <li key={i.id}>
@@ -95,8 +138,27 @@ export default function OrderDetail() {
           </ul>
 
           {order.status === 'placed' && shipped && (
-            <p className="muted small">{step === STEP_OF.delivered ? 'Delivered.' : 'On its way, so it can no longer be cancelled.'} Need help? <Link to="/help">Contact support</Link></p>
+            <p className="muted small">{delivered ? 'Delivered.' : 'On its way, so it can no longer be cancelled.'} Need help? <Link to="/help">Contact support</Link></p>
           )}
+          {canReturn && !returning && (
+            <button type="button" className="btn btn-outline" onClick={() => setReturning(true)}>
+              <Icon name="returns" size={14} /> Return order
+            </button>
+          )}
+          {returning && (
+            <form className="return-form" onSubmit={submitReturn}>
+              <label className="field">Why are you returning this order?
+                <textarea value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3} maxLength={500} rows={2} />
+              </label>
+              <div className="form-actions">
+                <button type="submit" className="btn btn-buy">Request return</button>
+                <button type="button" className="btn-text" onClick={() => setReturning(false)}>Cancel</button>
+              </div>
+            </form>
+          )}
+          <button type="button" className="btn-text no-print" onClick={() => window.print()}>
+            <Icon name="package" size={14} /> Print order receipt
+          </button>
           {order.status === 'placed' && !shipped && (
             <button type="button" className="btn btn-outline" disabled={cancelling} onClick={cancel}>
               <Icon name="x" size={14} /> {cancelling ? 'Cancelling…' : 'Cancel order'}

@@ -11,6 +11,7 @@ from ..deps import CurrentUser, get_optional_user, require_seller
 from ..schemas.product import ProductIn
 from ..services import events
 from ..services import products as product_service
+from ..services.ai import semantic_search
 from ..services.catalog import CATEGORY_GROUPS, serialize_product, to_object_id
 
 router = APIRouter(prefix="/api/products", tags=["products"])
@@ -89,6 +90,7 @@ async def list_products(
 
 
 CATALOG_TTL = 30  # seconds; any product write clears it (see invalidate_catalog)
+SEMANTIC_BELOW = 6  # fewer keyword matches than this, and search by meaning fills in the rest
 
 
 def invalidate_catalog() -> None:
@@ -111,9 +113,23 @@ async def _search(query: dict, q: str | None, sort: str, limit: int) -> list[dic
             async for p in db.products.find(query).sort(SORTS["popularity"]).limit(limit):
                 if p["_id"] not in seen and len(ranked) < limit:
                     ranked.append(p)
-        return [serialize_product({k: v for k, v in p.items() if k != "score"}) for p in ranked]
+        results = [serialize_product({k: v for k, v in p.items() if k != "score"}) for p in ranked]
+        if len(results) < SEMANTIC_BELOW and set(query) <= {"active", "$or"}:  # only for a plain, unfiltered search
+            seen_ids = {p["_id"] for p in results}
+            results += [p for p in await semantic_search(q.strip()) if p["_id"] not in seen_ids]
+        return results
     cursor = db.products.find(query).sort(SORTS.get(sort, SORTS["relevance"])).limit(limit)
     return [serialize_product(p) async for p in cursor]
+
+
+@router.get("/feed")
+async def feed():
+    """Every active product, for the AI service. /api/products stops at 200, which would hide most of the catalog."""
+    return await cached("catalog:feed", CATALOG_TTL, _feed)
+
+
+async def _feed() -> list[dict]:
+    return [serialize_product(p) async for p in get_db().products.find({"active": {"$ne": False}})]
 
 
 @router.get("/categories")

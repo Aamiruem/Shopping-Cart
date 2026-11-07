@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { responsiveImage } from '../../utils/image';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { CATEGORY_GROUPS, categoryLabel } from '../../constants/catalog';
@@ -43,7 +44,7 @@ export default function ShopByNeed() {
             <div className="need-grid">
               {g.categories.map((id) => (
                 <Link key={id} to={id === 'grocery' ? '/grocery' : `/products?category=${id}`} className="need-tile">
-                  <span className="need-img">{categories[id]?.image && <img src={categories[id].image} alt="" loading="lazy" />}</span>
+                  <span className="need-img">{categories[id]?.image && <img {...responsiveImage(categories[id].image, '120px')} alt="" loading="lazy" />}</span>
                   <strong>{categoryLabel(id)}</strong>
                   {categories[id] && <small>{categories[id].count} items</small>}
                 </Link>

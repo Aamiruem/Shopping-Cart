@@ -26,6 +26,8 @@ from ..services.catalog import CATEGORIES, CATEGORY_GROUPS, discount_percent, to
 
 router = APIRouter(tags=["seo"], include_in_schema=False)
 PRIVATE = ["/cart", "/checkout", "/account", "/orders", "/wishlist", "/seller/", "/login", "/register", "/api/"]
+# Googlebot renders the React pages, which fetch their products from these: blocking them would leave it an empty page
+PUBLIC_API = ["/api/products", "/api/recommendations/"]
 
 
 def site_url() -> str:
@@ -71,6 +73,7 @@ async def robots():
     lines = [
         "User-agent: *",
         "Allow: /",
+        *[f"Allow: {p}" for p in PUBLIC_API],
         *[f"Disallow: {p}" for p in PRIVATE],
         "Disallow: /*?*sort=",
         "",
@@ -81,7 +84,7 @@ async def robots():
 
 # ---------- Server-rendered page heads (/api/seo/page) ----------
 
-SITE = "Arvixa"
+SITE = "Arvixa Store"
 CATEGORY_LABELS = {
     "mobiles": "Mobiles",
     "electronics": "Electronics",
@@ -178,7 +181,7 @@ async def _product_page(product_id: str) -> tuple[int, str, str]:
     oid = to_object_id(product_id)
     p = await get_db().products.find_one({"_id": oid, "active": {"$ne": False}}) if oid else None
     if not p:
-        return 404, _head("Product not found", "This product is no longer available on Arvixa.", "/products", noindex=True), ""
+        return 404, _head("Product not found", "This product is no longer available on Arvixa Store.", "/products", noindex=True), ""
     name, brand, price = p["name"], p.get("brand") or SITE, p.get("price", 0)
     off = discount_percent(price, p.get("mrp"))
     category = CATEGORY_LABELS.get(p.get("category", ""), p.get("category", ""))
@@ -209,11 +212,12 @@ async def _product_page(product_id: str) -> tuple[int, str, str]:
     }
     if p.get("brand"):
         product_ld["brand"] = {"@type": "Brand", "name": p["brand"]}
-    if p.get("rating") and p.get("ratingCount"):
+    # Only real reviews from buyers: catalog sample ratings must never be marked up (Google treats that as spam)
+    if p.get("reviewCount"):
         product_ld["aggregateRating"] = {
             "@type": "AggregateRating",
-            "ratingValue": p["rating"],
-            "reviewCount": p["ratingCount"],
+            "ratingValue": p["reviewRating"],
+            "reviewCount": p["reviewCount"],
             "bestRating": 5,
         }
     category_path = f"/products?category={p.get('category')}"
@@ -263,7 +267,7 @@ async def _listing_page(query: dict[str, str]) -> tuple[int, str, str]:
     label = heading.replace("“", "").replace("”", "")
     count = len(products) or "Hundreds of"
     description = (
-        f"Shop {label} online at Arvixa. {count} products with top brands, great discounts, free delivery over ₹499 and easy returns."
+        f"Shop {label} online at Arvixa Store. {count} products with top brands, great discounts, free delivery over ₹499 and easy returns."
     )
     links = [(p["name"], f"/products/{p['_id']}/{slugify(p['name'])}", p.get("price", 0)) for p in products]
     json_ld = [_breadcrumb([("Home", "/"), (label, path)])]

@@ -99,7 +99,11 @@ def to_webp(raw: bytes) -> bytes:
 
 async def main(dry_run: bool) -> None:
     env_file = Path(__file__).resolve().parents[1] / ".env"
-    env = dict(line.split("=", 1) for line in env_file.read_text().splitlines() if "=" in line and not line.startswith("#")) if env_file.exists() else {}
+    env = (
+        dict(line.split("=", 1) for line in env_file.read_text().splitlines() if "=" in line and not line.startswith("#"))
+        if env_file.exists()
+        else {}
+    )
     key = os.getenv("PEXELS_API_KEY") or env.get("PEXELS_API_KEY", "").strip().strip('"')
     if not key:
         raise SystemExit("Set PEXELS_API_KEY (free at https://www.pexels.com/api/)")
