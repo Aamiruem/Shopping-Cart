@@ -2,15 +2,23 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api, TOKEN_KEY } from '../../api/client';
 import Icon from '../../components/common/Icon';
+import { PREVIEW } from '../../config';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { validatePhone } from '../../utils/validation';
 
-const PERKS = [
+const ALL_PERKS = [
   { icon: 'tag', title: 'List products in minutes', text: 'Add, edit and manage stock from one place.' },
   { icon: 'zap', title: 'AI sales insights', text: 'Forecasts, predicted best sellers and restock alerts.' },
   { icon: 'user', title: 'Know your customers', text: 'Segments, churn risk and cohort retention.' },
 ];
+// Store mode has no analytics service yet, so it promises only what sellers get today
+const STORE_PERKS = [
+  { icon: 'tag', title: 'List products in minutes', text: 'Add photos, prices and stock from one place.' },
+  { icon: 'truck', title: 'Sell across India', text: 'Shoppers anywhere in India can order your products.' },
+  { icon: 'package', title: 'Ship and track', text: 'Mark orders packed, shipped and delivered, with courier tracking.' },
+];
+const PERKS = PREVIEW ? STORE_PERKS : ALL_PERKS;
 
 export default function SellerOnboarding() {
   const { user, setUser } = useAuth();
@@ -45,7 +53,7 @@ export default function SellerOnboarding() {
       <div className="auth-card">
         <div className="auth-aside">
           <h1>Sell on Arvixa Store</h1>
-          <p>Reach shoppers across India and grow with built-in analytics.</p>
+          <p>{PREVIEW ? 'Reach shoppers across India.' : 'Reach shoppers across India and grow with built-in analytics.'}</p>
           <ul className="perk-list">
             {PERKS.map((p) => <li key={p.title}><Icon name={p.icon} size={20} /><div><strong>{p.title}</strong><span>{p.text}</span></div></li>)}
           </ul>
