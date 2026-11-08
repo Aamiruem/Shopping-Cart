@@ -30,7 +30,7 @@ export default function AddressForm({ defaults = {}, onSaved, onCancel }) {
   const onPincode = async (e) => {
     const pincode = e.target.value.replace(/\D/g, '').slice(0, 6);
     setForm((f) => ({ ...f, pincode }));
-    if (pincode.length !== 6 || PREVIEW) return; // the lookup is part of the full API
+    if (pincode.length !== 6) return;
     const place = await api.pincode(pincode).catch(() => null);
     if (place?.found) setForm((f) => ({ ...f, city: f.city || place.city, state: matchState(place.state) || f.state }));
     else if (place?.found === false) setError('We couldn’t find this pincode. Please check it.');

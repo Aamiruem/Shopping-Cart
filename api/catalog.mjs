@@ -74,6 +74,13 @@ export default async function handler(req, res) {
   const path = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
   if (req.method === 'HEAD' || req.method === 'OPTIONS') return send(res, 204, null);
   const [area, ...rest] = path.split('/').filter(Boolean);
+  if (req.method === 'GET' && area === 'location' && rest[0] === 'pincode' && rest.length === 2) {
+    const { PINCODE_RE, lookupPincode } = await import('./_location.mjs');
+    if (!PINCODE_RE.test(rest[1])) return send(res, 400, { error: 'Please enter a valid 6-digit pincode' });
+    const place = await lookupPincode(rest[1]);
+    if (place.found !== null) res.setHeader('Cache-Control', 'public, s-maxage=2592000, stale-while-revalidate=86400'); // a month
+    return send(res, 200, place, place.found !== null);
+  }
   if (req.method === 'GET' && path === 'recommendations/festive') {
     const { festiveStore } = await import('./_demand.mjs');
     const { query } = await import('./_auth.mjs');

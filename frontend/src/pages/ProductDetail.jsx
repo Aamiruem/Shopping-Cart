@@ -6,12 +6,14 @@ import Icon from '../components/common/Icon';
 import Price from '../components/common/Price';
 import Rating, { shownRating } from '../components/common/Rating';
 import ProductRail from '../components/product/ProductRail';
+import BuyBox from '../components/product/BuyBox';
 import Reviews from '../components/product/Reviews';
 import StoreFacts from '../components/product/StoreFacts';
 import Lightbox from '../components/product/Lightbox';
 import Spin360 from '../components/product/Spin360';
 import { aisleLabel, categoryLabel, groupOf } from '../constants/catalog';
 import { useCart } from '../context/CartContext';
+import { useToast } from '../context/ToastContext';
 import { useWishlist } from '../context/WishlistContext';
 import useShopActions from '../hooks/useShopActions';
 import { deliveryDate } from '../utils/format';
@@ -31,6 +33,34 @@ const OFFERS = [
   'Free delivery on orders above ₹499',
   'No-cost EMI on orders above ₹3,000',
 ];
+
+// Store mode (accounts and orders on the api/ functions, sample catalog): Amazon-style buy box on the right
+const STORE = PREVIEW && SHOPPING;
+
+// The phone's share sheet where there is one, otherwise copy the link
+function ShareButton({ product }) {
+  const toast = useToast();
+  const share = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: product.name, url });
+      } catch { /* the shopper closed the share sheet */ }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.show('Link copied');
+    } catch {
+      toast.show('Couldn’t copy the link. Copy it from the address bar.', 'error');
+    }
+  };
+  return (
+    <button type="button" className="share-btn" onClick={share} aria-label={`Share ${product.name}`} title="Share">
+      <Icon name="send" size={18} />
+    </button>
+  );
+}
 
 // Main photo that magnifies under the pointer (Flipkart-style hover zoom); touch screens just see the photo
 function ZoomImage({ src, alt, onOpen }) {
@@ -140,7 +170,7 @@ export default function ProductDetail() {
 
   return (
     <div className="page-detail container">
-      <div className="detail panel">
+      <div className={`detail panel ${STORE ? 'detail-store' : ''}`}>
         <div className={`detail-gallery ${product.category === 'fashion' ? 'detail-gallery-portrait' : ''}`}>
           <div className="thumbs">
             {frames360 && (
@@ -177,7 +207,7 @@ export default function ProductDetail() {
           </div>
           {!show360 && <p className="gallery-hint">Click the photo to see full view{images.length > 1 ? ` · ${images.length} photos` : ''}</p>}
           {fullView && <Lightbox images={images} start={activeImage} alt={product.name} onClose={() => setFullView(false)} />}
-          <div className="detail-actions">
+          {!STORE && <div className="detail-actions">
             {!SHOPPING ? (
               <button type="button" className="btn btn-cart btn-lg coming-soon" disabled>Coming soon</button>
             ) : (
@@ -194,7 +224,7 @@ export default function ProductDetail() {
                 </button>
               </>
             )}
-          </div>
+          </div>}
           {product.imageCredit && (
             <p className="image-credit">
               Photo: {product.imageCredit.author} ·{' '}
@@ -214,7 +244,10 @@ export default function ProductDetail() {
             )}
           </nav>
           {product.brand && <p className="detail-brand">{product.brand}</p>}
-          <h1>{product.name}</h1>
+          <div className="detail-title">
+            <h1>{product.name}</h1>
+            <ShareButton product={product} />
+          </div>
           {product.unit && <p className="detail-unit">Pack size: <strong>{product.unit}</strong></p>}
           <div className="detail-rating">
             {rating.count > 0 ? (
@@ -227,7 +260,7 @@ export default function ProductDetail() {
           </div>
           {!PREVIEW && product.discount > 0 && <p className="text-success special">Special price</p>}
           <Price price={product.price} mrp={product.mrp} size="lg" />
-          {PREVIEW && SHOPPING && <StoreFacts product={product} />}
+          {STORE && <StoreFacts />}
           {!PREVIEW && (
             <>
               <p className={`stock ${outOfStock ? 'text-error' : product.stock < 10 ? 'text-warn' : 'text-success'}`}>
@@ -290,6 +323,7 @@ export default function ProductDetail() {
             </table>
           </div>
         </div>
+        {STORE && <BuyBox product={product} />}
       </div>
 
       {!PREVIEW && <Reviews productId={product._id} />}

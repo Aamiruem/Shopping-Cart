@@ -49,12 +49,16 @@ export default function useShopActions() {
         trackAddToCart(product, qty);
       }, `${product.name} added to cart`, 'add'),
 
-    buyNow: async (product) => {
+    // Straight to checkout with this product at the chosen quantity
+    buyNow: async (product, qty = 1) => {
       if (!requireLogin()) return;
-      const ok = cart.has(product._id) || (await run(async () => {
-        await cart.add(product._id, 1);
-        trackAddToCart(product);
-      }, null, 'add'));
+      const line = cart.cart.items.find((i) => i.productId === product._id);
+      const ok = line
+        ? line.qty === qty || qty === 1 || (await run(() => cart.update(product._id, qty), null, 'add'))
+        : await run(async () => {
+          await cart.add(product._id, qty);
+          trackAddToCart(product, qty);
+        }, null, 'add');
       if (ok) navigate('/checkout');
     },
 
