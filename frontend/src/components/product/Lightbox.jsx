@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../common/Icon';
 
 // Full-screen photo viewer: arrows, arrow keys, swipe on phones, thumbnails, Esc or a click outside to close
@@ -33,7 +34,8 @@ export default function Lightbox({ images, start = 0, alt, onClose }) {
     touchX.current = null;
   };
 
-  return (
+  // Rendered at the end of <body>: inside the product panel, its layout would confine a fixed overlay
+  return createPortal(
     <div className="lightbox" role="dialog" aria-modal="true" aria-label={`${alt}: photo ${index + 1} of ${count}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <button ref={closeButton} type="button" className="lightbox-close" onClick={onClose} aria-label="Close"><Icon name="x" size={26} /></button>
       <div className="lightbox-stage" onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }} onTouchEnd={onTouchEnd}>
@@ -51,6 +53,7 @@ export default function Lightbox({ images, start = 0, alt, onClose }) {
           ))}
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

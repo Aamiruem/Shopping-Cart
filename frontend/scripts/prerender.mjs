@@ -217,7 +217,7 @@ const entry = (path, images = []) =>
   `<url><loc>${xml(abs(path))}</loc>${images.map((i) => `<image:image><image:loc>${xml(abs(i))}</image:loc></image:image>`).join('')}</url>`;
 
 const staticPaths = [
-  '/', '/products', '/grocery', '/sell', '/help', '/about', '/privacy',
+  '/', '/products', '/grocery', '/sell', '/help', '/about', '/privacy', '/terms', '/refunds', '/shipping',
   ...CATEGORIES.map((c) => `/products?category=${c.id}`),
   '/products?category=fashion&audience=women',
   '/products?category=fashion&audience=men',
