@@ -18,7 +18,7 @@ export const FESTIVALS = [
     from: '2026-10-25',
     to: '2026-11-15',
     collections: [
-      { id: 'decor', title: 'Décor & lighting', params: { category: 'home' } },
+      { id: 'decor', title: 'Home & décor', params: { category: 'home' } },
       { id: 'ethnic', title: 'Festive ethnic wear', params: { q: 'ethnic' } },
       { id: 'sweets', title: 'Dry fruits & treats', params: { category: 'grocery', subCategory: 'dry-fruits-health' } },
       { id: 'fragrances', title: 'Fragrances to gift', params: { category: 'beauty', subCategory: 'fragrances' } },
