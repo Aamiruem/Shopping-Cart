@@ -102,7 +102,7 @@ export default function App() {
               <Route path="orders" element={<SellerOrders />} />
               <Route path="earnings" element={<SellerEarnings />} />
               <Route path="settings" element={<SellerSettings />} />
-             </Route>
+          </Route>
 
             <Route path="*" element={<NotFound />} />
           </Routes>

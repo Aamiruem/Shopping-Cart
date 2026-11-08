@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import CouponBox from '../components/cart/CouponBox';
 import PriceDetails from '../components/cart/PriceDetails';
 import { EmptyState, Spinner } from '../components/common/Feedback';
 import Icon from '../components/common/Icon';
@@ -89,7 +90,7 @@ export default function Cart() {
           </div>
         </div>
       </section>
-      <PriceDetails cart={cart} />
+      <PriceDetails cart={cart}><CouponBox /></PriceDetails>
     </div>
   );
 }

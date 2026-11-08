@@ -27,7 +27,9 @@ const ONLINE = [
   { icon: 'phone', label: 'UPI', note: 'Google Pay, PhonePe, Paytm, BHIM and any UPI app' },
   { icon: 'card', label: 'Credit & debit cards', note: 'Visa, Mastercard, RuPay' },
   { icon: 'bank', label: 'Net banking', note: 'All major Indian banks' },
-  { icon: 'wallet', label: 'Wallets & EMI', note: 'Where your bank or card offers it' },
+  { icon: 'clock', label: 'EMI', note: 'Credit card and cardless EMI, where offered' },
+  { icon: 'zap', label: 'Pay Later', note: 'Buy now, pay later, if you’re eligible' },
+  { icon: 'wallet', label: 'Wallets', note: 'Popular mobile wallets' },
 ];
 
 // What's true for every order in store mode, as Amazon / Flipkart-style service icons plus the ways to pay.
@@ -35,11 +37,11 @@ const ONLINE = [
 export default function StoreFacts() {
   const online = useOnlinePayments();
   const services = [
-    { icon: 'truck', label: 'Free delivery', note: 'On orders of ₹499+', to: '/shipping' },
-    { icon: 'wallet', label: 'Cash on delivery', note: 'Pay when it arrives', to: '/terms' },
-    { icon: 'x', label: 'Free cancellation', note: 'Before it ships', to: '/refunds' },
-    { icon: 'returns', label: '7-day replacement', note: 'If damaged or wrong', to: '/refunds' },
-    ...(online ? [{ icon: 'lock', label: 'Secure payment', note: 'By Razorpay', to: '/terms' }] : []),
+    { icon: 'truck', label: 'Free delivery', note: 'On orders of ₹499+', to: '/shipping', color: '#16a34a' },
+    { icon: 'wallet', label: 'Cash on delivery', note: 'Pay when it arrives', to: '/terms', color: '#ea580c' },
+    { icon: 'x', label: 'Free cancellation', note: 'Before it ships', to: '/refunds', color: '#e11d48' },
+    { icon: 'returns', label: '7-day replacement', note: 'If damaged or wrong', to: '/refunds', color: '#7c3aed' },
+    ...(online ? [{ icon: 'lock', label: 'Secure payment', note: 'By Razorpay', to: '/terms', color: '#2563eb' }] : []),
   ];
 
   return (
@@ -47,7 +49,7 @@ export default function StoreFacts() {
       <ul className="service-icons" aria-label="Services">
         {services.map((s) => (
           <li key={s.label}>
-            <Link to={s.to}>
+            <Link to={s.to} style={{ '--tone': s.color }}>
               <span className="service-icon"><Icon name={s.icon} size={22} /></span>
               <strong>{s.label}</strong>
               <small>{s.note}</small>

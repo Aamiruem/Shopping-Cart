@@ -152,3 +152,10 @@
   .chat-fab span { display: none; }
   .chat-fab { padding: 14px; }
 }
+
+/* Colourful category icons: each tab tints its icon with its own colour (CategoryBar.jsx) */
+.cat-icon { width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--tab-color, var(--brand)) 12%, #fff); color: var(--tab-color, #3d3d3d); }
+.cat-tab:hover .cat-icon { color: var(--tab-color, var(--brand)); transform: translateY(-1px); }
+.cat-tab.active .cat-icon { background: var(--tab-color, var(--accent)); color: #fff; box-shadow: 0 4px 12px color-mix(in srgb, var(--tab-color, var(--brand)) 35%, transparent); }
+.cat-tab::after { background: var(--tab-color, var(--brand)); }
+.cat-tab .cat-icon { transition: background var(--transition), color var(--transition), transform var(--transition); }

@@ -6,6 +6,6 @@ export function paymentsConfig(env = process.env) {
     provider: enabled ? 'razorpay' : null,
     enabled,
     keyId: enabled ? env.RAZORPAY_KEY_ID : null, // the key id is public by design; the secret never leaves the server
-    methods: enabled ? ['upi', 'netbanking', 'card', 'wallet', 'emi'] : [],
+    methods: enabled ? ['upi', 'card', 'netbanking', 'emi', 'paylater', 'wallet'] : [],
   };
 }

@@ -36,6 +36,8 @@ export function CartProvider({ children }) {
     add: async (id, qty = 1) => setCart(await api.addToCart(id, qty)),
     update: async (id, qty) => setCart(await api.updateCart(id, qty)),
     remove: async (id) => setCart(await api.removeFromCart(id)),
+    applyCoupon: async (code) => setCart(await api.applyCoupon(code)),
+    removeCoupon: async () => setCart(await api.removeCoupon()),
   }), [cart, loading, refresh]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

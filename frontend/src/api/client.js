@@ -129,6 +129,9 @@ export const api = {
   addToCart: (productId, qty = 1) => request('/cart', { method: 'POST', body: { productId, qty } }),
   updateCart: (productId, qty) => request(`/cart/${productId}`, { method: 'PUT', body: { qty } }),
   removeFromCart: (productId) => request(`/cart/${productId}`, { method: 'DELETE' }),
+  applyCoupon: (code) => request('/cart/coupon', { method: 'POST', body: { code } }),
+  removeCoupon: () => request('/cart/coupon', { method: 'DELETE' }),
+  coupons: () => request('/cart/coupons'),
 
   // Wishlist
   wishlist: () => request('/wishlist'),

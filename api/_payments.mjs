@@ -12,7 +12,8 @@ import { ApiError, currentUserId, limit, postgresStore, query, safely } from './
 import { checkoutSummary, createOrder, resolveAddress } from './_shop.mjs';
 
 const API = 'https://api.razorpay.com/v1';
-const METHODS = { upi: 'upi', card: 'card', netbanking: 'netbanking', wallet: 'wallet', emi: 'emi' };
+// Razorpay payment.method -> orders.payment_method. Anything unknown is kept as 'online' rather than guessed.
+const METHODS = { upi: 'upi', card: 'card', netbanking: 'netbanking', wallet: 'wallet', emi: 'emi', cardless_emi: 'emi', paylater: 'paylater' };
 const START_LIMIT = 30;
 
 function sameHmac(secret, message, signature) {
@@ -59,7 +60,7 @@ export function razorpayClient(env = process.env) {
   };
 }
 
-const methodOf = (details) => METHODS[details?.method] || 'upi';
+const methodOf = (details) => METHODS[details?.method] || 'online';
 
 async function startPayment({ db, userId, body, rz, store }) {
   if (!rz.configured) throw new ApiError(503, 'Online payments are not set up yet. Please choose cash on delivery.');

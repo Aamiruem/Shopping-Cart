@@ -29,8 +29,40 @@ async function loadCart(db, userId) {
   return rows.map((r) => ({ product: getProduct(r.product_id), qty: r.qty })).filter((line) => line.product);
 }
 
-// mrp equals the price: the catalog's MRPs are samples, so no discount is claimed
-function summarize(lines) {
+const COUPON_RE = /^[A-Z0-9_-]{3,30}$/;
+const rupees = (n) => `₹${Math.round(n).toLocaleString('en-IN')}`;
+
+/** Why a coupon can't be used on this cart right now, or null if it can. */
+export function couponProblem(c, subtotal, used, now = new Date()) {
+  if (!c.active) return 'This coupon is no longer available';
+  if (new Date(c.starts_at) > now) return 'This coupon isn’t active yet';
+  if (c.ends_at && new Date(c.ends_at) <= now) return 'This coupon has expired';
+  if (used) return 'You’ve already used this coupon';
+  const min = Number(c.min_order);
+  if (subtotal < min) return `Add items worth ${rupees(min - subtotal)} more to use ${c.code}`;
+  return null;
+}
+
+/** Whole rupees off: a percentage up to its cap, or a flat amount up to the order value. */
+export function couponSavings(c, subtotal) {
+  const value = Number(c.value);
+  const off = c.kind === 'percent' ? Math.floor((subtotal * value) / 100) : Math.floor(value);
+  const cap = c.max_discount === null || c.max_discount === undefined ? Infinity : Number(c.max_discount);
+  return Math.max(0, Math.min(off, cap, subtotal));
+}
+
+async function loadCoupon(db, userId) {
+  const [row] = await db(
+    `SELECT c.*, EXISTS (SELECT 1 FROM coupon_redemptions r WHERE r.code = c.code AND r.user_id = $1) AS used
+       FROM cart_coupons cc JOIN coupons c ON c.code = cc.code
+      WHERE cc.user_id = $1`,
+    [userId],
+  );
+  return row ? { coupon: row, used: row.used } : null;
+}
+
+// mrp equals the price: the catalog's MRPs are samples, so no discount is claimed. Coupons are real: the owner sets them.
+function summarize(lines, applied = null) {
   const items = lines.map(({ product: p, qty }) => ({
     lineId: p._id,
     productId: p._id,
@@ -49,10 +81,64 @@ function summarize(lines) {
   }));
   const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
   const deliveryFee = !items.length || subtotal >= FREE_DELIVERY_ABOVE ? 0 : DELIVERY_FEE;
-  return { items, totalMrp: subtotal, discount: 0, subtotal, deliveryFee, total: subtotal + deliveryFee };
+  const couponError = applied ? couponProblem(applied.coupon, subtotal, applied.used) : null;
+  const couponDiscount = applied && !couponError ? couponSavings(applied.coupon, subtotal) : 0;
+  return {
+    items,
+    totalMrp: subtotal,
+    discount: 0,
+    subtotal,
+    deliveryFee,
+    coupon: applied ? { code: applied.coupon.code, description: applied.coupon.description, savings: couponDiscount } : null,
+    couponError,
+    couponDiscount,
+    total: subtotal - couponDiscount + deliveryFee,
+  };
 }
 
-const cartResponse = async (db, userId) => summarize(await loadCart(db, userId));
+const cartResponse = async (db, userId) => summarize(await loadCart(db, userId), await loadCoupon(db, userId));
+
+async function applyCoupon({ db, userId, body, store }) {
+  const code = text(body.code).toUpperCase();
+  if (!COUPON_RE.test(code)) throw new ApiError(400, 'Please enter a valid coupon code');
+  await limit(store, `coupon:${userId}`, 20, 'Too many coupon attempts. Please try again in 15 minutes.'); // no guessing codes
+  const [coupon] = await db(
+    `SELECT c.*, EXISTS (SELECT 1 FROM coupon_redemptions r WHERE r.code = c.code AND r.user_id = $2) AS used
+       FROM coupons c WHERE c.code = $1`,
+    [code, userId],
+  );
+  if (!coupon) throw new ApiError(404, `${code} isn’t a valid coupon code`);
+  const lines = await loadCart(db, userId);
+  if (!lines.length) throw new ApiError(400, 'Add something to your cart first');
+  const problem = couponProblem(coupon, summarize(lines).subtotal, coupon.used);
+  if (problem) throw new ApiError(400, problem);
+  await db(
+    `INSERT INTO cart_coupons (user_id, code) VALUES ($1, $2)
+     ON CONFLICT (user_id) DO UPDATE SET code = EXCLUDED.code, applied_at = NOW()`,
+    [userId, code],
+  );
+  return { body: await cartResponse(db, userId) };
+}
+
+async function removeCoupon({ db, userId }) {
+  await db('DELETE FROM cart_coupons WHERE user_id = $1', [userId]);
+  return { body: await cartResponse(db, userId) };
+}
+
+// Offers the shopper can use now, for the cart's "Available coupons" list
+async function listCoupons({ db, userId }) {
+  const rows = await db(
+    `SELECT code, description, kind, value, min_order, max_discount, ends_at,
+            EXISTS (SELECT 1 FROM coupon_redemptions r WHERE r.code = c.code AND r.user_id = $1) AS used
+       FROM coupons c
+      WHERE active AND public AND starts_at <= NOW() AND (ends_at IS NULL OR ends_at > NOW())
+      ORDER BY created_at DESC LIMIT 20`,
+    [userId],
+  );
+  return {
+    body: rows.map((r) => ({ ...r, value: Number(r.value), min_order: Number(r.min_order), max_discount: r.max_discount === null ? null : Number(r.max_discount) })),
+  };
+}
 
 function product(id) {
   const found = getProduct(text(id));
@@ -137,7 +223,7 @@ const ORDERS_SQL = `
    WHERE o.user_id = $1`;
 
 // PostgreSQL drivers return NUMERIC as text; the storefront does arithmetic on these
-const orderJson = (o) => ({ ...o, total: Number(o.total), delivery_fee: Number(o.delivery_fee) });
+const orderJson = (o) => ({ ...o, total: Number(o.total), delivery_fee: Number(o.delivery_fee), coupon_discount: Number(o.coupon_discount ?? 0) });
 
 /** The shopper's saved address as the one line stored on the order. */
 export async function resolveAddress(db, userId, addressId) {
@@ -150,7 +236,7 @@ export async function resolveAddress(db, userId, addressId) {
 /** The cart and its price breakdown, after checking it isn't empty and everything is in stock. */
 export async function checkoutSummary(db, userId) {
   const lines = await loadCart(db, userId);
-  const summary = summarize(lines);
+  const summary = summarize(lines, await loadCoupon(db, userId));
   if (!summary.items.length) throw new ApiError(400, 'Your cart is empty');
   for (const { product: p, qty } of lines) {
     if ((p.stock ?? 0) < qty) throw new ApiError(409, `Only ${p.stock ?? 0} left of ${p.name}`);
@@ -176,13 +262,21 @@ async function placeOrder({ db, userId, body, store, ip }) {
  */
 export async function createOrder(db, { userId, address, method, summary }) {
   const details = summary.items.map((i) => ({ product_id: i.productId, name: i.name, price: i.price, image: i.image, category: i.category }));
-  const [order] = await db(
-    `WITH taken AS (
+  const coupon = summary.couponDiscount > 0 ? summary.coupon.code : null; // only a coupon that actually applied
+  let rows;
+  try {
+    rows = await db(
+      `WITH taken AS (
        DELETE FROM cart_items WHERE user_id = $1 RETURNING product_id, qty
      ), placed AS (
-       INSERT INTO orders (user_id, total, address, payment_method, delivery_fee)
-       SELECT $1::int, $2::numeric, $3::text, $6::text, $4::numeric WHERE EXISTS (SELECT 1 FROM taken)
+       INSERT INTO orders (user_id, total, address, payment_method, delivery_fee, coupon_code, coupon_discount)
+       SELECT $1::int, $2::numeric, $3::text, $6::text, $4::numeric, $7::text, $8::numeric WHERE EXISTS (SELECT 1 FROM taken)
        RETURNING *
+     ), redeemed AS (
+       -- One use per customer: a second use breaks the (code, user) key and the whole order is undone
+       INSERT INTO coupon_redemptions (code, user_id, order_id) SELECT $7::text, $1::int, id FROM placed WHERE $7::text IS NOT NULL
+     ), coupon_done AS (
+       DELETE FROM cart_coupons WHERE user_id = $1 AND EXISTS (SELECT 1 FROM placed)
      ), lines AS (
        INSERT INTO order_items (order_id, product_id, name, price, qty, image, category)
        SELECT placed.id, x.product_id, x.name, x.price, taken.qty, x.image, x.category
@@ -193,8 +287,15 @@ export async function createOrder(db, { userId, address, method, summary }) {
        INSERT INTO order_events (order_id, status, note) SELECT id, 'placed', 'Order placed' FROM placed
      )
      SELECT * FROM placed`,
-    [userId, summary.total, address, summary.deliveryFee, JSON.stringify(details), method],
-  );
+      [userId, summary.total, address, summary.deliveryFee, JSON.stringify(details), method, coupon, summary.couponDiscount],
+    );
+  } catch (err) {
+    if (err.code === '23505' && String(err.constraint || err.message).includes('coupon_redemptions')) {
+      throw new ApiError(409, `You’ve already used ${coupon}. Remove it from your cart to continue.`);
+    }
+    throw err;
+  }
+  const [order] = rows;
   return order ? orderJson(order) : null;
 }
 
@@ -219,6 +320,9 @@ async function cancelOrder({ db, userId, id, rz }) {
            RETURNING *
          ), timeline AS (
            INSERT INTO order_events (order_id, status, note) SELECT id, 'cancelled', 'Cancelled by you' FROM cancelled
+         ), coupon_back AS (
+           -- a cancelled order gives its coupon use back
+           DELETE FROM coupon_redemptions WHERE order_id IN (SELECT id FROM cancelled)
          )
          SELECT * FROM cancelled`,
         [Number(id), userId],
@@ -260,7 +364,11 @@ const ROUTES = {
 
 const ownKey = (object, key) => (Object.hasOwn(object, key) ? object[key] : undefined);
 
+// /cart/coupon and /cart/coupons (product ids are 24 hex characters, so these can't clash with a product)
+const COUPON_ROUTES = { 'POST coupon': applyCoupon, 'DELETE coupon': removeCoupon, 'GET coupons': listCoupons };
+
 function findRoute(method, [area, id, action, ...extra]) {
+  if (area === 'cart' && ['coupon', 'coupons'].includes(id) && !action && !extra.length) return ownKey(COUPON_ROUTES, `${method} ${id}`);
   const routes = ownKey(ROUTES, area ?? '');
   if (!routes || extra.length) return undefined;
   return ownKey(routes, [method, id && 'id', action].filter(Boolean).join(' ').replace('id ', 'id/'));

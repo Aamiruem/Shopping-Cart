@@ -80,7 +80,7 @@ test('online payment is offered only when both keys are set, and the secret is n
   assert.equal(paymentsConfig({}).enabled, false);
   assert.equal(paymentsConfig({ RAZORPAY_KEY_ID: 'rzp_test_key' }).enabled, false);
   const on = paymentsConfig(ENV);
-  assert.deepEqual([on.enabled, on.keyId, on.methods], [true, 'rzp_test_key', ['upi', 'netbanking', 'card', 'wallet', 'emi']]);
+  assert.deepEqual([on.enabled, on.keyId, on.methods], [true, 'rzp_test_key', ['upi', 'card', 'netbanking', 'emi', 'paylater', 'wallet']]);
   assert.ok(!JSON.stringify(on).includes('test_secret'));
 });
 
@@ -113,12 +113,12 @@ test('pay by UPI: the order is created only after the signature checks out', asy
 });
 
 test('every Razorpay method is recorded on the order', async () => {
-  for (const method of ['netbanking', 'card', 'wallet', 'emi']) {
+  for (const [method, recorded] of [['netbanking', 'netbanking'], ['card', 'card'], ['wallet', 'wallet'], ['emi', 'emi'], ['cardless_emi', 'emi'], ['paylater', 'paylater'], ['something_new', 'online']]) {
     await pg.exec('TRUNCATE users, auth_rate_limits RESTART IDENTITY CASCADE');
     const s = await shopper();
     const start = await s.payments('POST', 'razorpay/order', { addressId: s.address });
     const verified = await s.payments('POST', 'razorpay/verify', pay(start.body.orderId, { method }));
-    assert.equal((await s.shop('GET', `orders/${verified.body.orderId}`)).body.payment_method, method);
+    assert.equal((await s.shop('GET', `orders/${verified.body.orderId}`)).body.payment_method, recorded);
   }
 });
 

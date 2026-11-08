@@ -139,3 +139,29 @@
 .otp-card .alert { margin: 0; width: 100%; }
 .otp-dev { background: #fff8e1; color: #8d6e00; padding: 6px 10px; border-radius: var(--radius-sm); font-size: var(--fs-xs); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: center; }
 .otp-note { display: flex; align-items: center; gap: 4px; }
+
+/* Payment choices (Checkout.jsx) and coupons (components/cart/CouponBox.jsx) */
+.pay-icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; --pay: var(--brand); background: color-mix(in srgb, var(--pay) 12%, #fff); color: var(--pay); }
+.pay-upi { --pay: #16a34a; }
+.pay-card { --pay: #2563eb; }
+.pay-netbanking { --pay: #7c3aed; }
+.pay-emi { --pay: #0891b2; }
+.pay-paylater { --pay: #db2777; }
+.pay-wallet { --pay: #ea580c; }
+.pay-cod { --pay: #b45309; }
+.payment-option.selected .pay-icon { background: var(--pay); color: #fff; }
+.secure-note { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; color: var(--text-muted); font-size: var(--fs-sm); }
+
+.coupon-box { display: grid; gap: 8px; margin: 12px 0; padding-top: 12px; border-top: 1px dashed var(--border); }
+.coupon-form { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; color: #16a34a; }
+.coupon-form input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; font-weight: 600; letter-spacing: 0.04em; color: var(--text); }
+.coupon-applied { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px dashed #16a34a; border-radius: 8px; background: #f0fdf4; color: #15803d; }
+.coupon-applied.blocked { border-color: var(--error); background: var(--error-bg); color: var(--error); }
+.coupon-applied > div { flex: 1; display: grid; gap: 2px; }
+.coupon-applied span { color: var(--text); }
+.coupon-offers { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.coupon-offers li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 8px; }
+.coupon-offers li > div { display: grid; gap: 2px; min-width: 0; }
+.coupon-offers p { margin: 0; font-size: var(--fs-sm); }
+.coupon-code { justify-self: start; padding: 2px 8px; border: 1px dashed #16a34a; border-radius: 4px; background: #f0fdf4; color: #15803d; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; }
+.price-details .coupon-box { margin: 4px 16px 16px; }

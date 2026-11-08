@@ -9,7 +9,7 @@ import { deliveryDate, formatDate, formatPrice } from '../utils/format';
 import { paymentStatus } from '../utils/orders';
 import { StatusBadge } from './Orders';
 
-const PAYMENT_LABELS = { cod: 'Cash on Delivery', upi: 'UPI', card: 'Card', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI' };
+const PAYMENT_LABELS = { cod: 'Cash on Delivery', upi: 'UPI', card: 'Card', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay Later', online: 'Online payment' };
 const TRACK_STEPS = ['Ordered', 'Packed', 'Shipped', 'Delivered'];
 const STEP_OF = { pending: 0, packed: 1, shipped: 2, delivered: 3 };
 const RETURN_WINDOW_DAYS = 7;
@@ -179,6 +179,7 @@ export default function OrderDetail() {
             <dl className="mini-dl">
               <div><dt>Items total</dt><dd>{formatPrice(itemsTotal)}</dd></div>
               <div><dt>Delivery</dt><dd>{Number(order.delivery_fee) ? formatPrice(order.delivery_fee) : 'FREE'}</dd></div>
+              {Number(order.coupon_discount) > 0 && <div><dt>Coupon ({order.coupon_code})</dt><dd className="text-success">− {formatPrice(order.coupon_discount)}</dd></div>}
               <div className="total-row"><dt>Order total</dt><dd>{formatPrice(order.total)}</dd></div>
               <div><dt>Payment method</dt><dd>{PAYMENT_LABELS[order.payment_method] || order.payment_method}</dd></div>
               <div><dt>Payment status</dt><dd><strong>{paymentStatus(order, delivered)}</strong></dd></div>

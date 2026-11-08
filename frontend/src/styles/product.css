@@ -354,3 +354,8 @@
   .detail-store .detail-info { order: 2; }
 }
 @media (prefers-reduced-motion: reduce) { .service-icon { transition: none; } }
+
+/* Colourful service icons (StoreFacts.jsx) */
+.service-icons a { --tone: var(--brand); }
+.service-icons .service-icon { background: color-mix(in srgb, var(--tone) 12%, #fff); color: var(--tone); }
+.service-icons strong { color: color-mix(in srgb, var(--tone) 80%, #000); }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { PREVIEW } from '../config';
 import AddressForm from '../components/account/AddressForm';
+import CouponBox from '../components/cart/CouponBox';
 import PriceDetails from '../components/cart/PriceDetails';
 import PaymentOtp from '../components/checkout/PaymentOtp';
 import { EmptyState, Spinner } from '../components/common/Feedback';
@@ -16,16 +17,17 @@ import { trackBeginCheckout, trackPurchase } from '../utils/analytics';
 import useSeo from '../hooks/useSeo';
 
 const COD = { id: 'cod', icon: 'truck', label: 'Cash on Delivery', note: 'Pay when your order arrives' };
-// Real payments through Razorpay (RBI-authorised payment aggregator) when the store has Razorpay keys
-const LIVE_OPTIONS = [
-  {
-    id: 'razorpay',
-    icon: 'card',
-    label: 'Pay online: UPI, Net Banking, Cards, Wallets',
-    note: 'Google Pay, PhonePe, Paytm, BHIM UPI · Net banking with all major banks · Visa, Mastercard, RuPay · Secured by Razorpay',
-  },
-  COD,
-];
+// Real payments through Razorpay (an RBI-authorised payment aggregator) once the store has Razorpay keys. Each choice
+// opens Razorpay Checkout on that method; card and bank details are entered on Razorpay's page, never on ours.
+const ONLINE_OPTIONS = [
+  { method: 'upi', icon: 'phone', label: 'UPI', note: 'Google Pay, PhonePe, Paytm, BHIM or any UPI app' },
+  { method: 'card', icon: 'card', label: 'Credit / Debit / ATM card', note: 'Visa, Mastercard, RuPay · confirmed with your bank’s OTP' },
+  { method: 'netbanking', icon: 'bank', label: 'Net banking', note: 'All major Indian banks' },
+  { method: 'emi', icon: 'clock', label: 'EMI', note: 'Credit card and cardless EMI, where your bank offers it' },
+  { method: 'paylater', icon: 'zap', label: 'Pay Later', note: 'Buy now, pay later, if you’re eligible' },
+  { method: 'wallet', icon: 'wallet', label: 'Wallets', note: 'Popular mobile wallets' },
+].map((o) => ({ ...o, id: `online-${o.method}` }));
+const LIVE_OPTIONS = [...ONLINE_OPTIONS, COD];
 // Development without Razorpay keys: an emailed OTP stands in for the payment gateway
 const DEMO_OPTIONS = [
   { id: 'upi', icon: 'phone', label: 'UPI', note: 'Pay by any UPI app · OTP verified (demo — no real charge)' },
@@ -89,7 +91,7 @@ export default function Checkout() {
     api.paymentsConfig()
       .then((cfg) => {
         setGateway(cfg);
-        if (cfg.enabled) setPayment('razorpay');
+        if (cfg.enabled) setPayment('online-upi');
       })
       .catch(() => setGateway({ enabled: false }));
   }, []);
@@ -128,7 +130,7 @@ export default function Checkout() {
   };
 
   // UPI / net banking / card / wallet in Razorpay Checkout; the order is created only after the server verifies the payment
-  const payOnline = async () => {
+  const payOnline = async (method) => {
     setPlacing(true);
     try {
       await loadRazorpay();
@@ -141,7 +143,7 @@ export default function Checkout() {
         name: start.name,
         description: start.description,
         image: `${window.location.origin}/brand/arvixa-mark-192.png`,
-        prefill: start.prefill,
+        prefill: { ...start.prefill, method }, // opens Razorpay on the method the shopper chose
         theme: { color: '#2874f0' },
         handler: async (response) => {
           try {
@@ -169,7 +171,8 @@ export default function Checkout() {
 
   // Cash on delivery places the order straight away; the dev OTP demo asks for an emailed code first
   const placeOrder = async () => {
-    if (payment === 'razorpay') return payOnline();
+    const online = ONLINE_OPTIONS.find((o) => o.id === payment);
+    if (online) return payOnline(online.method);
     if (OTP_DEMO.includes(payment)) return setOtpOpen(true);
     setPlacing(true);
     try {
@@ -250,17 +253,18 @@ export default function Checkout() {
           {options.map((p) => (
             <label key={p.id} className={`payment-option ${payment === p.id ? 'selected' : ''}`}>
               <input type="radio" name="payment" checked={payment === p.id} onChange={() => setPayment(p.id)} />
-              <Icon name={p.icon} size={20} />
+              <span className={`pay-icon pay-${p.method || p.id}`}><Icon name={p.icon} size={20} /></span>
               <div><strong>{p.label}</strong><span className="muted small">{p.note}</span></div>
             </label>
           ))}
           <button type="button" className="btn btn-buy btn-lg btn-block" disabled={placing || !address} onClick={placeOrder}>
             {placing ? 'Processing…' : payment === 'cod' ? `Confirm order · ${formatPrice(cart.total)}` : `Pay ${formatPrice(cart.total)}`}
           </button>
+          {gateway?.enabled && <p className="secure-note"><Icon name="lock" size={14} /> Payments are processed securely by Razorpay. We never see or store your card or bank details.</p>}
         </Step>
       </div>
 
-      <PriceDetails cart={cart} />
+      <PriceDetails cart={cart}><CouponBox /></PriceDetails>
       {otpOpen && <PaymentOtp amount={cart.total} onConfirm={confirmWithOtp} onCancel={() => setOtpOpen(false)} />}
     </div>
   );

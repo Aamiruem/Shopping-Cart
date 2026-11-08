@@ -3,7 +3,8 @@
   "private": true,
   "description": "Dependencies of the Vercel /api function. The storefront has its own package.json in frontend/.",
   "scripts": {
-    "db:setup": "node --env-file=.env.local scripts/setup-db.mjs"
+    "db:setup": "node --env-file=.env.local scripts/setup-db.mjs",
+    "coupon": "node --env-file=.env.local scripts/coupon.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.0.2",
