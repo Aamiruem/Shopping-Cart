@@ -18,10 +18,11 @@ const COLUMNS = [
     title: 'Help',
     links: [
       { label: 'Payments', to: '/help#payments' },
-      { label: 'Shipping', to: '/help#shipping' },
-      { label: 'Cancellation & Returns', to: '/help#returns' },
+      { label: 'Shipping Policy', to: '/shipping' },
+      { label: 'Cancellation & Refunds', to: '/refunds' },
       { label: 'FAQ', to: '/help' },
       { label: 'About Us', to: '/about' },
+      { label: 'Terms of Use', to: '/terms' },
       { label: 'Privacy Policy', to: '/privacy' },
     ],
   },

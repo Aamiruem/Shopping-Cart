@@ -11,7 +11,7 @@ import SiteHeader from './components/layout/SiteHeader';
 import { AuthModalProvider } from './context/AuthModalContext';
 import ProtectedRoute from './components/routing/ProtectedRoute';
 import ScrollToTop from './components/routing/ScrollToTop';
-import { About, OpeningSoon, Privacy } from './pages/Legal';
+import { About, OpeningSoon, Privacy, Refunds, Shipping, Terms } from './pages/Legal';
 import Home from './pages/Home';
 import NotFound from './pages/NotFound';
 import ProductDetail from './pages/ProductDetail';
@@ -81,6 +81,9 @@ export default function App() {
             <Route path="/visual-search" element={<VisualSearch />} />
             <Route path="/about" element={<About />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/refunds" element={<Refunds />} />
+            <Route path="/shipping" element={<Shipping />} />
 
             {/* Logged-in users only */}
             <Route path="/cart" element={shopRoute(<Cart />)} />

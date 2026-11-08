@@ -20,7 +20,8 @@ export default function ProductCard({ product, variant = 'grid' }) {
   const off = discountPercent(product.price, product.mrp);
   // Clothing reads best as a full-bleed portrait photo (Flipkart / Myntra style); gadgets stay square
   const portrait = product.category === 'fashion';
-  const hoverImage = portrait && product.images?.find((src) => src !== product.image);
+  // Any product with more than one photo shows the next one on hover
+  const hoverImage = product.images?.find((src) => src !== product.image);
 
   return (
     <article className={`product-card product-card-${variant} ${portrait ? 'product-card-portrait' : ''}`}>

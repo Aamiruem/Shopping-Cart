@@ -51,6 +51,9 @@
 .product-card-portrait:hover .product-img img { transform: none; }
 .product-img .product-img-alt { opacity: 0; transition: opacity 0.35s ease; }
 .product-card-portrait:hover .product-img-alt { opacity: 1; }
+.product-img .product-img-alt { background: var(--surface); }
+.product-card:hover .product-img-alt { opacity: 1; }
+.product-card-portrait .product-img .product-img-alt { background: var(--bg); }
 .product-card-portrait .product-info { padding: 10px 12px 0; gap: 3px; }
 .product-card-portrait .product-brand { color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-transform: none; letter-spacing: 0; }
 .product-card-portrait .product-name { color: var(--text-muted); font-size: var(--fs-sm); font-weight: 400; -webkit-line-clamp: 1; }
@@ -274,3 +277,36 @@
 .pay-ways li > svg { flex: none; margin-top: 2px; color: var(--brand); }
 .pay-ways span { display: grid; gap: 2px; }
 .pay-ways small { color: var(--text-muted); font-size: var(--fs-xs); }
+
+/* Product photos: step arrows, counter and full view (components/product/Lightbox.jsx) */
+.zoom-frame { display: block; padding: 0; border: 0; background: none; }
+.gallery-step { position: absolute; top: 50%; z-index: 2; display: grid; place-items: center; width: 38px; height: 38px; margin-top: -19px; border: 1px solid var(--border); border-radius: 50%; background: rgba(255, 255, 255, 0.92); color: var(--text); cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); opacity: 0; transition: opacity 0.2s ease; }
+.gallery-step.prev { left: 10px; }
+.gallery-step.next { right: 10px; }
+.main-image:hover .gallery-step, .gallery-step:focus-visible { opacity: 1; }
+.gallery-count { position: absolute; left: 50%; bottom: 10px; z-index: 2; transform: translateX(-50%); padding: 2px 10px; border-radius: 999px; background: rgba(23, 35, 55, 0.72); color: #fff; font-size: var(--fs-xs); font-weight: 600; }
+.gallery-hint { margin: 6px 0 0; text-align: center; color: var(--brand); font-size: var(--fs-sm); }
+@media (hover: none) { .gallery-step { opacity: 1; } }
+
+.lightbox { position: fixed; inset: 0; z-index: 1100; display: grid; grid-template-rows: 1fr auto; background: rgba(10, 14, 22, 0.94); animation: lightbox-in 0.18s ease-out; }
+.lightbox-stage { position: relative; display: grid; place-items: center; min-height: 0; padding: 56px 64px 16px; }
+.lightbox-stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; background: #fff; animation: lightbox-in 0.2s ease-out; }
+.lightbox-close { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: 12px; z-index: 2; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.12); color: #fff; cursor: pointer; }
+.lightbox-nav { position: absolute; top: 50%; display: grid; place-items: center; width: 48px; height: 48px; margin-top: -24px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.14); color: #fff; cursor: pointer; }
+.lightbox-nav:hover, .lightbox-close:hover { background: rgba(255, 255, 255, 0.26); }
+.lightbox-nav.prev { left: 10px; }
+.lightbox-nav.next { right: 10px; }
+.lightbox-strip { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 16px max(16px, env(safe-area-inset-bottom, 0px)); overflow-x: auto; }
+.lightbox-strip button { flex: none; width: 60px; height: 60px; padding: 3px; border: 2px solid transparent; border-radius: 8px; background: #fff; cursor: pointer; opacity: 0.6; }
+.lightbox-strip button.active { border-color: var(--accent); opacity: 1; }
+.lightbox-strip img { width: 100%; height: 100%; object-fit: contain; }
+.lightbox-count { flex: none; margin-right: 8px; color: #fff; font-size: var(--fs-sm); font-weight: 600; }
+@keyframes lightbox-in { from { opacity: 0; } }
+@media (max-width: 600px) {
+  .lightbox-stage { padding: 56px 8px 8px; }
+  .lightbox-nav { width: 40px; height: 40px; background: rgba(0, 0, 0, 0.4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lightbox, .lightbox-stage img { animation: none; }
+  .gallery-step { transition: none; }
+}

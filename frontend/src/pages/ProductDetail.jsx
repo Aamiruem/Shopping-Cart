@@ -8,6 +8,7 @@ import Rating, { shownRating } from '../components/common/Rating';
 import ProductRail from '../components/product/ProductRail';
 import Reviews from '../components/product/Reviews';
 import StoreFacts from '../components/product/StoreFacts';
+import Lightbox from '../components/product/Lightbox';
 import Spin360 from '../components/product/Spin360';
 import { aisleLabel, categoryLabel, groupOf } from '../constants/catalog';
 import { useCart } from '../context/CartContext';
@@ -32,7 +33,7 @@ const OFFERS = [
 ];
 
 // Main photo that magnifies under the pointer (Flipkart-style hover zoom); touch screens just see the photo
-function ZoomImage({ src, alt }) {
+function ZoomImage({ src, alt, onOpen }) {
   const [origin, setOrigin] = useState(null);
   const move = (e) => {
     if (e.pointerType !== 'mouse') return;
@@ -40,9 +41,9 @@ function ZoomImage({ src, alt }) {
     setOrigin(`${((e.clientX - r.left) / r.width) * 100}% ${((e.clientY - r.top) / r.height) * 100}%`);
   };
   return (
-    <div className={`zoom-frame ${origin ? 'zooming' : ''}`} onPointerMove={move} onPointerLeave={() => setOrigin(null)}>
+    <button type="button" className={`zoom-frame ${origin ? 'zooming' : ''}`} onPointerMove={move} onPointerLeave={() => setOrigin(null)} onClick={onOpen} aria-label={`Open full view of ${alt}`}>
       <img src={src} alt={alt} style={origin ? { transformOrigin: origin } : undefined} />
-    </div>
+    </button>
   );
 }
 
@@ -82,6 +83,7 @@ export default function ProductDetail() {
   const [product, setProduct] = useState(null);
   const [error, setError] = useState('');
   const [activeImage, setActiveImage] = useState(0);
+  const [fullView, setFullView] = useState(false);
   const [similar, setSimilar] = useState([]);
   const [together, setTogether] = useState({ items: [], strategy: '' });
   const { has: inCart } = useCart();
@@ -154,7 +156,14 @@ export default function ProductDetail() {
             ))}
           </div>
           <div className="main-image">
-            {show360 ? <Spin360 frames={frames360} alt={product.name} /> : <ZoomImage src={images[activeImage]} alt={product.name} />}
+            {show360 ? <Spin360 frames={frames360} alt={product.name} /> : <ZoomImage src={images[activeImage]} alt={product.name} onOpen={() => setFullView(true)} />}
+            {!show360 && images.length > 1 && (
+              <>
+                <button type="button" className="gallery-step prev" onClick={() => setActiveImage((activeImage - 1 + images.length) % images.length)} aria-label="Previous photo"><Icon name="chevronLeft" size={20} /></button>
+                <button type="button" className="gallery-step next" onClick={() => setActiveImage((activeImage + 1) % images.length)} aria-label="Next photo"><Icon name="chevronRight" size={20} /></button>
+                <span className="gallery-count">{activeImage + 1} / {images.length}</span>
+              </>
+            )}
             {frames360 && !show360 && (
               <button type="button" className="view-360-btn" onClick={() => setActiveImage(SPIN_VIEW)}>
                 <Icon name="rotate" size={14} /> View in 360°
@@ -166,6 +175,8 @@ export default function ProductDetail() {
             </button>
             )}
           </div>
+          {!show360 && <p className="gallery-hint">Click the photo to see full view{images.length > 1 ? ` · ${images.length} photos` : ''}</p>}
+          {fullView && <Lightbox images={images} start={activeImage} alt={product.name} onClose={() => setFullView(false)} />}
           <div className="detail-actions">
             {!SHOPPING ? (
               <button type="button" className="btn btn-cart btn-lg coming-soon" disabled>Coming soon</button>

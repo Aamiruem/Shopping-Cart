@@ -17,4 +17,13 @@ export const SITE_URL = (import.meta.env.VITE_SITE_URL || (typeof window !== 'un
 // Real support address, shown in the footer and legal pages. Hidden until set.
 export const CONTACT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL || '';
 
+// The business behind the store, shown in the Terms and policy pages. India's Consumer Protection (E-Commerce)
+// Rules 2020 and payment gateways such as Razorpay require these before selling: set them in Vercel, then redeploy.
+export const LEGAL = {
+  name: import.meta.env.VITE_LEGAL_NAME || '',
+  address: import.meta.env.VITE_LEGAL_ADDRESS || '',
+  phone: import.meta.env.VITE_CONTACT_PHONE || '',
+  grievanceOfficer: import.meta.env.VITE_GRIEVANCE_OFFICER || '',
+};
+
 export const OPENING_SOON_MESSAGE = 'Arvixa Store is opening soon. Ordering isn’t available yet.';

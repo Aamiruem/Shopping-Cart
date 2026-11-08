@@ -343,7 +343,7 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
             <button type="submit" className="btn btn-buy btn-lg btn-block" disabled={busy}>
               {busy ? 'Please wait…' : usingOtp ? 'Request OTP' : copy.submit}
             </button>
-            <p className="auth-terms">By continuing, you agree to Arvixa Store’s <Link to="/help">Terms of Use</Link> and <Link to="/help">Privacy Policy</Link>.</p>
+            <p className="auth-terms">By continuing, you agree to Arvixa Store’s <Link to="/terms">Terms of Use</Link> and <Link to="/privacy">Privacy Policy</Link>.</p>
 
             <GoogleButton onCredential={onGoogle} onError={setError} />
 

@@ -164,6 +164,9 @@ staticPage('/help', 'Help Center - Orders, Payments, Returns & Refunds', `Get he
 staticPage('/sell', `Sell Online on ${SITE_NAME} - Become a Seller`, `Open your online store on ${SITE_NAME}. List products with photos, videos and 360° views, and grow with sales insights.`, PREVIEW_NOTE);
 staticPage('/about', 'About Us', ABOUT_DESCRIPTION, PREVIEW_NOTE);
 staticPage('/privacy', 'Privacy Policy', PRIVACY_DESCRIPTION, '');
+staticPage('/terms', 'Terms of Use', `The terms for using ${SITE_NAME} and buying from it.`, '');
+staticPage('/refunds', 'Cancellation & Refund Policy', `How to cancel a ${SITE_NAME} order and how refunds work.`, '');
+staticPage('/shipping', 'Shipping Policy', `Where ${SITE_NAME} delivers and what delivery costs.`, '');
 
 products.forEach((p) => {
   const path = productPath(p);
