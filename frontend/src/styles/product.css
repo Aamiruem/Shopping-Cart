@@ -377,3 +377,4 @@
   .product-grid .product-card, .department { transition: none; }
   .product-grid .product-card:hover, .department:hover { transform: none; }
 }
+.rail-highlight .rail-head p { color: rgba(255, 255, 255, 0.85); }
