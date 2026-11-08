@@ -1,5 +1,6 @@
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { categoryLabel } from '../../constants/catalog';
+import { CATEGORY_COLORS } from '../../constants/colors';
 import Icon from '../common/Icon';
 
 const category = (id, icon) => ({
@@ -18,10 +19,7 @@ const audience = (id, label) => ({
 });
 
 // Each tab's colour: tinted circle behind the icon, solid when it's the current page
-const COLORS = {
-  'for-you': '#f59e0b', all: '#6366f1', fashion: '#ec4899', women: '#db2777', men: '#2563eb', mobiles: '#0284c7',
-  electronics: '#7c3aed', beauty: '#e11d48', home: '#ea580c', kitchen: '#b45309', grocery: '#16a34a', accessories: '#0891b2', sports: '#dc2626',
-};
+const COLORS = CATEGORY_COLORS;
 
 // Icon tab row under the header (Flipkart style). Each tab knows its link and how to tell it is the current page.
 const TABS = [

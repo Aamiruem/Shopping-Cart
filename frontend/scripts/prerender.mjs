@@ -173,7 +173,7 @@ products.forEach((p) => {
   const category = categoryLabel(p.category);
   const categoryPath = `/products?category=${p.category}`;
   const images = (p.images?.length ? p.images : [p.image]).filter(Boolean).map(abs);
-  const productLd = PREVIEW ? null : {
+  const productLd = process.env.VITE_STORE_MODE === 'preview' ? null : { // real offers once the store takes orders
     '@type': 'Product',
     name: p.name,
     description: p.description,

@@ -166,3 +166,17 @@ input:-webkit-autofill:focus {
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .span-2 { grid-column: auto; }
 }
+
+/* Category colour wash behind product and listing pages (hooks/usePageTint.js) */
+.tinted .app-main {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--page-tint) 16%, var(--bg)) 0, color-mix(in srgb, var(--page-tint) 6%, var(--bg)) 320px, var(--bg) 640px);
+  transition: background 0.3s ease;
+}
+
+/* Back / Share bar (components/layout/PageToolbar.jsx) */
+.page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.toolbar-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px 6px 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); }
+.toolbar-btn:hover { border-color: var(--brand); color: var(--brand); }
+.map-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: var(--fs-sm); font-weight: 600; color: var(--brand); text-decoration: none; }
+.map-link:hover { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { .tinted .app-main { transition: none; } }

@@ -212,6 +212,7 @@ export default function Checkout() {
               <div>
                 <p><strong>{a.name}</strong> <span className="chip">{a.type}</span> <strong>{a.phone}</strong></p>
                 <p className="muted">{a.line1}, {a.city}, {a.state} — <strong>{a.pincode}</strong></p>
+                <a className="map-link" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${a.line1}, ${a.city}, ${a.state} ${a.pincode}`)}`} target="_blank" rel="noreferrer"><Icon name="mapPin" size={14} /> Check on Google Maps</a>
                 {a.id === addressId && <button type="button" className="btn btn-buy" onClick={() => setStep(3)}>Deliver here</button>}
               </div>
             </label>

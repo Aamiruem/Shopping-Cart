@@ -7,6 +7,7 @@ import CategoryBar from './components/layout/CategoryBar';
 import Footer from './components/layout/Footer';
 import Navbar from './components/layout/Navbar';
 import { ConsentBanner, PreviewBanner } from './components/layout/NoticeBars';
+import PageToolbar from './components/layout/PageToolbar';
 import SiteHeader from './components/layout/SiteHeader';
 import { AuthModalProvider } from './context/AuthModalContext';
 import ProtectedRoute from './components/routing/ProtectedRoute';
@@ -66,6 +67,7 @@ export default function App() {
       </SiteHeader>
 
       <main className="app-main">
+        <PageToolbar />
         <Suspense fallback={<Spinner />}>
           <Routes>
             {/* Public */}

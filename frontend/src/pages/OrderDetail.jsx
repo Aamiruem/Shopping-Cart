@@ -9,6 +9,9 @@ import { deliveryDate, formatDate, formatPrice } from '../utils/format';
 import { paymentStatus } from '../utils/orders';
 import { StatusBadge } from './Orders';
 
+// Opens the address in Google Maps (no API key needed); the phone number is left out of the search
+const mapsLink = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.replace(/\. Phone: .*$/, ''))}`;
+
 const PAYMENT_LABELS = { cod: 'Cash on Delivery', upi: 'UPI', card: 'Card', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay Later', online: 'Online payment' };
 const TRACK_STEPS = ['Ordered', 'Packed', 'Shipped', 'Delivered'];
 const STEP_OF = { pending: 0, packed: 1, shipped: 2, delivered: 3 };
@@ -173,6 +176,7 @@ export default function OrderDetail() {
           <div className="panel side-box">
             <h3><Icon name="mapPin" size={16} /> Delivery address</h3>
             <p>{order.address}</p>
+            <a className="map-link" href={mapsLink(order.address)} target="_blank" rel="noreferrer"><Icon name="mapPin" size={14} /> View on Google Maps</a>
           </div>
           <div className="panel side-box">
             <h3><Icon name="card" size={16} /> Payment</h3>

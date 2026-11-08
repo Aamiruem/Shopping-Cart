@@ -6,6 +6,7 @@ import Icon from '../components/common/Icon';
 import ProductCard from '../components/product/ProductCard';
 import ProductRail from '../components/product/ProductRail';
 import { aisleLabel, GROCERY_AISLES, SORT_OPTIONS } from '../constants/catalog';
+import usePageTint from '../hooks/usePageTint';
 import useSeo, { breadcrumbLd } from '../hooks/useSeo';
 
 const PROMISES = [
@@ -18,6 +19,7 @@ const PROMISES = [
 // and filtered here, so switching aisles and searching are instant.
 export default function Grocery() {
   const [params, setParams] = useSearchParams();
+  usePageTint('grocery');
   const aisle = params.get('aisle') || '';
   const sort = params.get('sort') || 'popularity';
   const [query, setQuery] = useState(params.get('q') || '');

@@ -15,6 +15,7 @@ import { aisleLabel, categoryLabel, groupOf } from '../constants/catalog';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { useWishlist } from '../context/WishlistContext';
+import usePageTint from '../hooks/usePageTint';
 import useShopActions from '../hooks/useShopActions';
 import { deliveryDate } from '../utils/format';
 import { responsiveImage } from '../utils/image';
@@ -119,6 +120,7 @@ export default function ProductDetail() {
   const { has: inCart } = useCart();
   const { has: inWishlist } = useWishlist();
   const { addToCart, buyNow, toggleWishlist } = useShopActions();
+  usePageTint(product?.category);
 
   useEffect(() => {
     let cancelled = false;

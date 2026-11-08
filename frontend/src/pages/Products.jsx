@@ -9,6 +9,7 @@ import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, FASHION_TYPES, SORT_OPTIONS 
 import { PREVIEW } from '../config';
 import { listingDescription, listingTitle } from '../seo/copy';
 import { trackSearch } from '../utils/analytics';
+import usePageTint from '../hooks/usePageTint';
 import useSeo, { breadcrumbLd, itemListLd } from '../hooks/useSeo';
 
 const FILTER_KEYS = ['q', 'use', 'category', 'audience', 'subCategory', 'brand', 'minPrice', 'maxPrice', 'minRating', 'sort'];
@@ -18,6 +19,7 @@ const EMPTY_FACETS = { brands: [], minPrice: 0, maxPrice: 0 };
 export default function Products() {
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) || ''])), [params]);
+  usePageTint(filters.audience && filters.category === 'fashion' ? filters.audience : filters.category);
   const [products, setProducts] = useState([]);
   const [facets, setFacets] = useState(EMPTY_FACETS);
   const [loading, setLoading] = useState(true);

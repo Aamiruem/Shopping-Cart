@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { PREVIEW, SITE_URL } from '../config';
+import { SHOPPING, SITE_URL } from '../config';
 import { HOME_TITLE, LOGO_PATH, productPath, SHARE_IMAGE_PATH, SITE_NAME, slugify, SLOGAN } from '../seo/copy';
 
 export { productPath, slugify };
@@ -68,9 +68,9 @@ export const breadcrumbLd = (items) => ({
   itemListElement: items.map((it, i) => ({ '@type': 'ListItem', position: i + 1, name: it.name, item: absolute(it.path) })),
 });
 
-// Google's Product rich results need a real offer, so preview mode (sample prices, no ordering) sends none at all.
-// aggregateRating comes from real buyers' reviews only: marking up sample ratings breaks Google's rules.
-export const productLd = (p) => (PREVIEW ? null : {
+// Google's Product rich results need a real offer: sent once the store takes orders at these prices (store and live
+// modes), never in browse-only preview. aggregateRating comes from real buyers' reviews only.
+export const productLd = (p) => (!SHOPPING ? null : {
   '@type': 'Product',
   name: p.name,
   description: p.description,
