@@ -7,6 +7,7 @@ import { CartProvider } from './context/CartContext';
 import { ToastProvider } from './context/ToastContext';
 import { WishlistProvider } from './context/WishlistContext';
 import './styles/index.css';
+import './utils/install'; // catches the browser's install prompt before React starts
 
 // If a product image fails to load (e.g. a CDN hiccup), show a neutral placeholder instead of a broken icon
 document.addEventListener('error', (e) => {

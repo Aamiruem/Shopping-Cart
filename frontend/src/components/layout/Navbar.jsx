@@ -5,6 +5,8 @@ import { useAuthModal } from '../../context/AuthModalContext';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
 import { useWishlist } from '../../context/WishlistContext';
+import { PREVIEW } from '../../config';
+import { installApp, installStore, isInstalled, manualInstallHint } from '../../utils/install';
 import { soundStore } from '../../utils/sound';
 import Icon from '../common/Icon';
 import { OPEN_CHAT_EVENT } from '../chat/ChatWidget';
@@ -75,6 +77,24 @@ function MenuLink({ to, icon, label, count, state }) {
   );
 }
 
+// "Download App": the browser's install prompt where there is one, otherwise how to install from its menu
+function InstallAppItem({ onDone }) {
+  const toast = useToast();
+  useSyncExternalStore(installStore.subscribe, installStore.canPrompt);
+  if (isInstalled()) return null;
+  const install = async () => {
+    onDone?.();
+    const result = await installApp();
+    if (result === 'installed') toast.show('Arvixa is installed. Find it on your home screen or desktop.');
+    if (result === 'manual') toast.show(manualInstallHint(), 'info');
+  };
+  return (
+    <button type="button" className="menu-link" onClick={install}>
+      <Icon name="download" size={18} strokeWidth={1.6} /> <span>Download App</span>
+    </button>
+  );
+}
+
 function AccountMenu() {
   const { user, ready, logout } = useAuth();
   const { openLogin } = useAuthModal();
@@ -108,12 +128,15 @@ function AccountMenu() {
             </div>
           ) : !ready ? null : (
             <div className="menu-head menu-head-guest">
-              <Link to="/login" state={{ from: location }} className="btn btn-primary btn-block" onClick={(e) => { e.preventDefault(); openLogin('login'); }}>Login</Link>
-              <p>New customer? <Link to="/register" onClick={(e) => { e.preventDefault(); openLogin('register'); }}>Sign Up</Link></p>
+              <p className="menu-signup">New customer? <Link to="/register" onClick={(e) => { e.preventDefault(); setOpen(false); openLogin('register'); }}>Sign Up</Link></p>
+              <Link to="/login" state={{ from: location }} className="btn btn-primary btn-block" onClick={(e) => { e.preventDefault(); setOpen(false); openLogin('login'); }}>Login</Link>
             </div>
           )}
           <p className="menu-title">Your Account</p>
           {links.map((l) => <MenuLink key={l.to} {...l} />)}
+          {!isSellerRole(user) && <MenuLink to="/sell" icon="store" label="Become a Seller" />}
+          <MenuLink to="/help" icon="headphones" label="Customer Care" />
+          <InstallAppItem onDone={() => setOpen(false)} />
           {user && (
             <button type="button" className="menu-link menu-logout" onClick={onLogout}>
               <Icon name="logout" size={18} /> <span>Logout</span>
@@ -145,10 +168,15 @@ function MoreMenu() {
           <MenuLink to="/grocery" icon="home" label="Grocery Store" />
           {/* Seller Hub: sellers and admins only, and only in this menu */}
           {isSellerRole(user) && <MenuLink to="/seller/dashboard" icon="barChart" label="Seller Hub" />}
-          <MenuLink to="/help" icon="headphones" label="24x7 Customer Care" />
-          <button type="button" className="menu-link" onClick={() => { setOpen(false); window.dispatchEvent(new Event(OPEN_CHAT_EVENT)); }}>
-            <Icon name="message" size={18} /> <span>Chat with our assistant</span>
-          </button>
+          <MenuLink to="/help" icon="headphones" label="Customer Care" />
+          <MenuLink to="/orders" icon="package" label="Track your orders" />
+          {/* The chat assistant needs the full API; in store mode there's no chat window to open */}
+          {!PREVIEW && (
+            <button type="button" className="menu-link" onClick={() => { setOpen(false); window.dispatchEvent(new Event(OPEN_CHAT_EVENT)); }}>
+              <Icon name="message" size={18} /> <span>Chat with our assistant</span>
+            </button>
+          )}
+          <InstallAppItem onDone={() => setOpen(false)} />
           <button type="button" className="menu-link" onClick={() => soundStore.setMuted(!muted)} aria-pressed={!muted}>
             <Icon name={muted ? 'volumeOff' : 'volume'} size={18} /> <span>Notification sounds</span>
             <span className={`menu-switch ${muted ? '' : 'on'}`} aria-hidden="true" />

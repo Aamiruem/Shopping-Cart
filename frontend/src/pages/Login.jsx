@@ -14,8 +14,8 @@ import useSeo from '../hooks/useSeo';
 
 const COPY = {
   login: {
-    title: 'Welcome back',
-    blurb: PREVIEW ? 'Log in to shop, track your orders and save your wishlist.' : 'Log in to track orders, save your wishlist and get picks made for you.',
+    title: 'Login',
+    blurb: PREVIEW ? 'Get access to your orders, wishlist and saved addresses.' : 'Log in to track orders, save your wishlist and get picks made for you.',
     submit: 'Login',
     switchText: 'New to Arvixa Store?',
     switchLink: { to: '/register', label: 'Create an account' },
