@@ -2,6 +2,7 @@
 // products.json, accounts from _auth.mjs and shopping from _shop.mjs. Anything the full API alone can do answers 503
 // with a friendly message, which the storefront shows as-is.
 import { categories, facets, getProduct, listProducts, popular, similar, subcategories } from './_catalog.mjs';
+import { paymentsConfig } from './_payment-config.mjs';
 
 const OPENING_SOON = 'This part of Arvixa Store is opening soon.';
 const SHOP_AREAS = new Set(['cart', 'wishlist', 'addresses', 'orders']);
@@ -34,16 +35,18 @@ export function route(path, params = {}) {
     if (first === 'together' && second) return { body: { strategy: 'similar_shoppers', items: similar(second, count(params.k, 6, 12)) } };
   }
   if (area === 'ai' && first === 'recommend' && second) return { body: similar(second, count(params.k, 4)) };
-  if (area === 'payments' && first === 'config') return { body: { enabled: false } }; // no Razorpay keys yet: cash on delivery
+  if (area === 'payments' && first === 'config') return { body: paymentsConfig() }; // online payment once Razorpay keys are set
   return { status: 503, body: { error: OPENING_SOON } };
 }
 
 // Account and shopping routes. Loaded on demand: catalog requests stay fast and need none of their dependencies.
 async function personal(req, res, area, rest) {
   const auth = area === 'auth' ? await import('./_auth.mjs') : null;
-  const shop = auth ? null : await import('./_shop.mjs');
+  const pay = area === 'payments' ? await import('./_payments.mjs') : null;
+  const shop = auth || pay ? null : await import('./_shop.mjs');
   const segments = [area, ...rest];
-  if (auth ? !auth.isAuthRoute(req.method, rest.join('/')) : !shop.isShopRoute(req.method, segments)) return false;
+  const known = auth ? auth.isAuthRoute(req.method, rest.join('/')) : pay ? pay.isPaymentRoute(req.method, rest.join('/')) : shop.isShopRoute(req.method, segments);
+  if (!known) return false;
   let body;
   try {
     body = req.body; // Vercel parses JSON on first read and throws on malformed or empty input
@@ -56,7 +59,11 @@ async function personal(req, res, area, rest) {
     authorization: req.headers.authorization,
     ip: req.headers['x-real-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
   };
-  const result = await (auth ? auth.handleAuth({ ...request, rest: rest.join('/') }) : shop.handleShop({ ...request, segments }));
+  const result = await (auth
+    ? auth.handleAuth({ ...request, rest: rest.join('/') })
+    : pay
+      ? pay.handlePayments({ ...request, rest: rest.join('/') })
+      : shop.handleShop({ ...request, segments }));
   Object.entries(result.headers).forEach(([key, value]) => res.setHeader(key, value));
   send(res, result.status, result.body); // never cached: these answers are personal
   return true;
@@ -67,7 +74,7 @@ export default async function handler(req, res) {
   const path = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
   if (req.method === 'HEAD' || req.method === 'OPTIONS') return send(res, 204, null);
   const [area, ...rest] = path.split('/').filter(Boolean);
-  const isPersonal = SHOP_AREAS.has(area) || (area === 'auth' && rest.join('/') !== 'config');
+  const isPersonal = SHOP_AREAS.has(area) || (['auth', 'payments'].includes(area) && rest.join('/') !== 'config');
   if (isPersonal && (await personal(req, res, area, rest))) return undefined;
   if (req.method !== 'GET') return send(res, 503, { error: OPENING_SOON });
   const { status = 200, body } = route(path, params);

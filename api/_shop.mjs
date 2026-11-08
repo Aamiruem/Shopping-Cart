@@ -1,4 +1,5 @@
-// Shopping for the Vercel store: cart, wishlist, saved addresses and cash-on-delivery orders, in PostgreSQL. Response
+// Shopping for the Vercel store: cart, wishlist, saved addresses and orders, in PostgreSQL. Online payment is in
+// _payments.mjs. Response
 // shapes mirror backend/app/routers/{cart,wishlist,addresses,orders}.py, so the storefront runs unchanged on either API.
 // Addresses and orders use the backend's own tables; the backend keeps carts and wishlists in MongoDB, so those two
 // tables exist only here (see _schema.mjs).
@@ -7,6 +8,7 @@
 // stock is checked at checkout but doesn't go down as orders are placed.
 import { getProduct } from './_catalog.mjs';
 import { ApiError, currentUserId, limit, postgresStore, query, safely } from './_auth.mjs';
+import { razorpayClient, refundPaidOrder } from './_payments.mjs';
 
 const MAX_QTY = 10;
 const MAX_CART_LINES = 50;
@@ -137,31 +139,49 @@ const ORDERS_SQL = `
 // PostgreSQL drivers return NUMERIC as text; the storefront does arithmetic on these
 const orderJson = (o) => ({ ...o, total: Number(o.total), delivery_fee: Number(o.delivery_fee) });
 
-async function placeOrder({ db, userId, body, store, ip }) {
-  if (text(body.paymentMethod) !== 'cod') throw new ApiError(400, 'Online payment isn’t available yet. Please choose cash on delivery.');
-  if (!ID_RE.test(String(body.addressId ?? ''))) throw new ApiError(400, 'Shipping address is required');
-  const [a] = await db('SELECT * FROM addresses WHERE id = $1 AND user_id = $2', [Number(body.addressId), userId]);
+/** The shopper's saved address as the one line stored on the order. */
+export async function resolveAddress(db, userId, addressId) {
+  if (!ID_RE.test(String(addressId ?? ''))) throw new ApiError(400, 'Shipping address is required');
+  const [a] = await db('SELECT * FROM addresses WHERE id = $1 AND user_id = $2', [Number(addressId), userId]);
   if (!a) throw new ApiError(404, 'Address not found');
-  await limit(store, `order:${userId}`, ORDER_LIMIT, 'You’ve placed a lot of orders just now. Please try again in 15 minutes.');
-  await limit(store, `order-ip:${ip}`, ORDER_LIMIT * 3, 'Too many orders from this connection. Please try again in 15 minutes.');
+  return `${a.name}, ${a.line1}, ${a.city}, ${a.state} - ${a.pincode}. Phone: ${a.phone}`;
+}
 
+/** The cart and its price breakdown, after checking it isn't empty and everything is in stock. */
+export async function checkoutSummary(db, userId) {
   const lines = await loadCart(db, userId);
   const summary = summarize(lines);
   if (!summary.items.length) throw new ApiError(400, 'Your cart is empty');
   for (const { product: p, qty } of lines) {
     if ((p.stock ?? 0) < qty) throw new ApiError(409, `Only ${p.stock ?? 0} left of ${p.name}`);
   }
+  return { lines, summary };
+}
 
-  const address = `${a.name}, ${a.line1}, ${a.city}, ${a.state} - ${a.pincode}. Phone: ${a.phone}`;
+async function placeOrder({ db, userId, body, store, ip }) {
+  if (text(body.paymentMethod) !== 'cod') throw new ApiError(400, 'Please pay online with UPI, net banking or a card, or choose cash on delivery.');
+  const address = await resolveAddress(db, userId, body.addressId);
+  await limit(store, `order:${userId}`, ORDER_LIMIT, 'You’ve placed a lot of orders just now. Please try again in 15 minutes.');
+  await limit(store, `order-ip:${ip}`, ORDER_LIMIT * 3, 'Too many orders from this connection. Please try again in 15 minutes.');
+  const { summary } = await checkoutSummary(db, userId);
+  const order = await createOrder(db, { userId, address, method: 'cod', summary });
+  if (!order) throw new ApiError(400, 'Your cart is empty');
+  return { status: 201, body: { ...order, items: summary.items } };
+}
+
+/**
+ * Writes the order from the cart in one statement, so all of it happens or none of it does. Emptying the cart comes
+ * first and the order exists only if that removed something: a double-clicked "Place order" finds the cart already
+ * gone and creates nothing (returns null).
+ */
+export async function createOrder(db, { userId, address, method, summary }) {
   const details = summary.items.map((i) => ({ product_id: i.productId, name: i.name, price: i.price, image: i.image, category: i.category }));
-  // One statement, so all of it happens or none of it does. Emptying the cart comes first and the order exists only if
-  // that removed something: a double-clicked "Place order" finds the cart already gone and creates nothing.
   const [order] = await db(
     `WITH taken AS (
        DELETE FROM cart_items WHERE user_id = $1 RETURNING product_id, qty
      ), placed AS (
        INSERT INTO orders (user_id, total, address, payment_method, delivery_fee)
-       SELECT $1::int, $2::numeric, $3::text, 'cod', $4::numeric WHERE EXISTS (SELECT 1 FROM taken)
+       SELECT $1::int, $2::numeric, $3::text, $6::text, $4::numeric WHERE EXISTS (SELECT 1 FROM taken)
        RETURNING *
      ), lines AS (
        INSERT INTO order_items (order_id, product_id, name, price, qty, image, category)
@@ -173,10 +193,9 @@ async function placeOrder({ db, userId, body, store, ip }) {
        INSERT INTO order_events (order_id, status, note) SELECT id, 'placed', 'Order placed' FROM placed
      )
      SELECT * FROM placed`,
-    [userId, summary.total, address, summary.deliveryFee, JSON.stringify(details)],
+    [userId, summary.total, address, summary.deliveryFee, JSON.stringify(details), method],
   );
-  if (!order) throw new ApiError(400, 'Your cart is empty');
-  return { status: 201, body: { ...orderJson(order), items: summary.items } };
+  return order ? orderJson(order) : null;
 }
 
 async function listOrders({ db, userId }) {
@@ -190,7 +209,7 @@ async function getOrder({ db, userId, id }) {
   return { body: { ...orderJson(order), events, return: null } };
 }
 
-async function cancelOrder({ db, userId, id }) {
+async function cancelOrder({ db, userId, id, rz }) {
   const [order] = ID_RE.test(id)
     ? await db(
         `WITH cancelled AS (
@@ -206,7 +225,8 @@ async function cancelOrder({ db, userId, id }) {
       )
     : [];
   if (!order) throw new ApiError(400, 'This order cannot be cancelled');
-  return { body: { ...orderJson(order), refund: null } };
+  // Paid online: the money goes back to the UPI app, bank or card it came from
+  return { body: { ...orderJson(order), refund: await refundPaidOrder(db, order.id, rz) } };
 }
 
 // area, then method plus "id" / "id/action" when the path has them
@@ -248,9 +268,9 @@ function findRoute(method, [area, id, action, ...extra]) {
 
 export const isShopRoute = (method, segments) => Boolean(findRoute(method, segments));
 
-export function handleShop({ method, segments, body, authorization, ip }, { db = query } = {}) {
+export function handleShop({ method, segments, body, authorization, ip }, { db = query, rz = razorpayClient() } = {}) {
   return safely(async () => {
     const userId = currentUserId(authorization);
-    return findRoute(method, segments)({ db, userId, id: segments[1], body: body ?? {}, store: postgresStore(db), ip });
+    return findRoute(method, segments)({ db, userId, id: segments[1], body: body ?? {}, store: postgresStore(db), ip, rz });
   });
 }

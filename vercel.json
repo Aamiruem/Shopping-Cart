@@ -36,9 +36,16 @@
   "functions": {
     "api/catalog.mjs": {
       "includeFiles": "backend/app/data/products.json"
+    },
+    "api/razorpay-webhook.mjs": {
+      "includeFiles": "backend/app/data/products.json"
     }
   },
   "rewrites": [
+    {
+      "source": "/api/payments/razorpay/webhook",
+      "destination": "/api/razorpay-webhook"
+    },
     {
       "source": "/api/:path*",
       "destination": "/api/catalog?path=:path*"
