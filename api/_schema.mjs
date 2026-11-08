@@ -23,6 +23,17 @@ CREATE TABLE IF NOT EXISTS wishlist_items (
   PRIMARY KEY (user_id, product_id)
 );
 
+-- Products sellers list in the Seller Hub (the full backend keeps these in MongoDB). The data column holds the product in the
+-- catalog's shape; listed ones join the public catalog (api/_seller.mjs syncSellerProducts).
+CREATE TABLE IF NOT EXISTS seller_products (
+  id         VARCHAR(24) PRIMARY KEY,                     -- 24 hex characters, like a MongoDB id
+  seller_id  INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data       JSONB       NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS seller_products_seller_idx ON seller_products (seller_id, updated_at DESC);
+
 -- Coupon codes the owner creates (npm run coupon). One use per customer; cancelling the order gives the use back.
 CREATE TABLE IF NOT EXISTS coupons (
   code         VARCHAR(30)    PRIMARY KEY,                -- upper case

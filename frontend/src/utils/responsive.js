@@ -4,7 +4,7 @@
 const WIDTHS = [384, 640, 828, 1080];
 const QUALITY = 85;
 
-const optimizable = (url) => url.startsWith('/catalog/') || url.startsWith('https://cdn.dummyjson.com/');
+const optimizable = (url) => url.startsWith('/catalog/') || url.startsWith('https://cdn.dummyjson.com/') || /^https:\/\/[\w-]+\.public\.blob\.vercel-storage\.com\//.test(url);
 const optimized = (url, width) => `/_vercel/image?url=${encodeURIComponent(url)}&w=${width}&q=${QUALITY}`;
 
 export function responsiveSources(url, sizes, optimizerOn) {

@@ -98,7 +98,7 @@ async function publicUser(u, store) {
   };
 }
 
-const session = async (u, store) => ({ token: createToken(u), user: await publicUser(u, store) });
+export const session = async (u, store) => ({ token: createToken(u), user: await publicUser(u, store) });
 
 export async function limit(store, key, max, message = 'Too many login attempts. Please try again in 15 minutes.') {
   const digest = createHash('sha256').update(key).digest('hex'); // the table never holds a raw IP or email

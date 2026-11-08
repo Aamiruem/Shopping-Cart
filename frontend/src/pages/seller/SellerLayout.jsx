@@ -2,17 +2,20 @@ import { createContext, useContext } from 'react';
 import { Navigate, NavLink, Outlet } from 'react-router-dom';
 import { api } from '../../api/client';
 import Icon from '../../components/common/Icon';
+import { PREVIEW } from '../../config';
 import { useAuth } from '../../context/AuthContext';
 import useApi from '../../hooks/useApi';
 
 // Each section gets its own colour so the hub is easy to scan
-const LINKS = [
+const ALL_LINKS = [
   { to: '/seller/dashboard', icon: 'barChart', label: 'Analytics & AI', tone: 'blue' },
   { to: '/seller/products', icon: 'tag', label: 'Products', tone: 'orange' },
   { to: '/seller/orders', icon: 'package', label: 'Orders', tone: 'green' },
   { to: '/seller/earnings', icon: 'wallet', label: 'Payments & Earnings', tone: 'purple' },
   { to: '/seller/settings', icon: 'settings', label: 'Store Settings', tone: 'slate' },
 ];
+// The analytics & ML dashboard needs the full Python API
+const LINKS = PREVIEW ? ALL_LINKS.filter((l) => l.to !== '/seller/dashboard') : ALL_LINKS;
 
 // The store profile, shared with the hub pages (settings edits it, the sidebar shows the logo)
 const SellerProfileContext = createContext({ profile: null, reload: () => {} });

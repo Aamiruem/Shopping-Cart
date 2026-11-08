@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { EmptyState, ErrorMessage, Spinner } from '../../components/common/Feedback';
 import Icon from '../../components/common/Icon';
 import BulkImport from '../../components/seller/BulkImport';
+import { PREVIEW } from '../../config';
 import ProductForm from '../../components/seller/ProductForm';
 import { categoryLabel } from '../../constants/catalog';
 import { useToast } from '../../context/ToastContext';
@@ -116,7 +117,8 @@ export default function SellerProducts() {
           <p className="muted small">{rows.length} products · edit price and stock in the table, tick rows for bulk actions</p>
         </div>
         <div className="seller-head-actions">
-          <button type="button" className="btn btn-outline" onClick={() => setImporting(true)}><Icon name="upload" size={16} /> Bulk upload</button>
+          {/* Spreadsheet import runs on the full API */}
+          {!PREVIEW && <button type="button" className="btn btn-outline" onClick={() => setImporting(true)}><Icon name="upload" size={16} /> Bulk upload</button>}
           <button type="button" className="btn btn-primary" onClick={() => setEditing(null)}><Icon name="plus" size={16} /> Add product</button>
         </div>
       </header>

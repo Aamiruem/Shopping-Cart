@@ -108,7 +108,7 @@ export default function BuyBox({ product }) {
         <Icon name="zap" size={18} filled /> Buy now
       </button>
       <dl className="buy-box-meta">
-        <div><dt>Sold by</dt><dd>Arvixa Store</dd></div>
+        <div><dt>Sold by</dt><dd>{product.seller || 'Arvixa Store'}</dd></div>
         <div><dt>Payment</dt><dd>{online ? 'Secure online payment or cash on delivery' : 'Cash on delivery'}</dd></div>
         <div><dt>Cancel</dt><dd>Free, any time before it ships</dd></div>
       </dl>

@@ -72,7 +72,7 @@ function summarize(lines, applied = null) {
     brand: p.brand ?? '',
     image: p.image ?? null,
     category: p.category ?? null,
-    sellerId: null,
+    sellerId: p.sellerId ?? null,
     price: p.price,
     mrp: p.price,
     stock: p.stock ?? 0,
@@ -261,7 +261,7 @@ async function placeOrder({ db, userId, body, store, ip }) {
  * gone and creates nothing (returns null).
  */
 export async function createOrder(db, { userId, address, method, summary }) {
-  const details = summary.items.map((i) => ({ product_id: i.productId, name: i.name, price: i.price, image: i.image, category: i.category }));
+  const details = summary.items.map((i) => ({ product_id: i.productId, name: i.name, price: i.price, image: i.image, category: i.category, seller_id: i.sellerId }));
   const coupon = summary.couponDiscount > 0 ? summary.coupon.code : null; // only a coupon that actually applied
   let rows;
   try {
@@ -278,10 +278,10 @@ export async function createOrder(db, { userId, address, method, summary }) {
      ), coupon_done AS (
        DELETE FROM cart_coupons WHERE user_id = $1 AND EXISTS (SELECT 1 FROM placed)
      ), lines AS (
-       INSERT INTO order_items (order_id, product_id, name, price, qty, image, category)
-       SELECT placed.id, x.product_id, x.name, x.price, taken.qty, x.image, x.category
+       INSERT INTO order_items (order_id, product_id, name, price, qty, image, category, seller_id)
+       SELECT placed.id, x.product_id, x.name, x.price, taken.qty, x.image, x.category, x.seller_id
          FROM placed
-        CROSS JOIN jsonb_to_recordset($5::jsonb) AS x(product_id text, name text, price numeric, image text, category text)
+        CROSS JOIN jsonb_to_recordset($5::jsonb) AS x(product_id text, name text, price numeric, image text, category text, seller_id int)
          JOIN taken ON taken.product_id = x.product_id
      ), timeline AS (
        INSERT INTO order_events (order_id, status, note) SELECT id, 'placed', 'Order placed' FROM placed

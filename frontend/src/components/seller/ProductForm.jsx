@@ -5,6 +5,7 @@ import { AUDIENCES, CATEGORIES } from '../../constants/catalog';
 import { discountPercent } from '../../utils/format';
 import Icon from '../common/Icon';
 import Spin360 from '../product/Spin360';
+import { PREVIEW } from '../../config';
 
 const EMPTY = { name: '', brand: '', category: 'electronics', audience: '', description: '', price: '', mrp: '', stock: '10', tags: '', images: [], images360: [], videos: [], audio: '', unit: '', active: true };
 const MAX_IMAGES = { images: 8, images360: 36, videos: 4 };
@@ -149,7 +150,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
         </header>
 
         <div className="product-form-body">
-          <div className="ai-writer">
+          {!PREVIEW && <div className="ai-writer">
             <div>
               <strong><Icon name="zap" size={15} /> AI listing writer</strong>
               <span className="muted small">Type the product name (and any notes), then get a search-friendly title, description and tags.</span>
@@ -157,7 +158,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
             <button type="button" className="btn btn-primary btn-sm" onClick={writeWithAi} disabled={ai.busy}>
               {ai.busy ? 'Writing…' : '✨ Write with AI'}
             </button>
-          </div>
+          </div>}
           {ai.draft && (
             <div className="ai-draft">
               <p className="ai-draft-label">Suggested listing {ai.draft.source === 'template' ? '(quick template: add an Anthropic API key for full AI writing)' : '(written by Claude)'}</p>
@@ -229,7 +230,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
                   <button type="button" onClick={() => setForm({ ...form, videos: form.videos.filter((x) => x !== src) })} aria-label={`Remove video ${i + 1}`}><Icon name="x" size={14} /></button>
                 </figure>
               ))}
-              {form.videos.length < MAX_IMAGES.videos && (
+              {!PREVIEW && form.videos.length < MAX_IMAGES.videos && (
                 <button type="button" className="image-add media-add" onClick={() => videoRef.current?.click()} disabled={uploading}>
                   <Icon name="video" size={22} /> {uploading ? 'Uploading…' : 'Upload video'}
                 </button>
@@ -242,7 +243,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
             </div>
           </div>
 
-          <div className="image-manager">
+          {!PREVIEW && <div className="image-manager">
             <p className="field-label"><Icon name="music" size={15} /> Audio <span className="muted small">(optional · a sound sample or a spoken description · MP3, M4A, OGG or WAV, 10 MB)</span></p>
             {form.audio ? (
               <div className="audio-row">
@@ -255,7 +256,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
               </button>
             )}
             <input ref={audioRef} type="file" accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/ogg,audio/wav,audio/x-wav" hidden onChange={(e) => addAudio(e.target.files[0])} />
-          </div>
+          </div>}
 
           <div className="image-manager">
             <p className="field-label">360° view <span className="muted small">(optional · 4–36 photos taken while turning the product, uploaded in rotation order)</span></p>

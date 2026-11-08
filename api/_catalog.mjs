@@ -22,7 +22,22 @@ export function stableId(name, occurrence = 0) {
 export const discountPercent = (price, mrp) => (!mrp || mrp <= price ? 0 : Math.round(((mrp - price) / mrp) * 100));
 
 let cache;
+// Listed products from sellers (api/_seller.mjs keeps these fresh), shown after the store's own catalog
+let sellerProducts = [];
+let merged = null;
+
+export function setSellerProducts(products) {
+  sellerProducts = products.map((p) => ({ ...p, discount: discountPercent(p.price, p.mrp), active: true }));
+  merged = null;
+}
+
 export function loadProducts() {
+  if (merged) return merged;
+  merged = [...loadBaseProducts(), ...sellerProducts];
+  return merged;
+}
+
+function loadBaseProducts() {
   if (cache) return cache;
   const file = DATA_PATHS.find((p) => existsSync(p));
   const seen = new Map();

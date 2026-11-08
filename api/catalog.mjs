@@ -10,7 +10,8 @@ const SHOP_AREAS = new Set(['cart', 'wishlist', 'addresses', 'orders']);
 const send = (res, status, body, cacheable = false) => {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', cacheable ? 'public, s-maxage=3600, stale-while-revalidate=86400' : 'no-store');
+  // A minute at the edge: new seller listings and stock changes show up quickly
+  res.setHeader('Cache-Control', cacheable ? 'public, s-maxage=60, stale-while-revalidate=600' : 'no-store');
   res.end(body === null ? undefined : JSON.stringify(body));
 };
 
@@ -74,6 +75,23 @@ export default async function handler(req, res) {
   const path = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
   if (req.method === 'HEAD' || req.method === 'OPTIONS') return send(res, 204, null);
   const [area, ...rest] = path.split('/').filter(Boolean);
+  if (!['health', 'location', 'payments'].includes(area)) {
+    const { syncSellerProducts } = await import('./_seller.mjs');
+    await syncSellerProducts(); // sellers' listed products join the catalog (at most one query every 30 s)
+  }
+  if (area === 'seller') {
+    const seller = await import('./_seller.mjs');
+    if (seller.isSellerRoute(req.method, rest)) {
+      let body;
+      try {
+        body = req.body;
+      } catch {
+        body = undefined;
+      }
+      const result = await seller.handleSeller({ method: req.method, rest, body, params, authorization: req.headers.authorization });
+      return send(res, result.status, result.body);
+    }
+  }
   if (req.method === 'GET' && area === 'location' && rest[0] === 'pincode' && rest.length === 2) {
     const { PINCODE_RE, lookupPincode } = await import('./_location.mjs');
     if (!PINCODE_RE.test(rest[1])) return send(res, 400, { error: 'Please enter a valid 6-digit pincode' });

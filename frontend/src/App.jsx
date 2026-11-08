@@ -46,8 +46,8 @@ const WITH_CATEGORY_BAR = ['/', '/products', '/grocery'];
 
 const privateRoute = (element) => <ProtectedRoute>{element}</ProtectedRoute>;
 const shopRoute = (element) => (SHOPPING ? privateRoute(element) : <OpeningSoon />);
-// The Seller Hub needs the full API
-const sellerRoute = (element) => (PREVIEW ? <OpeningSoon /> : privateRoute(element));
+// The Seller Hub runs on the api/ functions too; only its analytics dashboard needs the full API
+const sellerRoute = (element) => (SHOPPING ? privateRoute(element) : <OpeningSoon />);
 
 export default function App() {
   const { pathname, search } = useLocation();
@@ -98,8 +98,8 @@ export default function App() {
             {/* Seller hub (sellers & admins; customers are sent to onboarding) */}
             <Route path="/seller/register" element={sellerRoute(<SellerOnboarding />)} />
             <Route path="/seller" element={sellerRoute(<SellerLayout />)}>
-              <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<AnalyticsDashboard />} />
+              <Route index element={<Navigate to={PREVIEW ? 'products' : 'dashboard'} replace />} />
+              <Route path="dashboard" element={PREVIEW ? <Navigate to="/seller/products" replace /> : <AnalyticsDashboard />} />
               <Route path="products" element={<SellerProducts />} />
               <Route path="orders" element={<SellerOrders />} />
               <Route path="earnings" element={<SellerEarnings />} />

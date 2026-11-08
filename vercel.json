@@ -32,6 +32,11 @@
         "protocol": "https",
         "hostname": "cdn.dummyjson.com",
         "pathname": "/product-images/**"
+      },
+      {
+        "protocol": "https",
+        "hostname": "*.public.blob.vercel-storage.com",
+        "pathname": "/**"
       }
     ]
   },
@@ -47,6 +52,10 @@
     {
       "source": "/api/payments/razorpay/webhook",
       "destination": "/api/razorpay-webhook"
+    },
+    {
+      "source": "/api/seller/uploads",
+      "destination": "/api/seller-upload"
     },
     {
       "source": "/api/:path*",
