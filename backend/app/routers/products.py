@@ -65,8 +65,9 @@ async def list_products(
     sort: str = "relevance",
     featured: str | None = None,
     limit: int = 200,
+    skip: int = 0,
 ):
-    """Returns a plain array - the AI service depends on this shape."""
+    """Returns a plain array - the AI service depends on this shape. `skip` pages through long lists."""
     query = _base_filter(q, category, audience, use)
     if subCategory:
         query["subCategory"] = subCategory
@@ -84,9 +85,32 @@ async def list_products(
         query["featured"] = True
 
     limit = max(1, min(limit, 200))
-    parts = (q, category, audience, use, subCategory, size, color, ageGroup, brand, minPrice, maxPrice, minRating, sort, featured, limit)
+    skip = max(0, min(skip, 5000))
+    parts = (
+        q,
+        category,
+        audience,
+        use,
+        subCategory,
+        size,
+        color,
+        ageGroup,
+        brand,
+        minPrice,
+        maxPrice,
+        minRating,
+        sort,
+        featured,
+        limit,
+        skip,
+    )
     key = "catalog:list:" + "|".join(str(x) for x in parts)
-    return await cached(key, CATALOG_TTL, lambda: _search(query, q, sort, limit))
+    # Search ranks across the whole result, so a page is cut from the top skip + limit
+    return await cached(key, CATALOG_TTL, lambda: _page(query, q, sort, skip, limit))
+
+
+async def _page(query: dict, q: str | None, sort: str, skip: int, limit: int) -> list[dict]:
+    return (await _search(query, q, sort, skip + limit))[skip:]
 
 
 CATALOG_TTL = 30  # seconds; any product write clears it (see invalidate_catalog)

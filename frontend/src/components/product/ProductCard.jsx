@@ -1,6 +1,7 @@
 import { responsiveImage } from '../../utils/image';
 import { Link } from 'react-router-dom';
 import { PREVIEW, SHOPPING } from '../../config';
+import { CATEGORY_COLORS } from '../../constants/colors';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { productPath } from '../../hooks/useSeo';
@@ -24,7 +25,7 @@ export default function ProductCard({ product, variant = 'grid' }) {
   const hoverImage = product.images?.find((src) => src !== product.image);
 
   return (
-    <article className={`product-card product-card-${variant} ${portrait ? 'product-card-portrait' : ''}`}>
+    <article className={`product-card product-card-${variant} ${portrait ? 'product-card-portrait' : ''}`} style={{ '--card-tint': CATEGORY_COLORS[product.category] }}>
       {SHOPPING && (
       <button
         type="button"

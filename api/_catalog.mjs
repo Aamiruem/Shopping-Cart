@@ -83,7 +83,9 @@ export function listProducts(params = {}) {
   const needle = (q || '').trim().toLowerCase();
   const rank = (p) => (needle && sort === 'relevance' && !p.name.toLowerCase().includes(needle) ? 1 : 0);
   const limit = Math.max(1, Math.min(Number(params.limit) || 200, 200));
-  return found.sort((a, b) => rank(a) - rank(b) || order(a, b)).slice(0, limit);
+  // skip pages through long lists ("Load more"); the response stays a plain array
+  const skip = Math.max(0, Math.min(Math.trunc(Number(params.skip)) || 0, 5000));
+  return found.sort((a, b) => rank(a) - rank(b) || order(a, b)).slice(skip, skip + limit);
 }
 
 export const getProduct = (id) => loadProducts().find((p) => p._id === id) || null;

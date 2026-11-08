@@ -39,6 +39,21 @@ export const GROCERY_AISLES = [
 export const aisleLabel = (id) => GROCERY_AISLES.find((a) => a.id === id)?.label || id;
 
 // Quick "shop by type" chips on the fashion listing: a sub-category or a search word
+// Department shortcuts at the top of All Products: gadgets and fashion one tap away
+export const DEPARTMENTS = [
+  { label: 'Mobiles', icon: 'phone', color: '#0284c7', to: '/products?category=mobiles' },
+  { label: 'Laptops', icon: 'monitor', color: '#7c3aed', to: '/products?category=electronics&subCategory=laptops' },
+  { label: 'Audio', icon: 'headphones', color: '#0891b2', to: '/products?category=electronics&subCategory=audio' },
+  { label: 'Wearables', icon: 'watch', color: '#16a34a', to: '/products?category=electronics&subCategory=wearables' },
+  { label: 'Cameras', icon: 'camera', color: '#f59e0b', to: '/products?category=electronics&subCategory=cameras' },
+  { label: 'Women', icon: 'user', color: '#db2777', to: '/products?category=fashion&audience=women' },
+  { label: 'Men', icon: 'user', color: '#2563eb', to: '/products?category=fashion&audience=men' },
+  { label: 'Footwear', icon: 'shoppingBag', color: '#ea580c', to: '/products?category=fashion&subCategory=footwear' },
+  { label: 'Watches', icon: 'watch', color: '#0f766e', to: '/products?q=watches' },
+  { label: 'Beauty', icon: 'droplet', color: '#e11d48', to: '/products?category=beauty' },
+  { label: 'Grocery', icon: 'basket', color: '#15803d', to: '/grocery' },
+];
+
 export const FASHION_TYPES = [
   { label: 'T-Shirts', params: { subCategory: 'mens-tshirts' } },
   { label: 'Shirts', params: { subCategory: 'mens-shirts' } },

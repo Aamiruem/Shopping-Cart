@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { EmptyState, ErrorMessage, SkeletonGrid } from '../components/common/Feedback';
 import Icon from '../components/common/Icon';
 import FilterSidebar from '../components/product/FilterSidebar';
 import ProductCard from '../components/product/ProductCard';
-import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, FASHION_TYPES, SORT_OPTIONS } from '../constants/catalog';
+import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, DEPARTMENTS, FASHION_TYPES, SORT_OPTIONS } from '../constants/catalog';
 import { PREVIEW } from '../config';
 import { listingDescription, listingTitle } from '../seo/copy';
 import { trackSearch } from '../utils/analytics';
 import usePageTint from '../hooks/usePageTint';
 import useSeo, { breadcrumbLd, itemListLd } from '../hooks/useSeo';
 
+const PAGE_SIZE = 48;
 const FILTER_KEYS = ['q', 'use', 'category', 'audience', 'subCategory', 'brand', 'minPrice', 'maxPrice', 'minRating', 'sort'];
 const EMPTY_FACETS = { brands: [], minPrice: 0, maxPrice: 0 };
 
@@ -26,16 +27,45 @@ export default function Products() {
   const [error, setError] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const moreRef = useRef(null);
+
+  // First page; more arrive as the shopper scrolls (or presses Load more)
   const load = useCallback(() => {
     setLoading(true);
     setError('');
-    api.products(filters)
-      .then(setProducts)
+    api.products({ ...filters, limit: PAGE_SIZE })
+      .then((page) => {
+        setProducts(page);
+        setHasMore(page.length === PAGE_SIZE);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [filters]);
 
   useEffect(load, [load]);
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    api.products({ ...filters, limit: PAGE_SIZE, skip: products.length })
+      .then((page) => {
+        setProducts((list) => [...list, ...page.filter((p) => !list.some((x) => x._id === p._id))]);
+        setHasMore(page.length === PAGE_SIZE);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoadingMore(false));
+  }, [filters, products.length, hasMore, loadingMore]);
+
+  // Infinite scroll: load the next page a screen before the end of the grid
+  useEffect(() => {
+    const target = moreRef.current;
+    if (!target || !hasMore) return undefined;
+    const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && loadMore(), { rootMargin: '800px' });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   useEffect(() => {
     if (filters.q) trackSearch(filters.q);
@@ -89,11 +119,22 @@ export default function Products() {
           <span>{heading}</span>
         </nav>
         <div className="listing-head">
-          <h1>{heading} <small>({loading ? '…' : products.length} items)</small></h1>
+          <h1>{heading} <small>({loading ? '…' : `${products.length}${hasMore ? '+' : ''}`} items)</small></h1>
           <button type="button" className="btn btn-outline btn-sm filters-toggle" onClick={() => setFiltersOpen(true)}>
             <Icon name="filter" size={14} /> Filters
           </button>
         </div>
+
+        {!filters.category && !filters.q && !filters.use && (
+          <nav className="departments" aria-label="Shop by department">
+            {DEPARTMENTS.map((d) => (
+              <Link key={d.label} to={d.to} className="department" style={{ '--dept': d.color }}>
+                <span className="department-icon"><Icon name={d.icon} size={22} /></span>
+                <span>{d.label}</span>
+              </Link>
+            ))}
+          </nav>
+        )}
 
         {filters.category === 'fashion' && (
           <nav className="type-chips" aria-label="Shop by type">
@@ -134,7 +175,16 @@ export default function Products() {
         {loading ? (
           <SkeletonGrid />
         ) : products.length ? (
-          <div className="product-grid">{products.map((p) => <ProductCard key={p._id} product={p} />)}</div>
+          <>
+            <div className="product-grid">{products.map((p) => <ProductCard key={p._id} product={p} />)}</div>
+            {hasMore && (
+              <div ref={moreRef} className="load-more">
+                <button type="button" className="btn btn-outline" onClick={loadMore} disabled={loadingMore}>
+                  {loadingMore ? 'Loading…' : 'Load more products'}
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           !error && (
             <EmptyState

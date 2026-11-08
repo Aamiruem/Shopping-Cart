@@ -66,3 +66,15 @@ test('anything needing an account answers 503 with a readable message', () => {
     assert.match(body.error, /opening soon/i);
   }
 });
+
+test('paging with skip reaches every product exactly once', () => {
+  const seen = [];
+  for (let skip = 0; ; skip += 48) {
+    const page = listProducts({ limit: 48, skip });
+    seen.push(...page.map((p) => p._id));
+    if (page.length < 48) break;
+  }
+  assert.equal(seen.length, loadProducts().length);
+  assert.equal(new Set(seen).size, seen.length);
+  assert.equal(listProducts({ limit: 5, skip: 'abc' })[0]._id, listProducts({ limit: 5 })[0]._id); // bad skip = start
+});
