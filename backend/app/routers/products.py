@@ -26,6 +26,9 @@ SORTS = {
 }
 
 
+AUDIENCE_MATCH = {"women": ["women", "unisex"], "men": ["men", "unisex"], "boys": ["boys"], "girls": ["girls"], "kids": ["boys", "girls"]}
+
+
 def _base_filter(q: str | None, category: str | None, audience: str | None = None, use: str | None = None) -> dict:
     """Shared by list and facets so both see the same search + category + audience + use scope."""
     query: dict = {"active": {"$ne": False}}
@@ -36,8 +39,9 @@ def _base_filter(q: str | None, category: str | None, audience: str | None = Non
         query["category"] = category
     elif use in CATEGORY_GROUPS:
         query["category"] = {"$in": CATEGORY_GROUPS[use]}
-    if audience in ("women", "men"):
-        query["audience"] = {"$in": [audience, "unisex"]}
+    # Adult unisex items show under both Women and Men; Kids means boys and girls (same as api/_catalog.mjs)
+    if audience in AUDIENCE_MATCH:
+        query["audience"] = {"$in": AUDIENCE_MATCH[audience]}
     return query
 
 

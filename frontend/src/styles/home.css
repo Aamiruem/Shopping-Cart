@@ -183,3 +183,13 @@
   .festive-loading { animation: none; }
   .festive-tile, .festive-shop { transition: none; }
 }
+
+/* "Shop clothing" buttons (components/home/ClothingShortcuts.jsx) */
+.clothing-shortcuts { margin-block: 12px; }
+.clothing-shortcuts .rail-head { display: flex; align-items: center; justify-content: space-between; }
+.clothing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; padding: 4px 16px 16px; }
+.clothing-btn { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--tone) 22%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--tone) 6%, #fff); color: var(--text); font-weight: 600; font-size: var(--fs-sm); text-decoration: none; transition: transform var(--transition), box-shadow var(--transition), background var(--transition); }
+.clothing-icon { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--tone); color: #fff; }
+.clothing-btn:hover { transform: translateY(-2px); background: color-mix(in srgb, var(--tone) 12%, #fff); box-shadow: 0 6px 16px color-mix(in srgb, var(--tone) 25%, transparent); }
+@media (max-width: 560px) { .clothing-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .clothing-btn { transition: none; } .clothing-btn:hover { transform: none; } }

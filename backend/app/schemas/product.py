@@ -26,7 +26,7 @@ class ProductIn(BaseModel):
     # Frames of a turntable shot in rotation order; 4+ frames enable the 360° viewer
     images360: list[str] = Field(default_factory=list, max_length=72)
     # Who a fashion item is for (drives the Women / Men filters); empty for everything else
-    audience: Literal["", "women", "men", "unisex"] = ""
+    audience: Literal["", "women", "men", "unisex", "boys", "girls"] = ""
     # Product videos (MP4 / WebM) and an audio clip (e.g. a sound sample or a spoken description)
     videos: list[str] = Field(default_factory=list, max_length=4)
     audio: str = Field(default="", max_length=1000)

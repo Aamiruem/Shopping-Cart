@@ -26,6 +26,9 @@ code { background: var(--bg); padding: 1px 6px; border-radius: var(--radius-sm);
 /* ---------- App shell ---------- */
 .app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 .app-main { flex: 1; padding: var(--gap) 0 16px; }
+/* At least a screen tall: while a page loads, the footer stays below what's visible instead of jumping down when
+   the content arrives (that jump was most of the product page's layout shift) */
+.app-main { min-height: 100vh; min-height: 100dvh; }
 .container { width: 100%; max-width: var(--container); margin: 0 auto; padding: 0 12px; }
 .container.narrow { max-width: 1000px; }
 .panel { background: var(--surface); border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); }

@@ -9,6 +9,26 @@ import { WishlistProvider } from './context/WishlistContext';
 import './styles/index.css';
 import './utils/install'; // catches the browser's install prompt before React starts
 
+// After a deploy, a tab opened earlier still asks for the old build's code files, which are gone: reload once to get the
+// new build instead of leaving the shopper on a stuck page. The flag stops a reload loop if something else is wrong.
+window.addEventListener('vite:preloadError', (event) => {
+  try {
+    if (sessionStorage.getItem('arvixa:reloaded-for-update')) return;
+    sessionStorage.setItem('arvixa:reloaded-for-update', '1');
+  } catch {
+    return;
+  }
+  event.preventDefault();
+  window.location.reload();
+});
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    try {
+      sessionStorage.removeItem('arvixa:reloaded-for-update');
+    } catch { /* ignore */ }
+  }, 10000);
+});
+
 // If a product image fails to load (e.g. a CDN hiccup), show a neutral placeholder instead of a broken icon
 document.addEventListener('error', (e) => {
   const img = e.target;

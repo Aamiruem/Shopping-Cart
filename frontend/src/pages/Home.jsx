@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { ErrorMessage } from '../components/common/Feedback';
 import DealTimer from '../components/home/DealTimer';
+import ClothingShortcuts from '../components/home/ClothingShortcuts';
 import FestiveStore from '../components/home/FestiveStore';
 import HeroCarousel from '../components/home/HeroCarousel';
 import OfferBanners from '../components/home/OfferBanners';
@@ -114,7 +115,8 @@ export default function Home() {
       <h1 className="sr-only">{SITE_NAME}: Online Shopping in India</h1>
       <QuickLinks />
       <FestiveStore />
-      {/* Fashion first: women's and men's styles straight after the festive store */}
+      {/* Fashion first: clothing shortcuts, then women's and men's styles, straight after the festive store */}
+      <ClothingShortcuts />
       {RAILS.filter((r) => FASHION_FIRST.includes(r.key)).map((r) => <Rail key={r.key} {...r} />)}
       <HeroCarousel />
       {recent.length > 0 && (

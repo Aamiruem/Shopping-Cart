@@ -5,7 +5,7 @@ import { EmptyState, ErrorMessage, SkeletonGrid } from '../components/common/Fee
 import Icon from '../components/common/Icon';
 import FilterSidebar from '../components/product/FilterSidebar';
 import ProductCard from '../components/product/ProductCard';
-import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, DEPARTMENTS, FASHION_TYPES, SORT_OPTIONS } from '../constants/catalog';
+import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, DEPARTMENTS, FASHION_TYPES, KIDS, SORT_OPTIONS } from '../constants/catalog';
 import { PREVIEW } from '../config';
 import { listingDescription, listingTitle } from '../seo/copy';
 import { trackSearch } from '../utils/analytics';
@@ -81,7 +81,7 @@ export default function Products() {
   };
   const clear = () => setParams(filters.q ? { q: filters.q } : {});
 
-  const audience = AUDIENCES.find((a) => a.id === filters.audience);
+  const audience = [...AUDIENCES, KIDS].find((a) => a.id === filters.audience);
   const group = CATEGORY_GROUPS.find((g) => g.id === filters.use);
   const heading = filters.q
     ? `Results for “${filters.q}”`
@@ -187,12 +187,21 @@ export default function Products() {
           </>
         ) : (
           !error && (
-            <EmptyState
-              icon="search"
-              title="Sorry, no results found!"
-              message="Please check the spelling or try searching for something else."
-              action={{ to: '/products', label: 'Browse all products' }}
-            />
+            ['boys', 'girls', 'kids'].includes(filters.audience) ? (
+              <EmptyState
+                icon="shirt"
+                title={`${audience?.label ?? 'Kids'}’ clothing is coming soon`}
+                message="We’re adding styles for children. Meanwhile, have a look at the rest of our fashion."
+                action={{ to: '/products?category=fashion', label: 'Shop all fashion' }}
+              />
+            ) : (
+              <EmptyState
+                icon="search"
+                title="Sorry, no results found!"
+                message="Please check the spelling or try searching for something else."
+                action={{ to: '/products', label: 'Browse all products' }}
+              />
+            )
           )
         )}
       </section>

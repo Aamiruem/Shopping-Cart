@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { PREVIEW } from '../../config';
-import { AUDIENCES, CATEGORY_GROUPS, categoryLabel } from '../../constants/catalog';
+import { AUDIENCES, CATEGORY_GROUPS, categoryLabel, KIDS } from '../../constants/catalog';
 import Icon from '../common/Icon';
 
 const PRICE_PRESETS = [
@@ -65,7 +65,7 @@ export default function FilterSidebar({ filters, facets, onChange, onClear, open
             <input type="radio" name="audience" checked={!filters.audience} onChange={() => onChange({ audience: '', brand: '' })} />
             Everyone
           </label>
-          {AUDIENCES.map((a) => (
+          {[...AUDIENCES, KIDS].map((a) => (
             <label key={a.id} className="radio-row">
               <input type="radio" name="audience" checked={filters.audience === a.id} onChange={() => onChange({ audience: a.id, brand: '' })} />
               {a.label}

@@ -175,7 +175,7 @@ export function validateProduct(body, { admin = false, featured = false } = {}) 
   if (image && !MEDIA_URL.test(image)) fail('The main photo must be an uploaded photo or an https link');
   const images360 = mediaList(body.images360, 72, '360° frames');
   if (images360.length > 0 && images360.length < 4) fail('A 360° view needs at least 4 frames');
-  if (!['', 'women', 'men', 'unisex'].includes(body.audience ?? '')) fail('Audience must be women, men or unisex');
+  if (!['', 'women', 'men', 'unisex', 'boys', 'girls'].includes(body.audience ?? '')) fail('Shop for must be women, men, unisex, boys or girls');
   const ageGroups = list(body.ageGroups, 4);
   if (ageGroups.some((a) => !AGE_GROUPS.includes(a))) fail('Unknown age group');
   const short = (value, max, label) => {

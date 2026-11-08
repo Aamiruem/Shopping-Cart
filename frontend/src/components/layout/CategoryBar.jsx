@@ -28,6 +28,7 @@ const TABS = [
   category('fashion', 'shirt'),
   audience('women', 'Women'),
   audience('men', 'Men'),
+  audience('kids', 'Kids'),
   category('mobiles', 'phone'),
   category('electronics', 'monitor'),
   category('beauty', 'droplet'),

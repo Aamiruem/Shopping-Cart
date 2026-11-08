@@ -76,9 +76,30 @@ export const SEASONS = [
 ];
 
 // Fashion is split by who it is for (`audience` on the product)
+// Who clothing is for: what sellers choose and shoppers filter by
 export const AUDIENCES = [
   { id: 'women', label: 'Women', heading: "Women's Fashion" },
   { id: 'men', label: 'Men', heading: "Men's Fashion" },
+  { id: 'boys', label: 'Boys', heading: "Boys' Fashion" },
+  { id: 'girls', label: 'Girls', heading: "Girls' Fashion" },
+];
+// Filter-only view of boys and girls together
+export const KIDS = { id: 'kids', label: 'Kids', heading: "Kids' Fashion" };
+
+// The home page's "Shop clothing" buttons: who it's for, then what it is
+export const CLOTHING_SHORTCUTS = [
+  { label: 'Women', icon: 'user', color: '#db2777', to: '/products?category=fashion&audience=women' },
+  { label: 'Men', icon: 'user', color: '#2563eb', to: '/products?category=fashion&audience=men' },
+  { label: 'Boys', icon: 'user', color: '#0891b2', to: '/products?category=fashion&audience=boys' },
+  { label: 'Girls', icon: 'user', color: '#c026d3', to: '/products?category=fashion&audience=girls' },
+  { label: 'T-Shirts', icon: 'shirt', color: '#7c3aed', to: '/products?category=fashion&subCategory=mens-tshirts' },
+  { label: 'Shirts', icon: 'shirt', color: '#0284c7', to: '/products?category=fashion&subCategory=mens-shirts' },
+  { label: 'Jeans', icon: 'shirt', color: '#1d4ed8', to: '/products?category=fashion&q=jeans' },
+  { label: 'Ethnic Wear', icon: 'gift', color: '#ea580c', to: '/products?category=fashion&q=ethnic' },
+  { label: 'Dresses', icon: 'shoppingBag', color: '#e11d48', to: '/products?category=fashion&q=dress' },
+  { label: 'Winterwear', icon: 'droplet', color: '#0f766e', to: '/products?category=fashion&q=winter' },
+  { label: 'Footwear', icon: 'shoppingBag', color: '#b45309', to: '/products?category=fashion&subCategory=footwear' },
+  { label: 'Watches', icon: 'watch', color: '#475569', to: '/products?q=watches' },
 ];
 
 export const SORT_OPTIONS = [

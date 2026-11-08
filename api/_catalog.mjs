@@ -64,8 +64,8 @@ const SORTS = {
 function fashionFirst(list) {
   const richness = (p) => (p.images360?.length >= 4 ? 2 : 0) + ((p.images?.length || 0) > 1 ? 1 : 0);
   const fashion = list.filter((p) => p.category === 'fashion').sort((a, b) => richness(b) - richness(a) || b.ratingCount - a.ratingCount);
-  const women = fashion.filter((p) => p.audience === 'women');
-  const men = fashion.filter((p) => p.audience !== 'women');
+  const women = fashion.filter((p) => ['women', 'girls'].includes(p.audience));
+  const men = fashion.filter((p) => !['women', 'girls'].includes(p.audience));
   const mixed = [];
   for (let i = 0; i < Math.max(women.length, men.length); i += 1) {
     if (men[i]) mixed.push(men[i]);
@@ -76,13 +76,16 @@ function fashionFirst(list) {
 
 const textOf = (p) => [p.name, p.brand, p.category, p.subCategory, ...(p.tags || [])].join(' ').toLowerCase();
 
+// Who clothing is for. Adult unisex items show under both Women and Men; Kids means boys and girls.
+const AUDIENCE_MATCH = { women: ['women', 'unisex'], men: ['men', 'unisex'], boys: ['boys'], girls: ['girls'], kids: ['boys', 'girls'] };
+
 function baseFilter({ q, category, audience, use }) {
   const needle = (q || '').trim().toLowerCase();
   const group = CATEGORY_GROUPS[use];
   return (p) =>
     (!needle || textOf(p).includes(needle)) &&
     (category ? p.category === category : !group || group.includes(p.category)) &&
-    (!['women', 'men'].includes(audience) || [audience, 'unisex'].includes(p.audience));
+    (!Object.hasOwn(AUDIENCE_MATCH, audience ?? '') || AUDIENCE_MATCH[audience].includes(p.audience));
 }
 
 const number = (v) => (v === undefined || v === '' || Number.isNaN(Number(v)) ? null : Number(v));

@@ -89,3 +89,13 @@ test('All products opens with fashion, men and women alternating; filters keep t
   assert.notEqual(listProducts({ sort: 'price_asc', limit: 1 })[0]._id, first[0]._id);
   assert.equal(new Set(listProducts({ limit: 200 }).concat(listProducts({ limit: 200, skip: 200 })).map((p) => p._id)).size, 400); // paging still exact
 });
+
+test('clothing groups: unisex shows for women and men; kids means boys and girls', () => {
+  const women = listProducts({ category: 'fashion', audience: 'women', limit: 200 });
+  assert.ok(women.length > 0 && women.every((p) => ['women', 'unisex'].includes(p.audience)));
+  assert.ok(women.some((p) => p.audience === 'unisex'));
+  assert.ok(listProducts({ category: 'fashion', audience: 'men', limit: 200 }).every((p) => ['men', 'unisex'].includes(p.audience)));
+  for (const kids of ['boys', 'girls', 'kids']) {
+    assert.ok(listProducts({ category: 'fashion', audience: kids, limit: 200 }).every((p) => ['boys', 'girls'].includes(p.audience)), kids);
+  }
+});
