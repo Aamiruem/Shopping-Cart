@@ -1,5 +1,6 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAuthModal } from '../context/AuthModalContext';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -11,11 +12,11 @@ import { playSound } from '../utils/sound';
 // (and back again afterwards), then confirm with a toast and a sound.
 export default function useShopActions() {
   const { user } = useAuth();
+  const { openLogin } = useAuthModal();
   const cart = useCart();
   const wishlist = useWishlist();
   const toast = useToast();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const requireLogin = () => {
     if (!SHOPPING) {
@@ -24,7 +25,7 @@ export default function useShopActions() {
     }
     if (user) return true;
     toast.show('Please log in to continue', 'info');
-    navigate('/login', { state: { from: location } });
+    openLogin('login');
     return false;
   };
 

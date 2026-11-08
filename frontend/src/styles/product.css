@@ -267,3 +267,10 @@
 .rail-highlight .rail-arrow { width: 44px; height: 44px; border-radius: 50%; right: 12px; }
 .rail-highlight .rail-arrow.left { left: 12px; }
 @media (max-width: 560px) { .rail-highlight .product-card-compact { width: 160px; } }
+
+/* Ways to pay (components/product/StoreFacts.jsx) */
+.pay-ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; margin: 8px 0; padding: 0; list-style: none; }
+.pay-ways li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.pay-ways li > svg { flex: none; margin-top: 2px; color: var(--brand); }
+.pay-ways span { display: grid; gap: 2px; }
+.pay-ways small { color: var(--text-muted); font-size: var(--fs-xs); }

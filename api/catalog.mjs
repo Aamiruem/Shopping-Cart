@@ -74,6 +74,12 @@ export default async function handler(req, res) {
   const path = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
   if (req.method === 'HEAD' || req.method === 'OPTIONS') return send(res, 204, null);
   const [area, ...rest] = path.split('/').filter(Boolean);
+  if (req.method === 'GET' && path === 'recommendations/festive') {
+    const { festiveStore } = await import('./_demand.mjs');
+    const { query } = await import('./_auth.mjs');
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600'); // demand moves in minutes, not seconds
+    return send(res, 200, await festiveStore(query), true);
+  }
   const isPersonal = SHOP_AREAS.has(area) || (['auth', 'payments'].includes(area) && rest.join('/') !== 'config');
   if (isPersonal && (await personal(req, res, area, rest))) return undefined;
   if (req.method !== 'GET') return send(res, 503, { error: OPENING_SOON });

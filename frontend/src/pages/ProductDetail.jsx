@@ -7,6 +7,7 @@ import Price from '../components/common/Price';
 import Rating, { shownRating } from '../components/common/Rating';
 import ProductRail from '../components/product/ProductRail';
 import Reviews from '../components/product/Reviews';
+import StoreFacts from '../components/product/StoreFacts';
 import Spin360 from '../components/product/Spin360';
 import { aisleLabel, categoryLabel, groupOf } from '../constants/catalog';
 import { useCart } from '../context/CartContext';
@@ -215,6 +216,7 @@ export default function ProductDetail() {
           </div>
           {!PREVIEW && product.discount > 0 && <p className="text-success special">Special price</p>}
           <Price price={product.price} mrp={product.mrp} size="lg" />
+          {PREVIEW && SHOPPING && <StoreFacts product={product} />}
           {!PREVIEW && (
             <>
               <p className={`stock ${outOfStock ? 'text-error' : product.stock < 10 ? 'text-warn' : 'text-success'}`}>

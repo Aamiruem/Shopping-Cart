@@ -137,3 +137,49 @@
 .season-card img { position: absolute; right: 8px; bottom: 8px; width: 46%; height: 80%; object-fit: cover; border-radius: var(--radius); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25); }
 @media (max-width: 900px) { .season-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .season-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Festive / seasonal store (components/home/FestiveStore.jsx) ---------- */
+.festive {
+  --festive-a: #4a0d2e; --festive-b: #9c1c3b; --festive-c: #e8742a; --festive-ink: #fff7e6; --festive-gold: #ffd34d;
+  margin-block: 12px; border-radius: 14px; overflow: hidden; color: var(--festive-ink);
+  background:
+    radial-gradient(120% 140% at 85% 0%, rgba(255, 211, 77, 0.22), transparent 55%),
+    linear-gradient(135deg, var(--festive-a) 0%, var(--festive-b) 55%, var(--festive-c) 100%);
+  box-shadow: 0 6px 24px rgba(74, 13, 46, 0.18);
+}
+.festive.theme-christmas { --festive-a: #0b3d2e; --festive-b: #14532d; --festive-c: #b91c1c; }
+.festive.theme-winter { --festive-a: #0b2a4a; --festive-b: #1d4f91; --festive-c: #3b82c4; }
+.festive.theme-summer { --festive-a: #9a3412; --festive-b: #ea580c; --festive-c: #f59e0b; }
+.festive.theme-monsoon { --festive-a: #0f3a3a; --festive-b: #0f766e; --festive-c: #2563eb; }
+.festive-loading { min-height: 360px; background: linear-gradient(90deg, #f3e8ee, #faf3f6, #f3e8ee); background-size: 200% 100%; animation: festive-shimmer 1.4s infinite; }
+@keyframes festive-shimmer { to { background-position: -200% 0; } }
+
+.festive-banner { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: center; gap: 8px; padding: 28px 32px 8px; }
+.festive-copy h2 { margin: 6px 0 8px; font-size: clamp(28px, 4.2vw, 46px); line-height: 1.05; letter-spacing: -0.02em; font-weight: 800; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.25); }
+.festive-eyebrow { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: var(--festive-gold); font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.festive-tagline { margin: 0; max-width: 34ch; font-size: var(--fs-lg); line-height: 1.45; opacity: 0.92; }
+.festive-ends { margin: 10px 0 0; font-size: var(--fs-sm); opacity: 0.8; }
+.festive-shop { display: inline-flex; align-items: center; gap: 4px; margin-top: 16px; padding: 10px 18px; border-radius: 8px; background: var(--festive-gold); color: #3b0a24; font-weight: 700; text-decoration: none; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.festive-shop:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25); }
+.festive-art { width: 100%; max-height: 240px; filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.25)); }
+
+.festive-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; padding: 12px 20px 22px; }
+.festive-tile { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 12px; background: var(--surface); color: var(--text); text-decoration: none; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.festive-tile:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2); }
+.festive-tile-price { font-size: var(--fs-xl); font-weight: 800; color: var(--festive-b); letter-spacing: -0.01em; }
+.festive-tile-title { font-size: var(--fs-md); font-weight: 600; color: var(--text-muted); }
+.festive-collage { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 0 8px; }
+.festive-collage img { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 8px; background: #f7f7f9; padding: 6px; }
+.festive-tile-cta { display: inline-flex; align-items: center; gap: 2px; margin-top: auto; font-size: var(--fs-sm); font-weight: 700; color: var(--brand); }
+
+@media (max-width: 760px) {
+  .festive { border-radius: 10px; }
+  .festive-banner { grid-template-columns: 1fr; padding: 20px 18px 0; }
+  .festive-art { max-height: 150px; order: -1; }
+  .festive-tiles { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding: 10px 14px 18px; }
+  .festive-tile { flex: 0 0 72%; scroll-snap-align: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .festive-loading { animation: none; }
+  .festive-tile, .festive-shop { transition: none; }
+}

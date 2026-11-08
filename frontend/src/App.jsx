@@ -8,6 +8,7 @@ import Footer from './components/layout/Footer';
 import Navbar from './components/layout/Navbar';
 import { ConsentBanner, PreviewBanner } from './components/layout/NoticeBars';
 import SiteHeader from './components/layout/SiteHeader';
+import { AuthModalProvider } from './context/AuthModalContext';
 import ProtectedRoute from './components/routing/ProtectedRoute';
 import ScrollToTop from './components/routing/ScrollToTop';
 import { About, OpeningSoon, Privacy } from './pages/Legal';
@@ -55,6 +56,7 @@ export default function App() {
   useEffect(() => pageView(`${pathname}${search}`), [pathname, search]);
 
   return (
+    <AuthModalProvider>
     <div className="app">
       <ScrollToTop />
       <PreviewBanner />
@@ -108,5 +110,6 @@ export default function App() {
       {!PREVIEW && <ChatWidget />}
       <ConsentBanner />
     </div>
+    </AuthModalProvider>
   );
 }

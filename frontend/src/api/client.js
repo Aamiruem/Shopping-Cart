@@ -196,6 +196,7 @@ export const api = {
 
   // Personalised recommendations
   forYou: () => request('/recommendations/for-you'),
+  festive: () => request('/recommendations/festive'),
   together: (productId) => request(`/recommendations/together/${productId}`),
 
   // Search with a photo, review summaries

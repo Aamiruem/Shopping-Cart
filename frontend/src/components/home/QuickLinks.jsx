@@ -1,12 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
 import { SHOPPING } from '../../config';
 import { useAuth } from '../../context/AuthContext';
+import { useAuthModal } from '../../context/AuthModalContext';
 import Icon from '../common/Icon';
 import { useAccountLinks } from '../layout/Navbar';
 
 // Top of the home page: a greeting plus every account option one click away (same list as the ⋮ menu)
 export default function QuickLinks() {
   const { user } = useAuth();
+  const { openLogin } = useAuthModal();
   const location = useLocation();
   // Guests get the essentials only; account pages are one hover away in the Login menu
   const links = useAccountLinks().filter((l) => (user ? true : ['/products', '/help'].includes(l.to)));
@@ -20,8 +22,8 @@ export default function QuickLinks() {
       <nav className="quick-list">
         {!user && SHOPPING && (
           <>
-            <Link to="/login" state={{ from: location }} className="quick-link primary"><Icon name="user" size={18} /> Login</Link>
-            <Link to="/register" className="quick-link"><Icon name="plus" size={18} /> Create account</Link>
+            <Link to="/login" state={{ from: location }} className="quick-link primary" onClick={(e) => { e.preventDefault(); openLogin('login'); }}><Icon name="user" size={18} /> Login</Link>
+            <Link to="/register" className="quick-link" onClick={(e) => { e.preventDefault(); openLogin('register'); }}><Icon name="plus" size={18} /> Create account</Link>
           </>
         )}
         {links.map((l) => (

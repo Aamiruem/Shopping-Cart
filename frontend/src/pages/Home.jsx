@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { ErrorMessage } from '../components/common/Feedback';
 import DealTimer from '../components/home/DealTimer';
+import FestiveStore from '../components/home/FestiveStore';
 import HeroCarousel from '../components/home/HeroCarousel';
 import OfferBanners from '../components/home/OfferBanners';
 import PromoVideo from '../components/home/PromoVideo';
@@ -109,6 +110,7 @@ export default function Home() {
     <div className="page-home container">
       <h1 className="sr-only">{SITE_NAME}: Online Shopping in India</h1>
       <QuickLinks />
+      <FestiveStore />
       <HeroCarousel />
       {recent.length > 0 && (
         <ProductRail tone="highlight" title={user ? `${user.name.split(' ')[0]}, still looking for these?` : 'Still looking for these?'} products={recent} />

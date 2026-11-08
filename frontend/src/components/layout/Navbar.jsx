@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useAuthModal } from '../../context/AuthModalContext';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
 import { useWishlist } from '../../context/WishlistContext';
@@ -76,6 +77,7 @@ function MenuLink({ to, icon, label, count, state }) {
 
 function AccountMenu() {
   const { user, ready, logout } = useAuth();
+  const { openLogin } = useAuthModal();
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -106,8 +108,8 @@ function AccountMenu() {
             </div>
           ) : !ready ? null : (
             <div className="menu-head menu-head-guest">
-              <Link to="/login" state={{ from: location }} className="btn btn-primary btn-block">Login</Link>
-              <p>New customer? <Link to="/register">Sign Up</Link></p>
+              <Link to="/login" state={{ from: location }} className="btn btn-primary btn-block" onClick={(e) => { e.preventDefault(); openLogin('login'); }}>Login</Link>
+              <p>New customer? <Link to="/register" onClick={(e) => { e.preventDefault(); openLogin('register'); }}>Sign Up</Link></p>
             </div>
           )}
           <p className="menu-title">Your Account</p>

@@ -113,3 +113,22 @@
 .phone-verify-actions .btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; }
 .phone-verify-actions .whatsapp { color: #128c7e; border-color: #9fd8cf; }
 .phone-hint { display: flex; align-items: center; gap: 6px; }
+
+/* Login / sign-up dialog (context/AuthModalContext.jsx) */
+.auth-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) 16px; background: rgba(15, 23, 42, 0.62); animation: auth-fade 0.15s ease-out; overflow-y: auto; }
+.auth-modal { position: relative; width: min(100%, 860px); animation: auth-rise 0.2s ease-out; }
+.auth-modal .auth-card { width: 100%; min-height: 0; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35); }
+.auth-modal-close { position: absolute; top: -6px; right: -48px; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; }
+.auth-modal-close:hover, .auth-modal-close:focus-visible { background: rgba(255, 255, 255, 0.16); }
+.auth-modal .btn-link { padding: 0; border: 0; background: none; color: var(--brand); font: inherit; font-weight: 600; cursor: pointer; }
+@keyframes auth-fade { from { opacity: 0; } }
+@keyframes auth-rise { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
+@media (max-width: 960px) {
+  .auth-modal-close { top: 8px; right: 8px; z-index: 1; color: var(--text); background: rgba(255, 255, 255, 0.9); }
+}
+@media (max-width: 760px) {
+  .auth-modal .auth-aside { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-modal-backdrop, .auth-modal { animation: none; }
+}

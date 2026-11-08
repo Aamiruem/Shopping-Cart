@@ -97,8 +97,15 @@ function AuthAside({ copy }) {
   );
 }
 
+// The /login and /register pages
 export default function Login({ mode = 'login' }) {
   useSeo({ title: mode === 'register' ? 'Create account' : 'Login', noindex: true });
+  return <LoginForm mode={mode} />;
+}
+
+// The form itself. `embedded` = inside the login dialog (AuthModalContext): it closes instead of navigating,
+// switches between login and sign-up in place, and leaves the page's title alone.
+export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }) {
   const { user, ready, login, otpLogin, register, verifySignup, googleLogin } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
@@ -125,8 +132,9 @@ export default function Login({ mode = 'login' }) {
   const finish = useCallback((signedIn, isNew) => {
     playSound('success');
     toast.show(isNew ? `Welcome to Arvixa Store, ${signedIn.name}!` : `Welcome back, ${signedIn.name}!`);
-    navigate(redirectTo, { replace: true });
-  }, [toast, navigate, redirectTo]);
+    if (embedded) onDone?.();
+    else navigate(redirectTo, { replace: true });
+  }, [toast, navigate, redirectTo, embedded, onDone]);
 
   const onGoogle = useCallback(async (credential) => {
     setError('');
@@ -141,14 +149,16 @@ export default function Login({ mode = 'login' }) {
     }
   }, [googleLogin, finish]);
 
-  if (ready && user) return <Navigate to={redirectTo} replace />;
+  if (ready && user) return embedded ? null : <Navigate to={redirectTo} replace />;
 
   const usingOtp = !isRegister && method === 'otp';
   const errors = usingOtp ? {} : validate(form, isRegister);
   const idError = usingOtp ? identifierError(identifier) : '';
   // Show a field's error once the user has left it, or after a submit attempt
   const shown = (name) => (submitted || touched[name]) && (name === 'identifier' ? idError : errors[name]);
-  const blur = (e) => setTouched((t) => ({ ...t, [e.target.name]: true }));
+  // Only once something was typed: leaving an empty field (to switch to sign-up, say) mustn't flash an error that
+  // moves the button being clicked. Submitting still shows every error.
+  const blur = (e) => e.target.value && setTouched((t) => ({ ...t, [e.target.name]: true }));
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const strength = passwordStrength(form.password);
   const mobile = looksLikeMobile(identifier);
@@ -229,9 +239,8 @@ export default function Login({ mode = 'login' }) {
     />
   ) : null;
 
-  return (
-    <div className="page-auth container">
-      <div className="auth-card">
+  const card = (
+      <div className={`auth-card ${embedded ? 'auth-card-embedded' : ''}`}>
         <AuthAside copy={copy} />
 
         {codeStep ? (
@@ -345,11 +354,16 @@ export default function Login({ mode = 'login' }) {
             )}
 
             <p className="auth-switch">
-              {copy.switchText} <Link to={copy.switchLink.to} state={location.state}>{copy.switchLink.label}</Link>
+              {copy.switchText}{' '}
+              {embedded ? (
+                <button type="button" className="btn-link" onClick={() => onSwitch?.(isRegister ? 'login' : 'register')}>{copy.switchLink.label}</button>
+              ) : (
+                <Link to={copy.switchLink.to} state={location.state}>{copy.switchLink.label}</Link>
+              )}
             </p>
           </form>
         )}
       </div>
-    </div>
   );
+  return embedded ? card : <div className="page-auth container">{card}</div>;
 }
