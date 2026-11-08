@@ -26,6 +26,9 @@ const RAILS = [
   { key: 'kitchen', title: 'Home & Kitchen Essentials', params: { category: 'kitchen', sort: 'popularity', limit: 12 } },
 ];
 
+const FASHION_FIRST = ['women', 'men'];
+const LATER_RAILS = RAILS.filter((r) => !FASHION_FIRST.includes(r.key));
+
 function useProducts(params) {
   const [state, setState] = useState({ products: [], loading: true, error: '' });
   const key = JSON.stringify(params);
@@ -111,6 +114,8 @@ export default function Home() {
       <h1 className="sr-only">{SITE_NAME}: Online Shopping in India</h1>
       <QuickLinks />
       <FestiveStore />
+      {/* Fashion first: women's and men's styles straight after the festive store */}
+      {RAILS.filter((r) => FASHION_FIRST.includes(r.key)).map((r) => <Rail key={r.key} {...r} />)}
       <HeroCarousel />
       {recent.length > 0 && (
         <ProductRail tone="highlight" title={user ? `${user.name.split(' ')[0]}, still looking for these?` : 'Still looking for these?'} products={recent} />
@@ -130,9 +135,9 @@ export default function Home() {
       <ForYou />
       {!PREVIEW && <OfferBanners />}
 
-      {RAILS.slice(0, 3).map((r) => <Rail key={r.key} {...r} />)}
+      {LATER_RAILS.slice(0, 2).map((r) => <Rail key={r.key} {...r} />)}
       <PromoVideo />
-      {RAILS.slice(3).map((r) => <Rail key={r.key} {...r} />)}
+      {LATER_RAILS.slice(2).map((r) => <Rail key={r.key} {...r} />)}
 
     </div>
   );

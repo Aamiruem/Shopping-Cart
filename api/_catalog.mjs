@@ -44,6 +44,21 @@ const SORTS = {
   newest: (a, b) => b.ratingCount - a.ratingCount, // the static catalog has no dates
 };
 
+// "All products" opens with fashion: styles with a 360° view and several photos first, men's and women's alternating
+// (unisex joins men's). Only for the unfiltered default listing; every filter and sort keeps its own order.
+function fashionFirst(list) {
+  const richness = (p) => (p.images360?.length >= 4 ? 2 : 0) + ((p.images?.length || 0) > 1 ? 1 : 0);
+  const fashion = list.filter((p) => p.category === 'fashion').sort((a, b) => richness(b) - richness(a) || b.ratingCount - a.ratingCount);
+  const women = fashion.filter((p) => p.audience === 'women');
+  const men = fashion.filter((p) => p.audience !== 'women');
+  const mixed = [];
+  for (let i = 0; i < Math.max(women.length, men.length); i += 1) {
+    if (men[i]) mixed.push(men[i]);
+    if (women[i]) mixed.push(women[i]);
+  }
+  return [...mixed, ...list.filter((p) => p.category !== 'fashion')];
+}
+
 const textOf = (p) => [p.name, p.brand, p.category, p.subCategory, ...(p.tags || [])].join(' ').toLowerCase();
 
 function baseFilter({ q, category, audience, use }) {
@@ -85,7 +100,10 @@ export function listProducts(params = {}) {
   const limit = Math.max(1, Math.min(Number(params.limit) || 200, 200));
   // skip pages through long lists ("Load more"); the response stays a plain array
   const skip = Math.max(0, Math.min(Math.trunc(Number(params.skip)) || 0, 5000));
-  return found.sort((a, b) => rank(a) - rank(b) || order(a, b)).slice(skip, skip + limit);
+  const sorted = found.sort((a, b) => rank(a) - rank(b) || order(a, b));
+  const unfiltered = sort === 'relevance' && !needle && !params.category && !params.use && !subCategory && !brand && featured !== 'true'
+    && low === null && high === null && minRating === null;
+  return (unfiltered ? fashionFirst(sorted) : sorted).slice(skip, skip + limit);
 }
 
 export const getProduct = (id) => loadProducts().find((p) => p._id === id) || null;

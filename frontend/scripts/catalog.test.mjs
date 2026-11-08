@@ -78,3 +78,14 @@ test('paging with skip reaches every product exactly once', () => {
   assert.equal(new Set(seen).size, seen.length);
   assert.equal(listProducts({ limit: 5, skip: 'abc' })[0]._id, listProducts({ limit: 5 })[0]._id); // bad skip = start
 });
+
+test('All products opens with fashion, men and women alternating; filters keep their own order', () => {
+  const first = listProducts({ limit: 20 });
+  assert.ok(first.every((p) => p.category === 'fashion'));
+  const audiences = first.slice(0, 10).map((p) => (p.audience === 'women' ? 'women' : 'men'));
+  assert.deepEqual(audiences, ['men', 'women', 'men', 'women', 'men', 'women', 'men', 'women', 'men', 'women']);
+  assert.ok(first[0].images360?.length >= 4); // the richest styles lead
+  assert.notEqual(listProducts({ category: 'mobiles', limit: 1 })[0].category, 'fashion');
+  assert.notEqual(listProducts({ sort: 'price_asc', limit: 1 })[0]._id, first[0]._id);
+  assert.equal(new Set(listProducts({ limit: 200 }).concat(listProducts({ limit: 200, skip: 200 })).map((p) => p._id)).size, 400); // paging still exact
+});
