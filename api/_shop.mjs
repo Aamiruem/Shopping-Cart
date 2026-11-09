@@ -219,7 +219,8 @@ async function addAddress({ db, userId, body }) {
 
 const ORDERS_SQL = `
   SELECT o.*, COALESCE(json_agg(oi.* ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items,
-         (SELECT p.status FROM payments p WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1) AS payment_status
+         (SELECT p.status FROM payments p WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1) AS payment_status,
+         (SELECT r.refund FROM order_returns r WHERE r.order_id = o.id AND r.status <> 'withdrawn') AS return_refund
     FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id
    WHERE o.user_id = $1`;
 

@@ -78,6 +78,7 @@
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .status-placed { color: var(--success); }
 .status-cancelled { color: var(--error); }
+.status-returned { color: var(--warn); }
 
 .order-success { display: flex; align-items: center; gap: 20px; padding: 16px; margin-bottom: 16px; border-left: 4px solid var(--success); animation: toast-in 0.4s ease-out; }
 .order-success h1 { color: var(--success); }

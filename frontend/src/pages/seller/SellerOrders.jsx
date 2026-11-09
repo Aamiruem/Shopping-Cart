@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { ErrorMessage, Spinner } from '../../components/common/Feedback';
 import Icon from '../../components/common/Icon';
-import { useAuth } from '../../context/AuthContext';
+import ReturnsQueue from '../../components/seller/ReturnsQueue';
 import { useToast } from '../../context/ToastContext';
 import useApi from '../../hooks/useApi';
 import { formatDate, formatPrice } from '../../utils/format';
@@ -16,40 +16,6 @@ export const FULFILMENT = [
   { id: 'shipped', label: 'Shipped', icon: 'truck' },
   { id: 'delivered', label: 'Delivered', icon: 'checkCircle' },
 ];
-
-// Admin only: returns waiting for a decision. Approving refunds online payments and restocks the items.
-function ReturnsQueue() {
-  const toast = useToast();
-  const { data, reload } = useApi(() => api.pendingReturns(), []);
-  if (!data?.length) return null;
-
-  const decide = async (orderId, approve) => {
-    try {
-      await api.resolveReturn(orderId, approve);
-      toast.show(approve ? 'Return approved' : 'Return rejected');
-      reload();
-    } catch (err) {
-      toast.show(err.message, 'error');
-    }
-  };
-
-  return (
-    <section className="panel returns-queue">
-      <h2>Return requests</h2>
-      <ul>
-        {data.map((r) => (
-          <li key={r.id}>
-            <span><strong>Order #{r.order_id}</strong> · {r.customer} · {formatPrice(r.total)} · {r.reason}</span>
-            <span className="form-actions">
-              <button type="button" className="btn btn-primary" onClick={() => decide(r.order_id, true)}>Approve &amp; refund</button>
-              <button type="button" className="btn-text" onClick={() => decide(r.order_id, false)}>Reject</button>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
 
 // The courier details shoppers see on their order page
 function ShipmentForm({ order, onSubmit, onCancel }) {
@@ -70,7 +36,6 @@ function ShipmentForm({ order, onSubmit, onCancel }) {
 }
 
 export default function SellerOrders() {
-  const { user } = useAuth();
   const toast = useToast();
   const [shipping, setShipping] = useState(null); // id of the order waiting for courier details
   const [status, setStatus] = useState('');
@@ -93,7 +58,7 @@ export default function SellerOrders() {
 
   return (
     <>
-    {user.role === 'admin' && <ReturnsQueue />}
+    <ReturnsQueue onChange={reload} />
     <div className="panel seller-products">
       <header className="seller-head">
         <div>
@@ -101,7 +66,7 @@ export default function SellerOrders() {
           <p className="muted small">Orders that include your products (amounts are your items only). Move each order along as you pack and ship it.</p>
         </div>
         <div className="segmented" role="group" aria-label="Order status">
-          {[['', 'All'], ['placed', 'Active'], ['cancelled', 'Cancelled']].map(([id, label]) => (
+          {[['', 'All'], ['placed', 'Active'], ['cancelled', 'Cancelled'], ['returned', 'Returned']].map(([id, label]) => (
             <button key={id} type="button" className={status === id ? 'active' : ''} onClick={() => setStatus(id)}>{label}</button>
           ))}
         </div>
@@ -135,6 +100,7 @@ export default function SellerOrders() {
                       <span className={`pay-status ${o.payment_status || 'cod'} block`}>{paymentStatus(o, o.fulfilment === 'delivered')}</span>
                     </td>
                     <td>
+                      {o.return_status && o.status === 'placed' && <span className="muted small block">Return {o.return_status}</span>}
                       {closed ? <StatusBadge status={o.status} /> : (
                         <div className="fulfil-steps" role="group" aria-label={`Fulfilment of order ${o.id}`}>
                           {FULFILMENT.map((f, i) => (

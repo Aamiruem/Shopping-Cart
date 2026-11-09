@@ -13,6 +13,7 @@ const ALL_LINKS = [
   { to: '/seller/orders', icon: 'package', label: 'Orders', tone: 'green' },
   { to: '/seller/earnings', icon: 'wallet', label: 'Payments & Earnings', tone: 'purple' },
   { to: '/seller/settings', icon: 'settings', label: 'Store Settings', tone: 'slate' },
+  { to: '/seller/support', icon: 'message', label: 'Complaints', tone: 'orange', admin: true },
 ];
 // The analytics & ML dashboard needs the full Python API
 const LINKS = PREVIEW ? ALL_LINKS.filter((l) => l.to !== '/seller/dashboard') : ALL_LINKS;
@@ -41,7 +42,7 @@ export default function SellerLayout() {
             </div>
           </div>
           <nav>
-            {LINKS.map((l) => (
+            {LINKS.filter((l) => !l.admin || user.role === 'admin').map((l) => (
               <NavLink key={l.to} to={l.to} className={`tone-${l.tone}`}>
                 <span className="nav-chip"><Icon name={l.icon} size={17} /></span> {l.label}
               </NavLink>

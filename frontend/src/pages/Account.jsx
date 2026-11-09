@@ -6,6 +6,7 @@ import AddressForm from '../components/account/AddressForm';
 import CodeVerify from '../components/account/CodeVerify';
 import { Spinner } from '../components/common/Feedback';
 import Icon from '../components/common/Icon';
+import TicketThread, { TICKET_STATUS } from '../components/support/TicketThread';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import useApi from '../hooks/useApi';
@@ -19,25 +20,27 @@ const ALL_TABS = [
   { id: 'security', label: 'Change password', icon: 'lock' },
   { id: 'support', label: 'Support tickets', icon: 'message' },
 ];
-// Support tickets need the full API
-const TABS = PREVIEW ? ALL_TABS.filter((t) => t.id !== 'support') : ALL_TABS;
+const TABS = ALL_TABS;
 
-const STATUS_LABEL = { open: 'Open', in_progress: 'In progress', resolved: 'Resolved' };
-
+// The shopper's complaints and support tickets, each with its conversation with the store team
 function SupportTab() {
-  const { data: tickets, loading } = useApi(() => api.tickets(), []);
-  if (loading) return <Spinner />;
+  const { data: tickets, loading, reload } = useApi(() => api.tickets(), []);
+  const [open, setOpen] = useState(null);
+  if (loading && !tickets) return <Spinner />;
   return (
     <div>
       <div className="tab-head"><h2>Support tickets</h2><Link to="/help#contact" className="btn-link"><Icon name="plus" size={14} /> New ticket</Link></div>
-      {!tickets?.length && <p className="muted">You haven't raised any tickets.</p>}
-      <ul className="address-list">
+      {!tickets?.length && <p className="muted">You haven’t raised any tickets. Problem with an order? Open it from My Orders and choose “Raise a complaint”.</p>}
+      <ul className="address-list ticket-cards">
         {(tickets || []).map((t) => (
           <li key={t.id}>
-            <span className="chip">{STATUS_LABEL[t.status]}</span>
-            <p><strong>#{t.id} {t.subject}</strong> <span className="muted small">· {t.categoryLabel} · {formatDate(t.created_at)}</span></p>
-            <p className="muted small">{t.message}</p>
-            <details><summary className="small">Our reply</summary><p className="small">{t.suggested_reply}</p></details>
+            <button type="button" className="ticket-toggle" aria-expanded={open === t.id} onClick={() => setOpen(open === t.id ? null : t.id)}>
+              <span className={`chip ticket-${t.status}`}>{TICKET_STATUS[t.status]}</span>
+              <span><strong>#{t.id} {t.subject}</strong> <span className="muted small">· {t.categoryLabel} · {formatDate(t.updated_at || t.created_at)}</span></span>
+              {t.last_from_staff && t.status !== 'resolved' && <span className="chip chip-new">New reply</span>}
+              <Icon name={open === t.id ? 'chevronDown' : 'chevronRight'} size={16} />
+            </button>
+            {open === t.id && <TicketThread id={t.id} onChange={reload} />}
           </li>
         ))}
       </ul>

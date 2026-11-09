@@ -4,9 +4,11 @@ import { api } from '../api/client';
 import { PREVIEW } from '../config';
 import { EmptyState, Spinner } from '../components/common/Feedback';
 import Icon from '../components/common/Icon';
+import { ReturnForm, ReturnStatus } from '../components/orders/ReturnPanel';
 import { useToast } from '../context/ToastContext';
 import { deliveryDate, formatDate, formatPrice } from '../utils/format';
 import { paymentStatus } from '../utils/orders';
+import { RETURN_WINDOW_DAYS } from '../utils/returns';
 import { StatusBadge } from './Orders';
 
 // Opens the address in Google Maps (no API key needed); the phone number is left out of the search
@@ -15,9 +17,6 @@ const mapsLink = (address) => `https://www.google.com/maps/search/?api=1&query=$
 const PAYMENT_LABELS = { cod: 'Cash on Delivery', upi: 'UPI', card: 'Card', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay Later', online: 'Online payment' };
 const TRACK_STEPS = ['Ordered', 'Packed', 'Shipped', 'Delivered'];
 const STEP_OF = { pending: 0, packed: 1, shipped: 2, delivered: 3 };
-const RETURN_WINDOW_DAYS = 7;
-const RETURN_LABELS = { requested: 'Return requested. We’ll update you soon.', approved: 'Return approved.', rejected: 'This return wasn’t approved.' };
-const REFUND_LABELS = { refunded: 'Your refund is on its way (usually 5–7 working days).', refund_pending: 'Your refund is being processed.', cod_manual: 'We’ll contact you to arrange your refund.' };
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -27,19 +26,16 @@ export default function OrderDetail() {
   const [error, setError] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [returning, setReturning] = useState(false);
-  const [reason, setReason] = useState('');
 
   const load = useCallback(() => api.order(id).then(setOrder).catch((err) => setError(err.message)), [id]);
   useEffect(() => {
     load();
   }, [load]);
 
-  const submitReturn = async (e) => {
-    e.preventDefault();
+  const withdrawReturn = async () => {
     try {
-      await api.requestReturn(id, reason);
-      toast.show('Return requested');
-      setReturning(false);
+      await api.withdrawReturn(id);
+      toast.show('Return request withdrawn', 'info');
       load();
     } catch (err) {
       toast.show(err.message, 'error');
@@ -73,7 +69,10 @@ export default function OrderDetail() {
   const shipped = step >= STEP_OF.shipped;
   const delivered = step === STEP_OF.delivered;
   const deliveredAt = Math.max(...order.items.map((i) => new Date(i.fulfilled_at || 0).getTime()));
-  const canReturn = order.status === 'placed' && delivered && !order.return && Date.now() - deliveredAt < RETURN_WINDOW_DAYS * 86400000;
+  const returnUntil = deliveredAt + RETURN_WINDOW_DAYS * 86400000;
+  const canReturn = order.status === 'placed' && delivered && !order.return && Date.now() < returnUntil;
+  // Paid online: a refund goes back to the same account. Cash: the shopper says where to send it.
+  const paidOnline = ['paid', 'refund_pending', 'refunded'].includes(order.payment_status);
   const shipment = order.items.find((i) => i.tracking_number);
 
   return (
@@ -125,9 +124,7 @@ export default function OrderDetail() {
             </ol>
           )}
 
-          {order.return && (
-            <p className="alert">{RETURN_LABELS[order.return.status]} {REFUND_LABELS[order.return.refund] || ''}</p>
-          )}
+          {order.return && <ReturnStatus ret={order.return} onWithdraw={withdrawReturn} />}
 
           <ul className="summary-list">
             {order.items.map((i) => (
@@ -143,8 +140,12 @@ export default function OrderDetail() {
             ))}
           </ul>
 
-          {order.status === 'placed' && shipped && (
-            <p className="muted small">{delivered ? 'Delivered.' : 'On its way, so it can no longer be cancelled.'} Need help? <Link to="/help">Contact support</Link></p>
+          {order.status === 'placed' && shipped && !order.return && (
+            <p className="muted small">
+              {delivered
+                ? canReturn ? `Delivered. You can return it until ${formatDate(returnUntil, { day: 'numeric', month: 'long' })}.` : 'Delivered. The return window for this order has closed.'
+                : 'On its way, so it can no longer be cancelled.'}
+            </p>
           )}
           {canReturn && !returning && (
             <button type="button" className="btn btn-outline" onClick={() => setReturning(true)}>
@@ -152,16 +153,11 @@ export default function OrderDetail() {
             </button>
           )}
           {returning && (
-            <form className="return-form" onSubmit={submitReturn}>
-              <label className="field">Why are you returning this order?
-                <textarea value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3} maxLength={500} rows={2} />
-              </label>
-              <div className="form-actions">
-                <button type="submit" className="btn btn-buy">Request return</button>
-                <button type="button" className="btn-text" onClick={() => setReturning(false)}>Cancel</button>
-              </div>
-            </form>
+            <ReturnForm order={order} paidOnline={paidOnline} onCancel={() => setReturning(false)} onDone={() => { setReturning(false); load(); }} />
           )}
+          <p className="muted small no-print">
+            <Icon name="message" size={14} /> Problem with this order? <Link to={`/help?order=${order.id}#contact`}>Raise a complaint</Link>
+          </p>
           <button type="button" className="btn-text no-print" onClick={() => window.print()}>
             <Icon name="package" size={14} /> Print order receipt
           </button>

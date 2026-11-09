@@ -40,6 +40,7 @@ const SellerProducts = lazy(() => import('./pages/seller/SellerProducts'));
 const SellerOrders = lazy(() => import('./pages/seller/SellerOrders'));
 const SellerEarnings = lazy(() => import('./pages/seller/SellerEarnings'));
 const SellerSettings = lazy(() => import('./pages/seller/SellerSettings'));
+const SellerSupport = lazy(() => import('./pages/seller/SellerSupport'));
 
 // Pages that show the category strip under the navbar
 const WITH_CATEGORY_BAR = ['/', '/products', '/grocery'];
@@ -104,6 +105,7 @@ export default function App() {
               <Route path="orders" element={<SellerOrders />} />
               <Route path="earnings" element={<SellerEarnings />} />
               <Route path="settings" element={<SellerSettings />} />
+              <Route path="support" element={<SellerSupport />} />
           </Route>
 
             <Route path="*" element={<NotFound />} />

@@ -340,7 +340,8 @@ async function myOrders({ db, userId, role, params }) {
             SUM(oi.price * oi.qty)::float AS amount,
             MIN(array_position(ARRAY['pending','packed','shipped','delivered'], oi.fulfilment::text)) AS step,
             (SELECT p.status FROM payments p WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1) AS payment_status,
-            (SELECT r.status FROM order_returns r WHERE r.order_id = o.id AND r.status <> 'withdrawn') AS return_status
+            (SELECT r.status FROM order_returns r WHERE r.order_id = o.id AND r.status <> 'withdrawn') AS return_status,
+            (SELECT r.refund FROM order_returns r WHERE r.order_id = o.id AND r.status <> 'withdrawn') AS return_refund
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       GROUP BY o.id ORDER BY o.created_at DESC LIMIT $${args.length}`,

@@ -114,14 +114,16 @@ export function Refunds() {
       <p className="muted small">Last updated: {UPDATED}</p>
       <h2>Cancelling an order</h2>
       <p>You can cancel any order that hasn’t shipped yet, from its page in <Link to="/orders">My Orders</Link>. Once an order has shipped it can’t be cancelled.</p>
+      <h2>Returns</h2>
+      <p>You can return an order within 7 days of delivery. Open it in <Link to="/orders">My Orders</Link>, choose “Return order” and tell us why. We reply within 24 hours. Once the return is approved, our courier picks the item up within 2–3 days; please keep it unused, with its tags and original packaging. If we can’t accept a return, the order page tells you why.</p>
       <h2>Refunds</h2>
       <ul>
-        <li><strong>Paid online</strong> (UPI, card, net banking, wallet or EMI): the full amount goes back to the account you paid from. Banks usually take 5–7 working days to show it.</li>
-        <li><strong>Cash on delivery</strong>: nothing is charged for a cancelled order.</li>
+        <li><strong>Paid online</strong> (UPI, card, net banking, wallet or EMI): the full amount goes back to the same account or card you paid from, when you cancel or after a returned item is picked up. Banks usually take 5–7 working days to show it.</li>
+        <li><strong>Cash on delivery</strong>: nothing is charged for a cancelled order. For a return, you give us a UPI ID or bank account and we transfer the full amount within 2 working days of pickup. Your order page shows the transfer’s reference number. We store the account details encrypted and delete them once the refund is sent.</li>
         <li>If a payment goes through but the order can’t be placed, the money is refunded automatically.</li>
       </ul>
-      <h2>Damaged, wrong or missing items</h2>
-      <p>If an item arrives damaged or defective, or isn’t what you ordered, contact us within 7 days of delivery with your order number and a photo. We’ll arrange a replacement or a full refund.</p>
+      <h2>Damaged, wrong or missing items, and complaints</h2>
+      <p>If an item arrives damaged or defective, or isn’t what you ordered, start a return from the order page within 7 days of delivery for a full refund. For anything else, choose “Raise a complaint” on the order page or use the <Link to="/help#contact">Help Center</Link>. You can follow every reply under My Account → Support tickets.</p>
       <h2>Contact</h2>
       <BusinessDetails />
     </article>
