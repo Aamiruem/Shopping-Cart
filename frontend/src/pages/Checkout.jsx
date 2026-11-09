@@ -5,13 +5,15 @@ import { PREVIEW } from '../config';
 import AddressForm from '../components/account/AddressForm';
 import CouponBox from '../components/cart/CouponBox';
 import PriceDetails from '../components/cart/PriceDetails';
+import PaymentMethods from '../components/checkout/PaymentMethods';
 import PaymentOtp from '../components/checkout/PaymentOtp';
+import ProductRail from '../components/product/ProductRail';
 import { EmptyState, Spinner } from '../components/common/Feedback';
 import Icon from '../components/common/Icon';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
-import { formatPrice } from '../utils/format';
+import { deliveryDate, formatPrice } from '../utils/format';
 import { playSound } from '../utils/sound';
 import { trackBeginCheckout, trackPurchase } from '../utils/analytics';
 import useSeo from '../hooks/useSeo';
@@ -30,6 +32,46 @@ const ONLINE_OPTIONS = [
   { key: 'wallet', method: 'wallet', icon: 'wallet', label: 'Wallets', note: 'Popular mobile wallets', instruments: [{ method: 'wallet' }] },
 ].map((o) => ({ ...o, id: `online-${o.key}` }));
 const LIVE_OPTIONS = [...ONLINE_OPTIONS, COD];
+// Before online payments are switched on, shoppers still see every method (marked "Coming soon") and pay cash on delivery
+const SOON_OPTIONS = [COD, ...ONLINE_OPTIONS.map((o) => ({ ...o, disabled: true }))];
+const PROGRESS = [[2, 'Address'], [3, 'Order Summary'], [4, 'Payment']];
+
+// Flipkart-style progress across the top: Address → Order Summary → Payment
+function CheckoutProgress({ step, onStep, canGo }) {
+  return (
+    <ol className="checkout-progress" aria-label="Checkout progress">
+      {PROGRESS.map(([n, label], i) => {
+        const state = step > n ? 'done' : step === n ? 'current' : '';
+        return (
+          <li key={n} className={state} aria-current={step === n ? 'step' : undefined}>
+            <button type="button" disabled={!canGo(n)} onClick={() => onStep(n)}>
+              <span className="progress-dot">{step > n ? <Icon name="check" size={13} strokeWidth={3} /> : i + 1}</span>
+              <span>{label}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+// Products that go with what's in the cart, for the bottom of checkout
+function useRelated(cart) {
+  const first = cart.items[0]?.productId;
+  const [related, setRelated] = useState([]);
+  useEffect(() => {
+    if (!first) return undefined;
+    let cancelled = false;
+    api.together(first)
+      .then((r) => !cancelled && setRelated(r.items || []))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [first]);
+  const inCart = new Set(cart.items.map((i) => i.productId));
+  return related.filter((p) => !inCart.has(p._id));
+}
 // Development without Razorpay keys: an emailed OTP stands in for the payment gateway
 const DEMO_OPTIONS = [
   { id: 'upi', icon: 'phone', label: 'UPI', note: 'Pay by any UPI app · OTP verified (demo — no real charge)' },
@@ -76,7 +118,8 @@ function Step({ number, title, done, summary, active, onChange, onOpen, children
 export default function Checkout() {
   useSeo({ title: 'Checkout', noindex: true });
   const { user } = useAuth();
-  const { cart, loading, refresh } = useCart();
+  const { cart, loading, refresh, update } = useCart();
+  const related = useRelated(cart);
   const toast = useToast();
   const navigate = useNavigate();
   const [step, setStep] = useState(2);
@@ -104,7 +147,7 @@ export default function Checkout() {
       .catch(() => setGateway({ enabled: false }));
   }, []);
   // Without the full API there's no OTP demo either, so the store takes cash on delivery only
-  const options = gateway?.enabled ? LIVE_OPTIONS : PREVIEW ? [COD] : DEMO_OPTIONS;
+  const options = gateway?.enabled ? LIVE_OPTIONS : PREVIEW ? SOON_OPTIONS : DEMO_OPTIONS;
 
   useEffect(() => {
     api.addresses()
@@ -203,8 +246,17 @@ export default function Checkout() {
     }
   };
 
+  const setQty = async (productId, qty) => {
+    try {
+      await update(productId, qty);
+    } catch (err) {
+      toast.show(err.message, 'error');
+    }
+  };
+
   return (
     <div className="page-cart container">
+      <CheckoutProgress step={step} onStep={setStep} canGo={(n) => n === 2 || Boolean(address)} />
       <div className="checkout-steps">
         <Step number={1} title="Login" done summary={`${user.name} · ${user.email}`} />
 
@@ -243,13 +295,26 @@ export default function Checkout() {
           onChange={() => setStep(3)}
           onOpen={address ? () => setStep(3) : undefined}
         >
-          <ul className="summary-list">
+          {address && (
+            <div className="deliver-to">
+              <p className="muted small">Deliver to:</p>
+              <p><strong>{address.name}</strong> <span className="chip">{address.type}</span></p>
+              <p className="small">{address.line1}, {address.city}, {address.state} {address.pincode} · {address.phone}</p>
+            </div>
+          )}
+          <ul className="summary-list checkout-items">
             {cart.items.map((i) => (
               <li key={i.productId}>
                 <img src={i.image} alt="" />
                 <div>
-                  <p>{i.name}</p>
-                  <p className="muted small">Qty: {i.qty}</p>
+                  <p className="item-name">{i.name}</p>
+                  {i.brand && <p className="muted small">{i.brand}</p>}
+                  <label className="qty-pick small">Qty:{' '}
+                    <select value={i.qty} onChange={(e) => setQty(i.productId, Number(e.target.value))} aria-label={`Quantity of ${i.name}`}>
+                      {Array.from({ length: Math.max(1, Math.min(10, i.stock || 10)) }, (_, n) => n + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </label>
+                  <p className="small delivery-by"><Icon name="truck" size={13} /> Delivery by <strong>{deliveryDate(4)}</strong></p>
                 </div>
                 <strong>{formatPrice(i.subtotal)}</strong>
               </li>
@@ -261,20 +326,19 @@ export default function Checkout() {
           </div>
         </Step>
 
-        <Step number={4} title="Payment options" active={step === 4} summary={address ? undefined : 'Choose a delivery address first'} onOpen={address ? () => setStep(4) : undefined}>
-          {options.map((p) => (
-            <label key={p.id} className={`payment-option ${payment === p.id ? 'selected' : ''}`}>
-              <input type="radio" name="payment" checked={payment === p.id} onChange={() => setPayment(p.id)} />
-              <span className={`pay-icon pay-${p.method || p.id}`}><Icon name={p.icon} size={20} /></span>
-              <div><strong>{p.label}</strong><span className="muted small">{p.note}</span></div>
-            </label>
-          ))}
-          <button type="button" className="btn btn-buy btn-lg btn-block" disabled={placing || !address} onClick={placeOrder}>
-            {placing ? 'Processing…' : payment === 'cod' ? `Confirm order · ${formatPrice(cart.total)}` : `Pay ${formatPrice(cart.total)}`}
-          </button>
-          {gateway && !gateway.enabled && <p className="muted small pay-soon"><Icon name="clock" size={14} /> More ways to pay (UPI, cards, net banking and EMI) are coming soon.</p>}
-          {gateway?.enabled && <p className="secure-note"><Icon name="lock" size={14} /> Payments are processed securely by Razorpay. We never see or store your card or bank details.</p>}
+        <Step number={4} title={<>Payment options <span className="secure-badge"><Icon name="lock" size={12} /> 100% Secure</span></>} active={step === 4} summary={address ? undefined : 'Choose a delivery address first'} onOpen={address ? () => setStep(4) : undefined}>
+          <PaymentMethods
+            methods={options}
+            selected={payment}
+            onSelect={setPayment}
+            total={cart.total}
+            placing={placing}
+            canPay={Boolean(address)}
+            onPay={placeOrder}
+          />
         </Step>
+
+        <ProductRail title="Customers also bought" subtitle="Goes well with what’s in your cart" products={related.slice(0, 12)} />
       </div>
 
       <PriceDetails cart={cart}><CouponBox /></PriceDetails>

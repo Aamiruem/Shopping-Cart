@@ -173,3 +173,55 @@
 .checkout-step.openable .step-open h2 { color: var(--brand); }
 .checkout-step.openable .step-open:hover h2 { text-decoration: underline; }
 .pay-soon { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; }
+
+/* ---------- Checkout: progress, order summary, payment methods (Flipkart-style) ---------- */
+.checkout-progress { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 200px)); justify-content: center; margin: 0 0 4px; padding: 14px 16px; list-style: none; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+.checkout-progress li { position: relative; display: flex; justify-content: center; }
+/* The line from the previous step's dot to this one, behind the dots */
+.checkout-progress li + li::before { content: ''; position: absolute; top: 13px; right: 50%; width: 100%; height: 2px; background: var(--border); }
+.checkout-progress li.done::before, .checkout-progress li.current::before { background: var(--brand); }
+.checkout-progress button { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
+.checkout-progress button:disabled { cursor: default; }
+.progress-dot { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); background: #fff; font-weight: 700; font-size: var(--fs-xs); }
+.checkout-progress li.done .progress-dot { border-color: var(--brand); color: var(--brand); }
+.checkout-progress li.current .progress-dot { border-color: var(--brand); background: var(--brand); color: #fff; }
+.checkout-progress li.current button { color: var(--text); font-weight: 700; }
+
+.secure-badge { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; padding: 2px 8px; border-radius: 10px; background: rgb(255 255 255 / 0.18); font-size: 11px; font-weight: 600; vertical-align: middle; text-transform: none; letter-spacing: 0; }
+
+.deliver-to { padding: 4px 0 12px; border-bottom: 1px solid var(--border-light); }
+.deliver-to p { margin: 2px 0; }
+.checkout-items li { align-items: flex-start; }
+.checkout-items img { width: 72px; height: 72px; object-fit: contain; }
+.item-name { font-weight: 500; }
+.qty-pick select { margin-left: 4px; padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; }
+.delivery-by { display: flex; align-items: center; gap: 4px; margin-top: 6px; color: var(--text-muted); }
+
+.pay-layout { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.pay-method-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.pay-method { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; text-align: left; transition: border-color var(--transition), background var(--transition); }
+.pay-method:hover { border-color: color-mix(in srgb, var(--brand) 50%, var(--border)); }
+.pay-method.selected { border-color: var(--brand); background: #f5faff; box-shadow: inset 3px 0 0 var(--brand); }
+.pay-method.selected .pay-icon { background: var(--pay); color: #fff; }
+.pay-method-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pay-method-text strong { font-size: var(--fs-md); }
+.pay-method-text small { color: var(--text-muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pay-chevron { color: var(--text-muted); flex: none; }
+.pay-credit_card, .pay-debit_card { --pay: #2563eb; }
+.pay-panel { position: sticky; top: calc(var(--nav-height, 64px) + 16px); padding: 20px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--bg); display: flex; flex-direction: column; gap: 12px; }
+.pay-panel h3 { margin: 0; font-size: var(--fs-lg); }
+.pay-points { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.pay-points li { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-sm); line-height: 1.5; }
+.pay-points .icon { flex: none; margin-top: 3px; color: var(--success); }
+.pay-apps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; }
+.pay-apps .chip { background: #fff; border: 1px solid var(--border-light); text-transform: none; font-size: var(--fs-xs); color: var(--text); }
+.pay-amount { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 0 0; padding-top: 12px; border-top: 1px dashed var(--border); }
+.pay-amount strong { font-size: var(--fs-xl); }
+.pay-soon-box { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: var(--radius-sm); background: #fff4e5; color: #663c00; font-size: var(--fs-sm); }
+.pay-soon-box p { margin: 0; line-height: 1.5; }
+.pay-panel .secure-note { margin: 0; }
+@media (max-width: 900px) {
+  .pay-layout { grid-template-columns: 1fr; }
+  .pay-panel { position: static; }
+  .checkout-progress button { font-size: var(--fs-xs); }
+}
