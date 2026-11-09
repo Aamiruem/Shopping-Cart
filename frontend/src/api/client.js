@@ -149,9 +149,9 @@ export const api = {
   orders: () => request('/orders'),
   order: (id) => request(`/orders/${id}`),
   cancelOrder: (id) => request(`/orders/${id}/cancel`, { method: 'PATCH' }),
-  requestReturn: (id, reason) => request(`/orders/${id}/return`, { method: 'POST', body: { reason } }),
-  pendingReturns: () => request('/orders/returns/pending'),
-  resolveReturn: (id, approve) => request(`/orders/${id}/return`, { method: 'PATCH', body: { approve } }),
+  // body: reasonCode, details and, for cash orders, where the refund goes (refundTo upi|bank with its fields)
+  requestReturn: (id, body) => request(`/orders/${id}/return`, { method: 'POST', body }),
+  withdrawReturn: (id) => request(`/orders/${id}/return`, { method: 'DELETE' }),
 
   // Online payments (Razorpay: UPI, net banking, cards, wallets)
   paymentsConfig: () => request('/payments/config'),
@@ -174,6 +174,9 @@ export const api = {
   sellerBulk: (ids, action, extra = {}) => request('/seller/products/bulk', { method: 'POST', body: { ids, action, ...extra } }),
   sellerDuplicateProduct: (id) => request(`/seller/products/${id}/duplicate`, { method: 'POST' }),
   sellerEarnings: () => request('/seller/earnings'),
+  // Returns: action approve | reject (note) | receive | refund (reference: the UTR of a manual transfer)
+  sellerReturns: (params = {}) => request(`/seller/returns?${query(params)}`),
+  sellerReturnAction: (orderId, body) => request(`/seller/returns/${orderId}`, { method: 'PATCH', body }),
   uploadImage: (file) => upload('/seller/uploads?kind=image', file),
   uploadMedia: (file, kind) => upload(`/seller/uploads?kind=${kind}`, file),
   sellerImportTemplateUrl: () => `${BASE}/api/seller/imports/template`,
@@ -210,6 +213,8 @@ export const api = {
   createTicket: (body) => request('/support/tickets', { method: 'POST', body }),
   tickets: (params = {}) => request(`/support/tickets?${query(params)}`),
   updateTicket: (id, status) => request(`/support/tickets/${id}`, { method: 'PATCH', body: { status } }),
+  ticket: (id) => request(`/support/tickets/${id}`),
+  replyTicket: (id, message) => request(`/support/tickets/${id}/messages`, { method: 'POST', body: { message } }),
 
   // AI service (proxied by the backend)
   recommend: (productId) => request(`/ai/recommend/${productId}`),

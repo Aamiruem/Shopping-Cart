@@ -167,9 +167,12 @@ async function myPayments({ db, userId }) {
   return { body: rows.map((r) => ({ ...r, amount: Number(r.amount) })) };
 }
 
-/** Refunds a cancelled order's online payment in full. null when it was cash on delivery. */
+/**
+ * Refunds a cancelled or returned order's online payment in full, to the account it was paid from. A refund that
+ * failed before (refund_pending) is tried again. null when there is no online payment left to refund.
+ */
 export async function refundPaidOrder(db, orderId, rz = razorpayClient()) {
-  const [payment] = await db("SELECT * FROM payments WHERE order_id = $1 AND status = 'paid'", [orderId]);
+  const [payment] = await db("SELECT * FROM payments WHERE order_id = $1 AND status IN ('paid', 'refund_pending') ORDER BY id DESC LIMIT 1", [orderId]);
   if (!payment) return null;
   let status = 'refunded';
   try {
@@ -222,7 +225,15 @@ export async function handleWebhook(raw, signature, { db = query, rz = razorpayC
       }
     } else if (kind === 'refund.processed') {
       const refund = event.payload?.refund?.entity || {};
-      await db("UPDATE payments SET status = 'refunded', updated_at = NOW() WHERE provider_payment_id = $1", [refund.payment_id]);
+      const paid = await db("UPDATE payments SET status = 'refunded', updated_at = NOW() WHERE provider_payment_id = $1 RETURNING order_id", [refund.payment_id]);
+      // A returned order's refund that was still pending is now complete
+      const orderId = paid[0]?.order_id;
+      if (orderId) {
+        await db(
+          "UPDATE order_returns SET refund = 'refunded', refunded_at = NOW(), updated_at = NOW() WHERE order_id = $1 AND refund IN ('refund_pending', 'processing')",
+          [orderId],
+        );
+      }
     }
   } catch (err) {
     console.error('webhook error', err);

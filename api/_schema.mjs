@@ -66,4 +66,33 @@ CREATE TABLE IF NOT EXISTS coupon_redemptions (
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_code     VARCHAR(30);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_discount NUMERIC(12, 2) NOT NULL DEFAULT 0;
+
+-- Returns (api/_returns.mjs): requested -> approved (pickup) -> received (refund sent) | rejected | withdrawn.
+-- refund: refunded | refund_pending (online refund to retry) | cod_manual (bank or UPI transfer still to be made).
+-- Online payments go back to the account they came from; cash-on-delivery refunds go to the bank account or UPI ID
+-- the shopper gives, stored encrypted and wiped once the transfer is made.
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS reason_code           VARCHAR(20);
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS amount                NUMERIC(12, 2);
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS refund_to             VARCHAR(10);  -- original | upi | bank
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS refund_upi            VARCHAR(100);
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS refund_account_name   VARCHAR(120);
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS refund_account_number TEXT;         -- encrypted, like seller payouts
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS refund_account_last4  VARCHAR(4);
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS refund_ifsc           VARCHAR(11);
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS refund_reference      VARCHAR(60);  -- UTR of a manual transfer
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS refunded_at           TIMESTAMPTZ;
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS note                  TEXT;         -- the store's note to the shopper
+ALTER TABLE order_returns ADD COLUMN IF NOT EXISTS updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- Complaints (api/_support.mjs): a conversation between the shopper and the store team on each support ticket
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+CREATE TABLE IF NOT EXISTS ticket_messages (
+  id         SERIAL PRIMARY KEY,
+  ticket_id  INTEGER     NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  user_id    INTEGER     REFERENCES users(id) ON DELETE SET NULL,
+  staff      BOOLEAN     NOT NULL DEFAULT FALSE,
+  body       TEXT        NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ticket_messages_ticket_idx ON ticket_messages (ticket_id, created_at);
 `;

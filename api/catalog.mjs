@@ -5,7 +5,7 @@ import { categories, facets, getProduct, listProducts, popular, similar, subcate
 import { paymentsConfig } from './_payment-config.mjs';
 
 const OPENING_SOON = 'This part of Arvixa Store is opening soon.';
-const SHOP_AREAS = new Set(['cart', 'wishlist', 'addresses', 'orders']);
+const SHOP_AREAS = new Set(['cart', 'wishlist', 'addresses', 'orders', 'support']);
 
 const send = (res, status, body, cacheable = false) => {
   res.statusCode = status;
@@ -40,13 +40,20 @@ export function route(path, params = {}) {
   return { status: 503, body: { error: OPENING_SOON } };
 }
 
-// Account and shopping routes. Loaded on demand: catalog requests stay fast and need none of their dependencies.
-async function personal(req, res, area, rest) {
+// Account, shopping and support routes. Loaded on demand: catalog requests stay fast and need none of their dependencies.
+async function personal(req, res, area, rest, params) {
   const auth = area === 'auth' ? await import('./_auth.mjs') : null;
   const pay = area === 'payments' ? await import('./_payments.mjs') : null;
-  const shop = auth || pay ? null : await import('./_shop.mjs');
+  const support = area === 'support' ? await import('./_support.mjs') : null;
+  const shop = auth || pay || support ? null : await import('./_shop.mjs');
   const segments = [area, ...rest];
-  const known = auth ? auth.isAuthRoute(req.method, rest.join('/')) : pay ? pay.isPaymentRoute(req.method, rest.join('/')) : shop.isShopRoute(req.method, segments);
+  const known = auth
+    ? auth.isAuthRoute(req.method, rest.join('/'))
+    : pay
+      ? pay.isPaymentRoute(req.method, rest.join('/'))
+      : support
+        ? support.isSupportRoute(req.method, rest)
+        : shop.isShopRoute(req.method, segments);
   if (!known) return false;
   let body;
   try {
@@ -64,7 +71,9 @@ async function personal(req, res, area, rest) {
     ? auth.handleAuth({ ...request, rest: rest.join('/') })
     : pay
       ? pay.handlePayments({ ...request, rest: rest.join('/') })
-      : shop.handleShop({ ...request, segments }));
+      : support
+        ? support.handleSupport({ ...request, rest, params })
+        : shop.handleShop({ ...request, segments }));
   Object.entries(result.headers).forEach(([key, value]) => res.setHeader(key, value));
   send(res, result.status, result.body); // never cached: these answers are personal
   return true;
@@ -106,7 +115,7 @@ export default async function handler(req, res) {
     return send(res, 200, await festiveStore(query), true);
   }
   const isPersonal = SHOP_AREAS.has(area) || (['auth', 'payments'].includes(area) && rest.join('/') !== 'config');
-  if (isPersonal && (await personal(req, res, area, rest))) return undefined;
+  if (isPersonal && (await personal(req, res, area, rest, params))) return undefined;
   if (req.method !== 'GET') return send(res, 503, { error: OPENING_SOON });
   const { status = 200, body } = route(path, params);
   return send(res, status, body, status === 200);

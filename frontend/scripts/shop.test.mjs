@@ -213,7 +213,7 @@ test('odd ids are a clean 404 or 400, never a database error', async () => {
 });
 
 test('only the listed routes are served', () => {
-  for (const [method, path] of [['POST', 'cart/abc'], ['DELETE', 'orders/1'], ['GET', 'orders/1/cancel'], ['POST', 'orders/1/return'], ['GET', 'constructor'], ['GET', 'cart/a/b/c']]) {
+  for (const [method, path] of [['POST', 'cart/abc'], ['DELETE', 'orders/1'], ['GET', 'orders/1/cancel'], ['PUT', 'orders/1/return'], ['GET', 'constructor'], ['GET', 'cart/a/b/c']]) {
     assert.equal(isShopRoute(method, path.split('/')), false, path);
   }
   assert.equal(isShopRoute('PATCH', ['orders', '1', 'cancel']), true);

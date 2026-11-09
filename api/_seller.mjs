@@ -5,6 +5,8 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEq
 import bcrypt from 'bcryptjs';
 import { ApiError, currentUserId, postgresStore, query, safely, session } from './_auth.mjs';
 import { setSellerProducts } from './_catalog.mjs';
+import { razorpayClient } from './_payments.mjs';
+import { actOnReturn, listReturns } from './_returns.mjs';
 
 const CATEGORIES = ['mobiles', 'electronics', 'fashion', 'accessories', 'beauty', 'home', 'kitchen', 'sports', 'grocery'];
 const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -321,7 +323,7 @@ async function duplicateProduct({ db, userId, role, id }) {
 async function myOrders({ db, userId, role, params }) {
   const args = role === 'admin' ? [] : [userId];
   const where = role === 'admin' ? [] : ['oi.seller_id = $1'];
-  if (['placed', 'cancelled'].includes(params.status)) {
+  if (['placed', 'cancelled', 'returned'].includes(params.status)) {
     args.push(params.status);
     where.push(`o.status = $${args.length}`);
   }
@@ -337,7 +339,8 @@ async function myOrders({ db, userId, role, params }) {
                                        'qty', oi.qty, 'fulfilment', oi.fulfilment, 'options', oi.options) ORDER BY oi.id) AS items,
             SUM(oi.price * oi.qty)::float AS amount,
             MIN(array_position(ARRAY['pending','packed','shipped','delivered'], oi.fulfilment::text)) AS step,
-            (SELECT p.status FROM payments p WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1) AS payment_status
+            (SELECT p.status FROM payments p WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1) AS payment_status,
+            (SELECT r.status FROM order_returns r WHERE r.order_id = o.id AND r.status <> 'withdrawn') AS return_status
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       GROUP BY o.id ORDER BY o.created_at DESC LIMIT $${args.length}`,
@@ -352,9 +355,13 @@ async function updateFulfilment({ db, userId, role, id, body }) {
   if (!FULFILMENT.includes(body.fulfilment)) fail('Unknown fulfilment step');
   const courier = text(body.courier).slice(0, 60) || null;
   const tracking = text(body.trackingNumber).slice(0, 60) || null;
-  const [order] = await db('SELECT status FROM orders WHERE id = $1', [Number(id)]);
+  const [order] = await db(
+    "SELECT status, EXISTS (SELECT 1 FROM order_returns r WHERE r.order_id = o.id AND r.status IN ('requested', 'approved')) AS returning FROM orders o WHERE id = $1",
+    [Number(id)],
+  );
   if (!order) fail('Order not found', 404);
   if (order.status !== 'placed') fail(`This order was ${order.status}`);
+  if (order.returning) fail('This order has a return in progress. Handle it under Return requests.');
   const note = body.fulfilment === 'shipped' && (courier || tracking)
     ? `Shipped by ${courier || 'courier'}${tracking ? `, tracking number ${tracking}` : ''}`
     : body.fulfilment[0].toUpperCase() + body.fulfilment.slice(1);
@@ -445,6 +452,8 @@ const ROUTES = {
   'GET orders': myOrders,
   'PATCH orders/:id': updateFulfilment,
   'GET earnings': earnings,
+  'GET returns': listReturns,
+  'PATCH returns/:id': actOnReturn,
 };
 
 function findRoute(method, rest) {
@@ -457,11 +466,11 @@ function findRoute(method, rest) {
 
 export const isSellerRoute = (method, rest) => Boolean(findRoute(method, rest));
 
-export function handleSeller({ method, rest, body, params = {}, authorization }, { db = query } = {}) {
+export function handleSeller({ method, rest, body, params = {}, authorization }, { db = query, rz = razorpayClient() } = {}) {
   return safely(async () => {
     const userId = currentUserId(authorization);
     const { key, id } = findRoute(method, rest);
     const role = key === 'POST register' ? null : await sellerRole(db, userId);
-    return ROUTES[key]({ db, userId, role, id, body: body ?? {}, params });
+    return ROUTES[key]({ db, userId, role, id, body: body ?? {}, params, rz });
   });
 }

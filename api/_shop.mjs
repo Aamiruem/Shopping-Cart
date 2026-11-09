@@ -9,6 +9,7 @@
 import { getProduct } from './_catalog.mjs';
 import { ApiError, currentUserId, limit, postgresStore, query, safely } from './_auth.mjs';
 import { razorpayClient, refundPaidOrder } from './_payments.mjs';
+import { orderReturn, requestReturn, withdrawReturn } from './_returns.mjs';
 
 const MAX_QTY = 10;
 const MAX_CART_LINES = 50;
@@ -307,7 +308,7 @@ async function getOrder({ db, userId, id }) {
   const [order] = ID_RE.test(id) ? await db(`${ORDERS_SQL} AND o.id = $2 GROUP BY o.id`, [userId, Number(id)]) : [];
   if (!order) throw new ApiError(404, 'Order not found');
   const events = await db('SELECT status, note, created_at FROM order_events WHERE order_id = $1 ORDER BY created_at, id', [order.id]);
-  return { body: { ...orderJson(order), events, return: null } };
+  return { body: { ...orderJson(order), events, return: await orderReturn(db, order.id) } };
 }
 
 async function cancelOrder({ db, userId, id, rz }) {
@@ -330,7 +331,12 @@ async function cancelOrder({ db, userId, id, rz }) {
     : [];
   if (!order) throw new ApiError(400, 'This order cannot be cancelled');
   // Paid online: the money goes back to the UPI app, bank or card it came from
-  return { body: { ...orderJson(order), refund: await refundPaidOrder(db, order.id, rz) } };
+  const refund = await refundPaidOrder(db, order.id, rz);
+  if (refund) {
+    const note = `Refund of ₹${Number(order.total).toLocaleString('en-IN')} ${refund === 'refunded' ? 'sent' : 'is being sent'} to your original payment method. Banks usually show it within 5–7 working days.`;
+    await db('INSERT INTO order_events (order_id, status, note) VALUES ($1, $2, $3)', [order.id, refund === 'refunded' ? 'refunded' : 'refund_initiated', note]);
+  }
+  return { body: { ...orderJson(order), refund } };
 }
 
 // area, then method plus "id" / "id/action" when the path has them
@@ -359,6 +365,8 @@ const ROUTES = {
     POST: placeOrder,
     'GET id': getOrder,
     'PATCH id/cancel': cancelOrder,
+    'POST id/return': requestReturn,
+    'DELETE id/return': withdrawReturn,
   },
 };
 
