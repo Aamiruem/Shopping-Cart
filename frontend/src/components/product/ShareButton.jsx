@@ -25,7 +25,7 @@ async function photoFile(src, name) {
 // Share a product: the photo being viewed with its name, price and link through the phone's share sheet, or a
 // WhatsApp / Facebook / X / Telegram / email / copy-link menu. The link is the product's own page, whose preview
 // (WhatsApp, Facebook...) shows this product's photo, name and price.
-export default function ShareButton({ product, image }) {
+export default function ShareButton({ product, image, floating = false }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -77,9 +77,9 @@ export default function ShareButton({ product, image }) {
   ];
 
   return (
-    <div className="share-wrap" ref={box}>
+    <div className={`share-wrap ${floating ? 'floating' : ''}`} ref={box}>
       <button type="button" className="share-btn" onClick={() => setOpen(!open)} aria-label={`Share ${product.name}`} aria-expanded={open} title="Share">
-        <Icon name="send" size={18} />
+        <Icon name="send" size={floating ? 17 : 18} />
       </button>
       {open && (
         <div className="share-menu panel" role="menu" aria-label="Share this product">

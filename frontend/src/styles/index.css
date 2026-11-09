@@ -239,3 +239,29 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   .big-score { font-size: 42px; }
 }
 .reviews .review-summary + .review-form, .reviews .review-summary + p + .review-form { border-top: 0; padding-top: 0; }
+
+/* Product photo: wishlist heart with Share right below it */
+.gallery-actions { position: absolute; top: 16px; right: 16px; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.gallery-actions .wish-btn.large { position: static; }
+.share-wrap.floating .share-btn { width: 40px; height: 40px; border: 0; background: #fff; color: #5b5b66; box-shadow: var(--shadow-sm); transition: color var(--transition), transform var(--transition); }
+.share-wrap.floating .share-btn:hover, .share-wrap.floating .share-btn[aria-expanded="true"] { color: var(--brand); transform: scale(1.1); background: #fff; }
+.share-wrap.floating .share-menu { top: 0; right: calc(100% + 10px); }
+@media (max-width: 600px) {
+  .share-wrap.floating .share-menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; width: auto; z-index: 300; }
+}
+
+/* Service buttons on the product page (StoreFacts.jsx): each opens its details */
+.service-icons button { display: grid; justify-items: center; gap: 4px; width: 100%; padding: 8px 4px; border-radius: var(--radius); text-align: center; color: var(--text); cursor: pointer; transition: background var(--transition); }
+.service-icons button:hover, .service-icons button.active { background: color-mix(in srgb, var(--tone) 7%, #fff); }
+.service-icons button:hover .service-icon, .service-icons button.active .service-icon { transform: translateY(-2px); background: var(--tone); color: #fff; }
+.service-icons button:focus-visible { outline: 2px solid var(--tone); outline-offset: 2px; }
+.service-detail { margin: 4px 0 12px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--tone) 30%, #fff); border-left: 4px solid var(--tone); border-radius: var(--radius); background: color-mix(in srgb, var(--tone) 4%, #fff); animation: toast-in 0.2s ease-out; }
+.service-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.service-detail-head strong { flex: 1; color: color-mix(in srgb, var(--tone) 80%, #000); }
+.service-detail .service-icon { width: 32px; height: 32px; background: var(--tone); color: #fff; }
+.service-close { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--text-muted); }
+.service-close:hover { background: var(--bg); }
+.service-detail ul { margin: 0 0 10px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.service-detail li { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-sm); line-height: 1.5; }
+.service-detail li .icon { flex: none; margin-top: 3px; color: var(--tone); }
+.service-links { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }

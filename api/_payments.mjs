@@ -192,7 +192,86 @@ export async function refundPaidOrder(db, orderId, rz = razorpayClient()) {
   return status;
 }
 
-const ROUTES = { 'POST razorpay/order': startPayment, 'POST razorpay/verify': verifyPayment, 'GET mine': myPayments };
+// ---------- Payment history: every payment and refund in one timeline ----------
+const RETURN_REFUND = { refunded: 'refunded', refund_pending: 'processing', processing: 'processing', cod_manual: 'processing' };
+
+/** What happened to the money on one order: was it paid, how, and is anything still owed back. */
+function orderPayment(o, payment) {
+  const delivered = o.delivered && o.status !== 'cancelled';
+  if (payment) {
+    return { status: payment.status === 'paid' || payment.status === 'refunded' || payment.status === 'refund_pending' ? 'paid' : payment.status, reference: payment.provider_payment_id };
+  }
+  if (o.payment_method !== 'cod') return { status: 'paid', reference: null }; // the full API's demo payments
+  if (o.status === 'cancelled') return { status: 'not_charged', reference: null };
+  return { status: delivered ? 'paid_on_delivery' : 'due_on_delivery', reference: null };
+}
+
+export async function paymentHistory({ db, userId }) {
+  const [orders, payments, returns] = await Promise.all([
+    db(
+      `SELECT o.id, o.created_at, o.status, o.total, o.payment_method,
+              bool_and(oi.fulfilment = 'delivered') AS delivered, MAX(oi.fulfilled_at) AS delivered_at,
+              (array_agg(oi.name ORDER BY oi.id))[1] AS first_item, (array_agg(oi.image ORDER BY oi.id))[1] AS image, COUNT(*)::int AS lines
+         FROM orders o JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.user_id = $1 GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300`,
+      [userId],
+    ),
+    db('SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 300', [userId]),
+    db("SELECT * FROM order_returns WHERE user_id = $1 AND status <> 'withdrawn'", [userId]),
+  ]);
+  const paymentOf = new Map(payments.filter((p) => p.order_id).map((p) => [p.order_id, p]));
+  const returnOf = new Map(returns.map((r) => [r.order_id, r]));
+  const entries = [];
+  for (const o of orders) {
+    const payment = paymentOf.get(o.id);
+    const order = { id: o.id, item: o.first_item, image: o.image, items: o.lines };
+    const paid = orderPayment(o, payment);
+    entries.push({
+      id: `pay-${o.id}`, kind: 'payment', date: o.status === 'placed' && paid.status === 'paid_on_delivery' ? o.delivered_at || o.created_at : o.created_at,
+      amount: Number(o.total), method: payment?.method || o.payment_method, status: paid.status, reference: paid.reference, order,
+    });
+    // Money going back: a cancelled online order, or a return
+    const ret = returnOf.get(o.id);
+    if (ret?.refund) {
+      entries.push({
+        id: `refund-${o.id}`, kind: 'refund', reason: 'return', date: ret.refunded_at || ret.updated_at, amount: Number(ret.amount ?? o.total),
+        method: ret.refund_to === 'original' ? payment?.method || o.payment_method : ret.refund_to,
+        to: ret.refund_to === 'original' ? 'original' : ret.refund_to === 'upi' ? `UPI ${ret.refund_upi}` : `Bank ••••${ret.refund_account_last4}`,
+        status: RETURN_REFUND[ret.refund] || 'processing', reference: ret.refund_reference, order,
+      });
+    } else if (o.status === 'cancelled' && payment && ['refunded', 'refund_pending'].includes(payment.status)) {
+      entries.push({
+        id: `refund-${o.id}`, kind: 'refund', reason: 'cancelled', date: payment.updated_at, amount: Number(payment.amount),
+        method: payment.method, to: 'original', status: payment.status === 'refunded' ? 'refunded' : 'processing', reference: null, order,
+      });
+    }
+  }
+  // Attempts that never became an order: failed, or taken and given straight back
+  for (const p of payments.filter((x) => !x.order_id && ['failed', 'refunded', 'refund_pending'].includes(x.status))) {
+    entries.push({
+      id: `attempt-${p.id}`, kind: p.status === 'failed' ? 'failed' : 'refund', reason: 'not_placed', date: p.updated_at, amount: Number(p.amount),
+      method: p.method || 'online', to: 'original', status: p.status === 'failed' ? 'failed' : p.status === 'refunded' ? 'refunded' : 'processing',
+      reference: p.provider_payment_id, order: null, note: p.status === 'failed' ? 'Payment didn’t go through. Nothing was charged.' : 'The order couldn’t be placed, so the money was sent back.',
+    });
+  }
+  entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sum = (list) => Math.round(list.reduce((s, e) => s + e.amount, 0) * 100) / 100;
+  const charged = entries.filter((e) => e.kind === 'payment' && ['paid', 'paid_on_delivery'].includes(e.status));
+  return {
+    body: {
+      summary: {
+        paid: sum(charged),
+        refunded: sum(entries.filter((e) => e.kind === 'refund' && e.status === 'refunded')),
+        refundPending: sum(entries.filter((e) => e.kind === 'refund' && e.status === 'processing')),
+        dueOnDelivery: sum(entries.filter((e) => e.status === 'due_on_delivery')),
+        orders: orders.length,
+      },
+      entries,
+    },
+  };
+}
+
+const ROUTES = { 'POST razorpay/order': startPayment, 'POST razorpay/verify': verifyPayment, 'GET mine': myPayments, 'GET history': paymentHistory };
 
 export const isPaymentRoute = (method, rest) => Object.hasOwn(ROUTES, `${method} ${rest}`);
 

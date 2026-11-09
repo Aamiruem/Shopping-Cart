@@ -6,7 +6,7 @@ import { before, beforeEach, test } from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 import { handleAuth, postgresStore } from '../../api/_auth.mjs';
 import { listProducts } from '../../api/_catalog.mjs';
-import { handleWebhook } from '../../api/_payments.mjs';
+import { handlePayments, handleWebhook } from '../../api/_payments.mjs';
 import { STORE_SCHEMA } from '../../api/_schema.mjs';
 import { handleSeller } from '../../api/_seller.mjs';
 import { handleShop, isShopRoute } from '../../api/_shop.mjs';
@@ -47,6 +47,7 @@ async function person(email, role = 'customer') {
     shop: (method, path, payload) => handleShop({ method, segments: path.split('/'), body: payload, authorization, ip: '1.1.1.1' }, { db, rz }),
     seller: (method, path, payload, params) => handleSeller({ method, rest: path.split('/'), body: payload, params, authorization }, { db, rz }),
     support: (method, path, payload, params) => handleSupport({ method, rest: path.split('/'), body: payload, params, authorization }, { db }),
+    payments: (method, rest) => handlePayments({ method, rest, authorization }, { db, rz }),
   };
 }
 
@@ -286,4 +287,35 @@ test('only the listed return and support routes are served', () => {
   assert.ok(isSupportRoute('POST', ['tickets', '1', 'messages']));
   assert.equal(isSupportRoute('DELETE', ['tickets', '1']), false);
   assert.equal(isSupportRoute('GET', ['other']), false);
+});
+
+test('payment history: payments, cash due, refunds from cancellations and returns, and failed attempts', async () => {
+  const asha = await person('asha@example.com');
+  const admin = await person('owner@example.com', 'admin');
+  const cash = await order(asha);
+  const paidThenCancelled = await order(asha, { online: true, product: products[1] });
+  await asha.shop('PATCH', `orders/${paidThenCancelled.id}/cancel`);
+  const returned = await order(asha, { product: products[2] });
+  await deliver(returned.id);
+  await asha.shop('POST', `orders/${returned.id}/return`, UPI);
+  await admin.seller('PATCH', `returns/${returned.id}`, { action: 'approve' });
+  await admin.seller('PATCH', `returns/${returned.id}`, { action: 'receive' });
+  await db("INSERT INTO payments (user_id, provider_order_id, amount, status, address, error) VALUES ($1, 'order_x', 500, 'failed', 'x', 'declined')", [asha.id]);
+
+  const { status, body } = await asha.payments('GET', 'history');
+  assert.equal(status, 200);
+  const byId = Object.fromEntries(body.entries.map((e) => [e.id, e]));
+  assert.equal(byId[`pay-${cash.id}`].status, 'due_on_delivery');
+  assert.deepEqual([byId[`pay-${paidThenCancelled.id}`].status, byId[`refund-${paidThenCancelled.id}`].status, byId[`refund-${paidThenCancelled.id}`].to], ['paid', 'refunded', 'original']);
+  assert.deepEqual([byId[`pay-${returned.id}`].status, byId[`refund-${returned.id}`].status, byId[`refund-${returned.id}`].to], ['paid_on_delivery', 'processing', 'UPI asha@okhdfcbank']);
+  assert.equal(body.entries.filter((e) => e.kind === 'failed').length, 1);
+  assert.deepEqual(body.summary, {
+    paid: paidThenCancelled.total + returned.total,
+    refunded: paidThenCancelled.total,
+    refundPending: returned.total,
+    dueOnDelivery: cash.total,
+    orders: 3,
+  });
+  const ravi = await person('ravi@example.com');
+  assert.deepEqual((await ravi.payments('GET', 'history')).body.entries, []); // only your own
 });

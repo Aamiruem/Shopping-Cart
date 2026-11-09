@@ -181,11 +181,15 @@ export default function ProductDetail() {
                 <Icon name="rotate" size={14} /> View in 360°
               </button>
             )}
-            {SHOPPING && (
-            <button type="button" className={`wish-btn large ${wished ? 'active' : ''}`} onClick={() => toggleWishlist(product)} aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}>
-              <Icon name="heart" size={20} filled={wished} />
-            </button>
-            )}
+            {/* Wishlist, with Share right below it */}
+            <div className="gallery-actions">
+              {SHOPPING && (
+                <button type="button" className={`wish-btn large ${wished ? 'active' : ''}`} onClick={() => toggleWishlist(product)} aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'} title={wished ? 'Remove from wishlist' : 'Add to wishlist'}>
+                  <Icon name="heart" size={20} filled={wished} />
+                </button>
+              )}
+              <ShareButton product={product} image={activeImage >= 0 ? images[activeImage] : product.image} floating />
+            </div>
           </div>
           {!show360 && <p className="gallery-hint">Click the photo to see full view{images.length > 1 ? ` · ${images.length} photos` : ''}</p>}
           {fullView && <Lightbox images={images} start={activeImage} alt={product.name} onClose={() => setFullView(false)} />}
@@ -228,7 +232,6 @@ export default function ProductDetail() {
           {product.brand && <p className="detail-brand">{product.brand}</p>}
           <div className="detail-title">
             <h1>{product.name}</h1>
-            <ShareButton product={product} image={activeImage >= 0 ? images[activeImage] : product.image} />
           </div>
           {product.unit && <p className="detail-unit">Pack size: <strong>{product.unit}</strong></p>}
           <div className="detail-rating">
@@ -242,7 +245,7 @@ export default function ProductDetail() {
           </div>
           {!PREVIEW && product.discount > 0 && <p className="text-success special">Special price</p>}
           <Price price={product.price} mrp={product.mrp} size="lg" />
-          {STORE && <StoreFacts />}
+          {STORE && <StoreFacts product={product} />}
           {!PREVIEW && (
             <>
               <p className={`stock ${outOfStock ? 'text-error' : product.stock < 10 ? 'text-warn' : 'text-success'}`}>
