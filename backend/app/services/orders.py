@@ -3,17 +3,21 @@
 import logging
 from datetime import UTC, datetime
 
+import asyncpg
+
 from ..core.cache import invalidate
 from ..core.errors import ApiError
 from ..db.mongo import get_db
 from ..db.postgres import get_pool
-from . import events, mailer
-from .cart import load_cart, save_cart, summarize
+from . import events, mailer, razorpay
+from .cart import load_cart, save_cart
+from .catalog import to_object_id
+from .coupons import priced
 
 log = logging.getLogger("orders")
 
 # Every way an order can be paid. cod = cash on delivery; the rest are online (Razorpay, or the dev-only OTP demo).
-PAYMENT_METHODS = ("cod", "upi", "card", "netbanking", "wallet", "emi")
+PAYMENT_METHODS = ("cod", "upi", "card", "credit_card", "debit_card", "netbanking", "wallet", "emi", "paylater", "online")
 FULFILMENT_STEPS = ("pending", "packed", "shipped", "delivered")
 
 
@@ -40,7 +44,7 @@ async def resolve_address(user_id: int, address_id: int | None, address: str | N
 async def checkout_summary(user_id: int) -> tuple[list[dict], dict]:
     """The cart and its price breakdown, after checking it is not empty and everything is in stock."""
     lines = await load_cart(user_id)
-    summary = summarize(lines)
+    summary = await priced(user_id, lines)
     if not summary["items"]:
         raise ApiError(400, "Your cart is empty")
     for line in lines:
@@ -96,18 +100,28 @@ async def place_order(
     if lines is None or summary is None:
         lines, summary = await checkout_summary(user_id)
 
+    coupon = summary["coupon"]["code"] if summary.get("couponDiscount") else None  # only a coupon that actually applied
     await _reserve_stock(lines)
     pool = get_pool()
     try:
         async with pool.acquire() as conn, conn.transaction():
             order = await conn.fetchrow(
-                "INSERT INTO orders (user_id, total, address, payment_method, delivery_fee) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+                """INSERT INTO orders (user_id, total, address, payment_method, delivery_fee, coupon_code, coupon_discount)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *""",
                 user_id,
                 summary["total"],
                 address,
                 payment_method,
                 summary["deliveryFee"],
+                coupon,
+                summary.get("couponDiscount", 0),
             )
+            if coupon:
+                # One use per customer: a second use breaks the (code, user) key and the whole order is undone
+                await conn.execute(
+                    "INSERT INTO coupon_redemptions (code, user_id, order_id) VALUES ($1, $2, $3)", coupon, user_id, order["id"]
+                )
+                await conn.execute("DELETE FROM cart_coupons WHERE user_id = $1", user_id)
             await conn.executemany(
                 """INSERT INTO order_items (order_id, product_id, name, price, qty, image, seller_id, category, options)
                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)""",
@@ -117,6 +131,9 @@ async def place_order(
                 ],
             )
             await add_event(conn, order["id"], "placed", "Order placed")
+    except asyncpg.UniqueViolationError:
+        await release_stock(lines)
+        raise ApiError(409, f"You’ve already used {coupon}. Remove it from your cart to continue.") from None
     except Exception:
         await release_stock(lines)
         raise
@@ -142,3 +159,31 @@ async def place_order(
     )
     await _send_confirmation(user_id, order["id"], float(summary["total"]))
     return {**dict(order), "items": summary["items"]}
+
+
+async def return_stock(order_id: int) -> None:
+    """Puts an order's items back on the shelf (a cancelled order, or a returned one once the item is back)."""
+    db = get_db()
+    for item in await get_pool().fetch("SELECT product_id, qty FROM order_items WHERE order_id = $1", order_id):
+        if oid := to_object_id(item["product_id"]):
+            await db.products.update_one({"_id": oid}, {"$inc": {"stock": item["qty"]}})
+    invalidate("catalog:")
+
+
+async def refund_order(order_id: int) -> str | None:
+    """Refunds an order's online payment in full, to the account it was paid from. A refund that failed before
+    (refund_pending) is tried again. None when nothing was paid online (cash on delivery)."""
+    pool = get_pool()
+    payment = await pool.fetchrow(
+        "SELECT * FROM payments WHERE order_id = $1 AND status IN ('paid', 'refund_pending') ORDER BY id DESC LIMIT 1", order_id
+    )
+    if not payment:
+        return None
+    try:
+        await razorpay.refund(payment["provider_payment_id"])
+        status = "refunded"
+    except ApiError:
+        log.exception("refund failed for payment %s", payment["id"])
+        status = "refund_pending"  # retried from the Razorpay dashboard; the shopper is told it is on its way
+    await pool.execute("UPDATE payments SET status = $1, updated_at = NOW() WHERE id = $2", status, payment["id"])
+    return status

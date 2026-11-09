@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from ..core.errors import ApiError
+from ..core.rate_limit import rate_limit
 from ..db.mongo import get_db
 from ..deps import CurrentUser, get_current_user
-from ..services import events
-from ..services.cart import clamp_qty, line_id, load_cart, save_cart, summarize
+from ..services import coupons, events
+from ..services.cart import clamp_qty, line_id, load_cart, save_cart
 from ..services.catalog import to_object_id
 
 router = APIRouter(prefix="/api/cart", tags=["cart"])
@@ -31,7 +32,7 @@ def _find_line(lines: list[dict], key: str) -> dict | None:
 
 @router.get("")
 async def get_cart(user: CurrentUser = Depends(get_current_user)):
-    return summarize(await load_cart(user.id))
+    return await coupons.priced(user.id, await load_cart(user.id))
 
 
 @router.post("", status_code=201)
@@ -67,7 +68,33 @@ async def add(body: AddIn, user: CurrentUser = Depends(get_current_user)):
         lines.append({"product": product, "qty": clamp_qty(body.qty, product["stock"]), "size": size, "color": color})
     await save_cart(user.id, lines)
     await events.track("add_to_cart", product, user.id, int(body.qty) or 1)
-    return summarize(await load_cart(user.id))
+    return await coupons.priced(user.id, await load_cart(user.id))
+
+
+class CouponIn(BaseModel):
+    code: str = ""
+
+
+coupon_limiter = rate_limit(20, message="Too many coupon attempts. Please try again in 15 minutes.")  # no guessing codes
+
+
+# Coupon routes come before /{line_key}, so "coupon" is never read as a cart line
+@router.post("/coupon", dependencies=[Depends(coupon_limiter)])
+async def apply_coupon(body: CouponIn, user: CurrentUser = Depends(get_current_user)):
+    lines = await load_cart(user.id)
+    await coupons.apply(user.id, body.code, lines)
+    return await coupons.priced(user.id, lines)
+
+
+@router.delete("/coupon")
+async def remove_coupon(user: CurrentUser = Depends(get_current_user)):
+    await coupons.remove(user.id)
+    return await coupons.priced(user.id, await load_cart(user.id))
+
+
+@router.get("/coupons")
+async def list_coupons(user: CurrentUser = Depends(get_current_user)):
+    return await coupons.available(user.id)
 
 
 @router.put("/{line_key}")
@@ -82,11 +109,11 @@ async def update(line_key: str, body: QtyIn, user: CurrentUser = Depends(get_cur
     else:
         line["qty"] = clamp_qty(body.qty, line["product"].get("stock", 0))
     await save_cart(user.id, lines)
-    return summarize(await load_cart(user.id))
+    return await coupons.priced(user.id, await load_cart(user.id))
 
 
 @router.delete("/{line_key}")
 async def remove(line_key: str, user: CurrentUser = Depends(get_current_user)):
     lines = [line for line in await load_cart(user.id) if line_id(line["product"]["_id"], line.get("size"), line.get("color")) != line_key]
     await save_cart(user.id, lines)
-    return summarize(lines)
+    return await coupons.priced(user.id, lines)

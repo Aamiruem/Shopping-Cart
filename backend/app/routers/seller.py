@@ -14,11 +14,12 @@ from ..core.errors import ApiError
 from ..core.security import verify_password
 from ..db.mongo import get_db
 from ..db.postgres import get_pool, rows
-from ..deps import CurrentUser, get_current_user, require_seller
+from ..deps import CurrentUser, get_current_user, require_admin, require_seller
 from ..schemas.product import ProductIn, ProductPatch
 from ..services import products as product_service
+from ..services import returns as return_service
 from ..services.ai import check_photo
-from ..services.catalog import serialize_product
+from ..services.catalog import serialize_product, to_object_id
 from ..services.crypto import decrypt, encrypt
 from ..services.orders import FULFILMENT_STEPS, add_event
 from ..services.storage import MEDIA, save_media
@@ -293,7 +294,7 @@ async def my_orders(
 ):
     params: list = [] if user.is_admin else [user.id]
     where = [] if user.is_admin else ["oi.seller_id = $1"]
-    if status in ("placed", "cancelled"):
+    if status in ("placed", "cancelled", "returned"):
         params.append(status)
         where.append(f"o.status = ${len(params)}")
     if fulfilment in FULFILMENT_STEPS:
@@ -308,7 +309,9 @@ async def my_orders(
                                           'options', oi.options) ORDER BY oi.id) AS items,
                SUM(oi.price * oi.qty) AS amount,
                MIN(array_position(ARRAY['pending','packed','shipped','delivered'], oi.fulfilment::text)) AS step,
-               (SELECT p.status FROM payments p WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1) AS payment_status
+               (SELECT p.status FROM payments p WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1) AS payment_status,
+               (SELECT r.status FROM order_returns r WHERE r.order_id = o.id AND r.status <> 'withdrawn') AS return_status,
+               (SELECT r.refund FROM order_returns r WHERE r.order_id = o.id AND r.status <> 'withdrawn') AS return_refund
           FROM order_items oi JOIN orders o ON o.id = oi.order_id
          {'WHERE ' + ' AND '.join(where) if where else ''}
          GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${len(params)}"""
@@ -335,11 +338,18 @@ def _timeline_note(body: FulfilmentIn) -> str:
 async def update_fulfilment(order_id: int, body: FulfilmentIn, user: CurrentUser = Depends(require_seller)):
     """Moves the seller's lines of an order forward: pending -> packed -> shipped -> delivered."""
     pool = get_pool()
-    order = await pool.fetchrow("SELECT status FROM orders WHERE id = $1", order_id)
+    order = await pool.fetchrow(
+        """SELECT status, EXISTS (SELECT 1 FROM order_returns r WHERE r.order_id = o.id AND r.status IN ('requested', 'approved'))
+                  AS returning
+             FROM orders o WHERE id = $1""",
+        order_id,
+    )
     if not order:
         raise ApiError(404, "Order not found")
     if order["status"] != "placed":
         raise ApiError(400, f"This order was {order['status']}")
+    if order["returning"]:
+        raise ApiError(400, "This order has a return in progress. Handle it under Return requests.")
     owner = "" if user.is_admin else " AND seller_id = $5"
     args = [order_id, body.fulfilment, body.courier, body.trackingNumber] + ([] if user.is_admin else [user.id])
     updated = await pool.fetch(
@@ -355,6 +365,101 @@ async def update_fulfilment(order_id: int, body: FulfilmentIn, user: CurrentUser
         raise ApiError(404, "This order has none of your products")
     await add_event(pool, order_id, body.fulfilment, _timeline_note(body))
     return {"orderId": order_id, "fulfilment": body.fulfilment, "lines": len(updated)}
+
+
+# ---------- Returns of the seller's orders (every order for the admin) ----------
+
+
+class ReturnActionIn(BaseModel):
+    action: Literal["approve", "reject", "receive", "refund"]
+    note: str | None = Field(default=None, max_length=500)
+    reference: str | None = Field(default=None, max_length=30)
+
+
+@router.get("/returns")
+async def list_returns(view: str = "open", user: CurrentUser = Depends(require_seller)):
+    """Return requests waiting for a decision, a pickup or a refund (view=all for every one)."""
+    return await return_service.list_returns(user.id, user.is_admin, view)
+
+
+@router.patch("/returns/{order_id}")
+async def act_on_return(order_id: int, body: ReturnActionIn, user: CurrentUser = Depends(require_seller)):
+    """approve (book pickup) | reject (note) | receive (item back: refund goes out) | refund (retry, or record a UTR)."""
+    return await return_service.act(user.id, user.is_admin, order_id, body.action, body.note, body.reference)
+
+
+# ---------- The admin's catalog editor (Seller Hub → Store catalog) ----------
+# Here products live in MongoDB, so edits are saved on the product itself: there is no separate original to undo to.
+
+
+class CatalogEditIn(BaseModel):
+    price: float | None = Field(default=None, gt=0, le=1_000_000)
+    mrp: float | None = Field(default=None, gt=0, le=1_000_000)
+    stock: int | None = Field(default=None, ge=0, le=100_000)
+    name: str | None = Field(default=None, min_length=3, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
+    active: bool | None = None
+
+
+def _catalog_row(p: dict) -> dict:
+    out = serialize_product(p)
+    return {
+        **{k: out.get(k) for k in ("_id", "name", "brand", "category", "image", "price", "stock", "active", "description")},
+        "mrp": out.get("mrp"),
+        "edited": [],
+        "reviewRating": out.get("reviewRating"),
+        "reviewCount": out.get("reviewCount", 0),
+    }
+
+
+@router.get("/catalog")
+async def catalog(
+    q: str = "", category: str | None = None, status: str = "", limit: int = 50, skip: int = 0, user: CurrentUser = Depends(require_admin)
+):
+    query: dict = {}
+    if q.strip():
+        pattern = re.compile(re.escape(q.strip()), re.I)
+        query["$or"] = [{"name": pattern}, {"brand": pattern}]
+    if category:
+        query["category"] = category
+    if status == "hidden":
+        query["active"] = False
+    elif status == "low_stock":
+        query["stock"] = {"$lt": 10}
+    elif status == "edited":
+        return {"total": 0, "items": []}  # edits are saved on the product itself
+    db = get_db()
+    limit, skip = max(1, min(limit, 200)), max(0, skip)
+    total = await db.products.count_documents(query)
+    items = [_catalog_row(p) async for p in db.products.find(query).sort([("name", 1)]).skip(skip).limit(limit)]
+    return {"total": total, "items": items}
+
+
+@router.patch("/catalog/{product_id}")
+async def edit_catalog_product(product_id: str, body: CatalogEditIn, user: CurrentUser = Depends(require_admin)):
+    oid = to_object_id(product_id)
+    product = await get_db().products.find_one({"_id": oid}) if oid else None
+    if not product:
+        raise ApiError(404, "Product not found")
+    changes = body.model_dump(exclude_unset=True)
+    if not changes:
+        raise ApiError(400, "Nothing to change. Editable: price, mrp, stock, name, description, active")
+    price = changes.get("price", product.get("price"))
+    mrp = changes.get("mrp", product.get("mrp"))
+    if mrp is not None and price is not None and mrp < price:
+        raise ApiError(400, "MRP can’t be lower than the price")
+    for key in ("name", "description"):
+        if key in changes and changes[key] is not None:
+            changes[key] = changes[key].strip()
+    changes["updatedAt"] = datetime.now(UTC)
+    await get_db().products.update_one({"_id": oid}, {"$set": changes})
+    invalidate("catalog:")
+    return _catalog_row(await get_db().products.find_one({"_id": oid}))
+
+
+@router.delete("/catalog/{product_id}")
+async def reset_catalog_product(product_id: str, user: CurrentUser = Depends(require_admin)):
+    raise ApiError(400, "Edits here are saved on the product itself, so there’s nothing to undo. Edit it again instead.")
 
 
 @router.get("/earnings")
