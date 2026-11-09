@@ -46,7 +46,12 @@ async function summary(db, productId) {
   });
   const count = Object.values(histogram).reduce((a, b) => a + b, 0);
   const average = count ? Math.round((Object.entries(histogram).reduce((s, [stars, n]) => s + stars * n, 0) / count) * 10) / 10 : 0;
-  return { average, count, histogram };
+  // Ratings that came with words or photos: "120 Ratings, 45 Reviews"
+  const [{ written }] = await db(
+    "SELECT COUNT(*)::int AS written FROM product_reviews WHERE product_id = $1 AND (body <> '' OR title <> '' OR jsonb_array_length(photos) > 0)",
+    [productId],
+  );
+  return { average, count, written, histogram };
 }
 
 function optionalUser(authorization) {

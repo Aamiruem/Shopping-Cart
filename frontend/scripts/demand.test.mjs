@@ -157,7 +157,7 @@ test('reviews: verified buyers only, one each, with photos, and the average reac
   assert.equal(saved.status, 201);
   await asha.reviews('POST', `${a._id}/reviews`, { rating: 2, title: 'Changed my mind', body: 'Stopped working', photos: [] }); // replaces
   const list = (await ravi.reviews('GET', `${a._id}/reviews`)).body;
-  assert.deepEqual([list.count, list.average, list.histogram[2], list.items[0].author, list.items[0].mine], [1, 2, 1, 'Asha R.', false]);
+  assert.deepEqual([list.count, list.written, list.average, list.histogram[2], list.items[0].author, list.items[0].mine], [1, 1, 2, 1, 'Asha R.', false]);
   assert.equal(getProduct(a._id).reviewRating, 2);
 
   const anonymous = await handleReviews({ method: 'GET', rest: [a._id, 'reviews'] }, { db });

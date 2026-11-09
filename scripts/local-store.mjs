@@ -92,6 +92,8 @@ const returned = await order(asha, [cream], { delivered: true, daysAgo: 4 });
 await asha.shop('POST', `orders/${returned}/return`, { reasonCode: 'damaged', details: 'The seal was broken (demo)', refundTo: 'upi', upi: 'asha@okhdfcbank' });
 await owner.seller('PATCH', `returns/${returned}`, { action: 'approve' });
 await asha.review(phone._id, { rating: 5, title: 'Demo review: great value', body: 'Fast delivery and works well. (Local demo data, not a real customer.)' });
+// Uploads need Vercel Blob, so the local demo borrows two catalog images to show what review photos look like
+await db("UPDATE product_reviews SET photos = $1::jsonb WHERE product_id = $2", [JSON.stringify(phone.images?.slice(0, 2) ?? [phone.image]), phone._id]);
 for (const p of [phone, earbuds]) await order(ravi, [p, cream], { delivered: true, daysAgo: 6 });
 await ravi.review(earbuds._id, { rating: 3, title: 'Demo review: okay', body: 'Sound is fine, battery could be better. (Local demo data.)' });
 if (listed.status === 201) await order(ravi, [listed.body], { daysAgo: 0 });

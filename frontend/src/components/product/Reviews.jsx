@@ -3,9 +3,26 @@ import { api } from '../../api/client';
 import { useToast } from '../../context/ToastContext';
 import { formatDate } from '../../utils/format';
 import Icon from '../common/Icon';
-import Rating from '../common/Rating';
 
-const STARS = [5, 4, 3, 2, 1];
+// The five levels, best first, each with its bar colour
+const LEVELS = [
+  { stars: 5, label: 'Excellent', tone: 'excellent' },
+  { stars: 4, label: 'Very Good', tone: 'very-good' },
+  { stars: 3, label: 'Good', tone: 'good' },
+  { stars: 2, label: 'Average', tone: 'average' },
+  { stars: 1, label: 'Poor', tone: 'poor' },
+];
+const toneOf = (rating) => (rating >= 4 ? 'excellent' : rating >= 3 ? 'good' : rating >= 2 ? 'average' : 'poor');
+const count = (n, one, many) => `${Number(n).toLocaleString('en-IN')} ${n === 1 ? one : many}`;
+
+// "4.2 ★" on a green, yellow, orange or red pill
+function ScoreBadge({ value }) {
+  return (
+    <span className={`score-badge tone-${toneOf(value)}`} aria-label={`${value} out of 5 stars`}>
+      {Number(value).toFixed(1)} <Icon name="star" size={13} filled strokeWidth={0} />
+    </span>
+  );
+}
 const MIN_FOR_SUMMARY = 3;
 const MAX_PHOTOS = 3;
 const SORTS = [['recent', 'Most recent'], ['helpful', 'Most detailed'], ['critical', 'Lowest rated']];
@@ -149,27 +166,32 @@ export default function Reviews({ productId }) {
 
   return (
     <section className="reviews panel" aria-label="Ratings and reviews">
-      <h2>Ratings &amp; Reviews</h2>
-      {data.count > 0 ? (
-        <div className="review-summary">
-          <div className="review-score">
-            <strong>{data.average}</strong>
-            <Rating value={data.average} />
-            <span className="muted small">{data.count} verified {data.count === 1 ? 'rating' : 'ratings'}</span>
-          </div>
-          <ul className="review-bars">
-            {STARS.map((stars) => (
-              <li key={stars}>
-                <span>{stars} ★</span>
-                <span className="review-bar"><span style={{ width: `${(data.histogram[stars] / data.count) * 100}%` }} /></span>
-                <span className="muted small">{data.histogram[stars]}</span>
-              </li>
-            ))}
-          </ul>
+      <h2>Product Ratings &amp; Reviews</h2>
+      <div className={`review-summary ${data.count ? '' : 'empty'}`}>
+        <div className="review-score">
+          {data.count > 0 ? (
+            <>
+              <strong className={`big-score tone-${toneOf(data.average)}`}>{Number(data.average).toFixed(1)} <Icon name="star" size={30} filled strokeWidth={0} /></strong>
+              <span className="muted small">{count(data.count, 'Rating', 'Ratings')},<br />{count(data.written ?? data.count, 'Review', 'Reviews')}</span>
+            </>
+          ) : (
+            <>
+              <strong className="big-score muted">– <Icon name="star" size={30} filled strokeWidth={0} /></strong>
+              <span className="muted small">No ratings yet</span>
+            </>
+          )}
         </div>
-      ) : (
-        <p className="muted">No reviews yet. Only shoppers who received this product can review it.</p>
-      )}
+        <ul className="review-bars">
+          {LEVELS.map(({ stars, label, tone }) => (
+            <li key={stars}>
+              <span className="level">{label}</span>
+              <span className="review-bar"><span className={`tone-${tone}`} style={{ width: `${data.count ? (data.histogram[stars] / data.count) * 100 : 0}%` }} /></span>
+              <span className="muted small">{Number(data.histogram[stars] || 0).toLocaleString('en-IN')}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {!data.count && <p className="muted small">Be the first to rate it. Only customers who received this product can review it, so every rating here is from a real buyer.</p>}
 
       {data.count >= MIN_FOR_SUMMARY && <ReviewSummary productId={productId} />}
 
@@ -191,10 +213,18 @@ export default function Reviews({ productId }) {
       <ul className="review-list">
         {data.items.map((r) => (
           <li key={r.id}>
-            <Rating value={r.rating} size="sm" />
-            {r.title && <strong> {r.title}</strong>}
-            {r.mine && <span className="chip">Your review</span>}
-            {r.body && <p>{r.body}</p>}
+            <p className="reviewer">
+              <span className="reviewer-avatar" aria-hidden="true"><Icon name="user" size={16} /></span>
+              <span className="reviewer-name">{r.author}</span>
+              {r.mine && <span className="chip">Your review</span>}
+            </p>
+            <p className="review-meta">
+              <ScoreBadge value={r.rating} />
+              <span className="muted small">• Posted on {formatDate(r.createdAt, { day: 'numeric', month: 'short', year: 'numeric' })}{r.edited ? ' · edited' : ''}</span>
+              <span className="verified small"><Icon name="shield" size={12} /> Verified buyer</span>
+            </p>
+            {r.title && <strong className="review-title">{r.title}</strong>}
+            {r.body && <p className="review-body">{r.body}</p>}
             {r.photos?.length > 0 && (
               <div className="review-photos">
                 {r.photos.map((src) => (
@@ -204,7 +234,6 @@ export default function Reviews({ productId }) {
                 ))}
               </div>
             )}
-            <p className="muted small">{r.author} · <Icon name="shield" size={11} /> Verified buyer · {formatDate(r.createdAt, { day: 'numeric', month: 'short', year: 'numeric' })}{r.edited ? ' · edited' : ''}</p>
           </li>
         ))}
       </ul>
