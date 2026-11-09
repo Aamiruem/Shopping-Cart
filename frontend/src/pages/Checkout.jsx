@@ -49,13 +49,19 @@ function loadRazorpay() {
   });
 }
 
-function Step({ number, title, done, summary, active, onChange, children }) {
+// onOpen: the step's title opens it (once there's an address), so shoppers can jump to Payment options directly
+function Step({ number, title, done, summary, active, onChange, onOpen, children }) {
+  const canOpen = Boolean(onOpen) && !active;
   return (
-    <section className={`checkout-step panel ${active ? 'active' : ''}`}>
+    <section className={`checkout-step panel ${active ? 'active' : ''} ${canOpen ? 'openable' : ''}`}>
       <header>
         <span className="step-num">{done && !active ? <Icon name="check" size={14} /> : number}</span>
         <div className="step-title">
-          <h2>{title}</h2>
+          {canOpen ? (
+            <button type="button" className="step-open" onClick={onOpen} aria-expanded="false"><h2>{title}</h2></button>
+          ) : (
+            <h2>{title}</h2>
+          )}
           {!active && summary && <p>{summary}</p>}
         </div>
         {done && !active && onChange && <button type="button" className="btn btn-outline btn-sm" onClick={onChange}>Change</button>}
@@ -231,6 +237,7 @@ export default function Checkout() {
           done={step > 3}
           summary={`${cart.items.length} item${cart.items.length === 1 ? '' : 's'}`}
           onChange={() => setStep(3)}
+          onOpen={address ? () => setStep(3) : undefined}
         >
           <ul className="summary-list">
             {cart.items.map((i) => (
@@ -250,7 +257,7 @@ export default function Checkout() {
           </div>
         </Step>
 
-        <Step number={4} title="Payment options" active={step === 4}>
+        <Step number={4} title="Payment options" active={step === 4} summary={address ? undefined : 'Choose a delivery address first'} onOpen={address ? () => setStep(4) : undefined}>
           {options.map((p) => (
             <label key={p.id} className={`payment-option ${payment === p.id ? 'selected' : ''}`}>
               <input type="radio" name="payment" checked={payment === p.id} onChange={() => setPayment(p.id)} />
@@ -261,6 +268,7 @@ export default function Checkout() {
           <button type="button" className="btn btn-buy btn-lg btn-block" disabled={placing || !address} onClick={placeOrder}>
             {placing ? 'Processing…' : payment === 'cod' ? `Confirm order · ${formatPrice(cart.total)}` : `Pay ${formatPrice(cart.total)}`}
           </button>
+          {gateway && !gateway.enabled && <p className="muted small pay-soon"><Icon name="clock" size={14} /> More ways to pay (UPI, cards, net banking and EMI) are coming soon.</p>}
           {gateway?.enabled && <p className="secure-note"><Icon name="lock" size={14} /> Payments are processed securely by Razorpay. We never see or store your card or bank details.</p>}
         </Step>
       </div>

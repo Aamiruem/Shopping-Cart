@@ -165,3 +165,10 @@
 .coupon-offers p { margin: 0; font-size: var(--fs-sm); }
 .coupon-code { justify-self: start; padding: 2px 8px; border: 1px dashed #16a34a; border-radius: 4px; background: #f0fdf4; color: #15803d; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; }
 .price-details .coupon-box { margin: 4px 16px 16px; }
+
+/* A collapsed step whose title opens it */
+.step-open { display: block; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.checkout-step.openable header { cursor: pointer; }
+.checkout-step.openable .step-open h2 { color: var(--brand); }
+.checkout-step.openable .step-open:hover h2 { text-decoration: underline; }
+.pay-soon { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; }
