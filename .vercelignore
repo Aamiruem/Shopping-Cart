@@ -1,5 +1,6 @@
 # Vercel needs the storefront, the /api function and the catalog data; everything else stays out of the upload
 ai-service
+mcp-server
 infra
 .github
 .vscode
