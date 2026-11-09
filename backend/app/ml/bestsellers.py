@@ -11,11 +11,19 @@ naive "next month = last month" baseline.
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
-from xgboost import XGBRegressor
 
 from .data import completed
 from .tracking import tracked_run
+
+try:
+    from xgboost import XGBRegressor
+except Exception:  # not installed, or its native library can't load (e.g. blocked by Windows Smart App Control)
+    XGBRegressor = None
+
+# The same kind of model either way: gradient-boosted trees. scikit-learn's stands in when XGBoost can't load.
+MODEL_NAME = "xgboost" if XGBRegressor is not None else "sklearn-gradient-boosting"
 
 FEATURES = [
     "units_7",
@@ -140,6 +148,8 @@ def predict_bestsellers(
     train, test = cut < split, cut >= split
 
     def new_model():
+        if XGBRegressor is None:
+            return GradientBoostingRegressor(n_estimators=250, max_depth=3, learning_rate=0.05, subsample=0.8, random_state=42)
         return XGBRegressor(n_estimators=250, max_depth=3, learning_rate=0.05, subsample=0.8, random_state=42, n_jobs=1)
 
     model = new_model().fit(X[train], np.log1p(y[train]))
@@ -159,7 +169,7 @@ def predict_bestsellers(
         "top10HitRate": round(len(actual_top & predicted_top) / 10, 2),
     }
     metrics["improvementPct"] = round((1 - metrics["mae"] / metrics["baselineMae"]) * 100, 1) if metrics["baselineMae"] else None
-    with tracked_run("bestsellers-xgboost", {"horizon_days": horizon, "samples": metrics["trainingSamples"]}) as log_metrics:
+    with tracked_run(f"bestsellers-{MODEL_NAME}", {"horizon_days": horizon, "samples": metrics["trainingSamples"]}) as log_metrics:
         log_metrics({"mae": metrics["mae"], "baseline_mae": metrics["baselineMae"], "r2": metrics["r2"]})
 
     # Refit on everything and score today

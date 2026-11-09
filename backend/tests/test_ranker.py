@@ -4,10 +4,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-pytest.importorskip("xgboost")
+from app.ml import ranker
+from app.ml.recommender import build
 
-from app.ml import ranker  # noqa: E402
-from app.ml.recommender import build  # noqa: E402
+# XGBoost may be missing, or its native library blocked (Windows Smart App Control): then the ranker steps aside
+needs_xgboost = pytest.mark.skipif(ranker.xgb is None, reason="xgboost can't load on this machine")
 
 TZ = "Asia/Kolkata"
 TODAY = pd.Timestamp("2026-06-01", tz=TZ)
@@ -38,6 +39,7 @@ def _shop(signal: bool, shoppers=160, seed=3):
     return events, products
 
 
+@needs_xgboost
 def test_ranker_is_only_used_when_it_beats_collaborative_filtering():
     events, products = _shop(signal=True)
     model = ranker.train(events, products, TODAY)
@@ -46,19 +48,32 @@ def test_ranker_is_only_used_when_it_beats_collaborative_filtering():
     assert (model.booster is not None) == model.metrics["used"]
 
 
+@needs_xgboost
 def test_too_little_data_means_no_model():
     events, products = _shop(signal=True, shoppers=10)
     assert ranker.train(events, products, TODAY).booster is None
 
 
+@needs_xgboost
 def test_no_events_means_no_model():
     _, products = _shop(signal=True, shoppers=2)
     assert ranker.train(pd.DataFrame(), products, TODAY).booster is None
 
 
+@needs_xgboost
 def test_unproven_model_leaves_the_order_alone():
     events, products = _shop(signal=True, shoppers=8)
     cf = build(events, products["product_id"].tolist())
     picks = [{"productId": "p1", "score": 1.0}, {"productId": "p2", "score": 0.5}]
     unused = ranker.Ranker(None, {}, {}, {"used": False})
     assert ranker.rerank(unused, cf, 0, picks) == picks
+
+
+def test_without_xgboost_the_collaborative_order_stands(monkeypatch):
+    monkeypatch.setattr(ranker, "xgb", None)
+    products = pd.DataFrame({"product_id": ["a", "b"], "category": ["x", "y"], "price": [10.0, 20.0]})
+    events = pd.DataFrame({"type": ["purchase"], "userId": [1], "productId": ["a"], "ts": [TODAY]})
+    trained = ranker.train(events, products, TODAY)
+    assert trained.booster is None and trained.metrics["used"] is False
+    picks = [{"productId": "b", "score": 0.9}, {"productId": "a", "score": 0.5}]
+    assert ranker.rerank(trained, None, 1, picks) == picks

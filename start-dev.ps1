@@ -15,7 +15,11 @@ function Start-Window($title, $dir, $cmd) {
 }
 
 Start-Window 'Arvixa API :5000' 'backend' '.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 5000'
-Start-Window 'Arvixa AI :8100' 'ai-service' '.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8100'
+# Windows Smart App Control can block psycopg's bundled libpq DLL ("An Application Control policy has blocked this
+# file"). PostgreSQL's own signed libpq.dll is allowed, so the AI service uses it through psycopg's pure-Python mode.
+$pgBin = Get-ChildItem 'C:\Program Files\PostgreSQL\*\bin\libpq.dll' -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+$aiEnv = if ($pgBin) { "`$env:PATH='$($pgBin.DirectoryName);' + `$env:PATH; `$env:PSYCOPG_IMPL='python'; " } else { '' }
+Start-Window 'Arvixa AI :8100' 'ai-service' "$aiEnv.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8100"
 Start-Window 'Arvixa web :5173' 'frontend' 'npm run dev'
 
 Write-Host 'Starting... open http://localhost:5173 (API docs: http://localhost:5000/docs)'

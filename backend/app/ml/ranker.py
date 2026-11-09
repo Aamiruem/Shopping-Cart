@@ -7,12 +7,18 @@ It's trained on behaviour before a cutoff date and tested on what the same kind 
 it doesn't beat collaborative filtering on shoppers it never saw, it isn't used.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-import xgboost as xgb
 from sklearn.metrics import ndcg_score
+
+try:
+    import xgboost as xgb
+except Exception:  # not installed, or its native library can't load (e.g. blocked by Windows Smart App Control)
+    xgb = None
 
 from .recommender import WEIGHTS, RecommenderModel, build
 from .tracking import tracked_run
@@ -73,6 +79,8 @@ def train(events: pd.DataFrame, products: pd.DataFrame, today: pd.Timestamp) -> 
     categories = dict(zip(products["product_id"], products["category"], strict=True))
     prices = dict(zip(products["product_id"], products["price"].astype(float), strict=True))
     unused = Ranker(None, categories, prices, {"used": False})
+    if xgb is None:  # without XGBoost, the collaborative-filtering order stands
+        return Ranker(None, categories, prices, {"used": False, "reason": "xgboost unavailable"})
     if events.empty:
         return unused
     known = events[events["userId"].notna()]
