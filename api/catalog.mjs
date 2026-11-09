@@ -79,14 +79,63 @@ async function personal(req, res, area, rest, params) {
   return true;
 }
 
+const bodyOf = (req) => {
+  try {
+    return req.body; // Vercel parses JSON on first read and throws on malformed or empty input
+  } catch {
+    return undefined;
+  }
+};
+
+// A signed-in shopper, or null: recommendations work without a login, they just aren't personal
+async function optionalUser(authorization) {
+  if (!authorization) return null;
+  const { currentUserId } = await import('./_auth.mjs');
+  try {
+    return currentUserId(authorization);
+  } catch {
+    return null;
+  }
+}
+
+// Recommendations from real demand (api/_recommend.mjs) and the product-view signal behind them. null: not one of these.
+async function recommendations(req, area, rest, params) {
+  const [first, second, ...extra] = rest;
+  if (extra.length) return null;
+  const rec = await import('./_recommend.mjs');
+  const { query } = await import('./_auth.mjs');
+  if (req.method === 'GET' && area === 'recommendations') {
+    if (first === 'trending' && !second) return { body: (await rec.trending(query, { k: count(params.k, 12), category: params.category })).items, cacheable: true };
+    if (first === 'together' && second) return { body: await rec.together(query, second, count(params.k, 6, 12)), cacheable: true };
+    if (first === 'for-you' && !second) {
+      const userId = await optionalUser(req.headers.authorization);
+      return { body: await rec.forYou(query, { userId, visitor: params.visitor, k: count(params.k, 12) }) }; // personal: never cached
+    }
+  }
+  if (req.method === 'GET' && area === 'ai' && first === 'recommend' && second) return { body: await rec.similar(query, second, count(params.k, 4, 12)), cacheable: true };
+  if (req.method === 'POST' && area === 'events' && first === 'view' && !second) {
+    const { limit, postgresStore } = await import('./_auth.mjs');
+    const body = bodyOf(req) || {};
+    try {
+      await limit(postgresStore(query), `views:${req.headers['x-real-ip'] || 'unknown'}`, 600, 'Too many requests');
+      await rec.recordView(query, { productId: String(body.productId ?? ''), userId: await optionalUser(req.headers.authorization), visitor: String(body.visitor ?? '') });
+    } catch (err) {
+      if (err.status !== 429) console.error('view not recorded', err.message); // a lost view never breaks the page
+    }
+    return { status: 204, body: null };
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   const { path: rawPath = '', ...params } = req.query || {};
   const path = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
   if (req.method === 'HEAD' || req.method === 'OPTIONS') return send(res, 204, null);
   const [area, ...rest] = path.split('/').filter(Boolean);
   if (!['health', 'location', 'payments'].includes(area)) {
-    const { syncSellerProducts } = await import('./_seller.mjs');
-    await syncSellerProducts(); // sellers' listed products join the catalog (at most one query every 30 s)
+    const [{ syncSellerProducts }, { syncCatalogState }] = await Promise.all([import('./_seller.mjs'), import('./_inventory.mjs')]);
+    // Sellers' listed products join the catalog; the admin's edits, stock and review ratings apply (each at most every 30 s)
+    await Promise.all([syncSellerProducts(), syncCatalogState()]);
   }
   if (area === 'seller') {
     const seller = await import('./_seller.mjs');
@@ -113,6 +162,17 @@ export default async function handler(req, res) {
     const { query } = await import('./_auth.mjs');
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600'); // demand moves in minutes, not seconds
     return send(res, 200, await festiveStore(query), true);
+  }
+  if (area === 'products' && rest[1] === 'reviews') {
+    const reviews = await import('./_reviews.mjs');
+    if (reviews.isReviewRoute(req.method, rest)) {
+      const result = await reviews.handleReviews({ method: req.method, rest, body: bodyOf(req), params, authorization: req.headers.authorization });
+      return send(res, result.status, result.body);
+    }
+  }
+  if (['recommendations', 'ai', 'events'].includes(area)) {
+    const answer = await recommendations(req, area, rest, params);
+    if (answer) return send(res, answer.status ?? 200, answer.body, answer.cacheable);
   }
   const isPersonal = SHOP_AREAS.has(area) || (['auth', 'payments'].includes(area) && rest.join('/') !== 'config');
   if (isPersonal && (await personal(req, res, area, rest, params))) return undefined;

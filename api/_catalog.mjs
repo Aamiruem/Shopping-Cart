@@ -26,16 +26,55 @@ let cache;
 let sellerProducts = [];
 let merged = null;
 
+// What the database adds to the read-only file (api/_inventory.mjs keeps these fresh): the admin's edits, stock sold
+// and given back, and real shoppers' review ratings
+let overrides = new Map(); // id -> { price, mrp, stock, name, description, active }
+let stockDeltas = new Map(); // id -> stock change since the base stock was set
+let reviewStats = new Map(); // id -> { average, count }
+
 export function setSellerProducts(products) {
   sellerProducts = products.map((p) => ({ ...p, discount: discountPercent(p.price, p.mrp), active: true }));
   merged = null;
 }
 
+export function setCatalogState({ overrides: o = overrides, deltas = stockDeltas, reviews = reviewStats } = {}) {
+  overrides = o;
+  stockDeltas = deltas;
+  reviewStats = reviews;
+  merged = null;
+}
+
+/** A store catalog product with the admin's edits and the stock left, whether or not it is listed. */
+function withState(p) {
+  const edit = overrides.get(p._id);
+  const base = edit ? { ...p, ...edit } : p;
+  const stock = Math.max(0, Math.trunc((base.stock ?? 0) + (stockDeltas.get(p._id) || 0)));
+  const reviews = reviewStats.get(p._id);
+  return {
+    ...base,
+    stock,
+    discount: discountPercent(base.price, base.mrp),
+    active: base.active !== false,
+    ...(reviews ? { reviewRating: reviews.average, reviewCount: reviews.count } : {}),
+  };
+}
+
+/** Every product shoppers can see: the store's listed catalog, then sellers' listed products. */
 export function loadProducts() {
   if (merged) return merged;
-  merged = [...loadBaseProducts(), ...sellerProducts];
+  const withReviews = (p) => {
+    const reviews = reviewStats.get(p._id);
+    return reviews ? { ...p, reviewRating: reviews.average, reviewCount: reviews.count } : p;
+  };
+  merged = [...loadBaseProducts().map(withState).filter((p) => p.active), ...sellerProducts.map(withReviews)];
   return merged;
 }
+
+/** The store's own catalog for the admin, hidden products included. */
+export const storeCatalog = () => loadBaseProducts().map((p) => ({ ...withState(p), edited: overrides.has(p._id) ? Object.keys(overrides.get(p._id)) : [] }));
+
+/** The store's own product as it came from the file, before any edit. */
+export const baseProduct = (id) => loadBaseProducts().find((p) => p._id === id) || null;
 
 function loadBaseProducts() {
   if (cache) return cache;

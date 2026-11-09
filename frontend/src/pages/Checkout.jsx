@@ -19,14 +19,16 @@ import useSeo from '../hooks/useSeo';
 const COD = { id: 'cod', icon: 'truck', label: 'Cash on Delivery', note: 'Pay when your order arrives' };
 // Real payments through Razorpay (an RBI-authorised payment aggregator) once the store has Razorpay keys. Each choice
 // opens Razorpay Checkout on that method; card and bank details are entered on Razorpay's page, never on ours.
+// `instruments` is the Razorpay Checkout block shown first for that choice; the shopper can still switch method there.
 const ONLINE_OPTIONS = [
-  { method: 'upi', icon: 'phone', label: 'UPI', note: 'Google Pay, PhonePe, Paytm, BHIM or any UPI app' },
-  { method: 'card', icon: 'card', label: 'Credit / Debit / ATM card', note: 'Visa, Mastercard, RuPay · confirmed with your bank’s OTP' },
-  { method: 'netbanking', icon: 'bank', label: 'Net banking', note: 'All major Indian banks' },
-  { method: 'emi', icon: 'clock', label: 'EMI', note: 'Credit card and cardless EMI, where your bank offers it' },
-  { method: 'paylater', icon: 'zap', label: 'Pay Later', note: 'Buy now, pay later, if you’re eligible' },
-  { method: 'wallet', icon: 'wallet', label: 'Wallets', note: 'Popular mobile wallets' },
-].map((o) => ({ ...o, id: `online-${o.method}` }));
+  { key: 'upi', method: 'upi', icon: 'phone', label: 'UPI', note: 'Google Pay, PhonePe, Paytm, BHIM or any UPI app', instruments: [{ method: 'upi' }] },
+  { key: 'credit_card', method: 'card', icon: 'card', label: 'Credit card', note: 'Visa, Mastercard, RuPay, Amex · confirmed with your bank’s OTP', instruments: [{ method: 'card', types: ['credit'] }] },
+  { key: 'debit_card', method: 'card', icon: 'card', label: 'Debit / ATM card', note: 'Visa, Mastercard, RuPay · confirmed with your bank’s OTP', instruments: [{ method: 'card', types: ['debit'] }] },
+  { key: 'netbanking', method: 'netbanking', icon: 'bank', label: 'Net banking', note: 'All major Indian banks', instruments: [{ method: 'netbanking' }] },
+  { key: 'emi', method: 'emi', icon: 'clock', label: 'EMI', note: 'Credit card, debit card and cardless EMI, where your bank offers it', instruments: [{ method: 'emi' }, { method: 'cardless_emi' }] },
+  { key: 'paylater', method: 'paylater', icon: 'zap', label: 'Pay Later', note: 'Buy now, pay later, if you’re eligible', instruments: [{ method: 'paylater' }] },
+  { key: 'wallet', method: 'wallet', icon: 'wallet', label: 'Wallets', note: 'Popular mobile wallets', instruments: [{ method: 'wallet' }] },
+].map((o) => ({ ...o, id: `online-${o.key}` }));
 const LIVE_OPTIONS = [...ONLINE_OPTIONS, COD];
 // Development without Razorpay keys: an emailed OTP stands in for the payment gateway
 const DEMO_OPTIONS = [
@@ -136,7 +138,7 @@ export default function Checkout() {
   };
 
   // UPI / net banking / card / wallet in Razorpay Checkout; the order is created only after the server verifies the payment
-  const payOnline = async (method) => {
+  const payOnline = async ({ method, label, instruments }) => {
     setPlacing(true);
     try {
       await loadRazorpay();
@@ -150,6 +152,8 @@ export default function Checkout() {
         description: start.description,
         image: `${window.location.origin}/brand/arvixa-mark-192.png`,
         prefill: { ...start.prefill, method }, // opens Razorpay on the method the shopper chose
+        // ...with that choice (say, credit cards only) shown first, and every other method still one tap away
+        config: { display: { blocks: { chosen: { name: label, instruments } }, sequence: ['block.chosen'], preferences: { show_default_blocks: true } } },
         theme: { color: '#2874f0' },
         handler: async (response) => {
           try {
@@ -178,7 +182,7 @@ export default function Checkout() {
   // Cash on delivery places the order straight away; the dev OTP demo asks for an emailed code first
   const placeOrder = async () => {
     const online = ONLINE_OPTIONS.find((o) => o.id === payment);
-    if (online) return payOnline(online.method);
+    if (online) return payOnline(online);
     if (OTP_DEMO.includes(payment)) return setOtpOpen(true);
     setPlacing(true);
     try {

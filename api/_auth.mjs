@@ -190,7 +190,14 @@ export function handleAuth({ method, rest, body, ip, authorization }, { store = 
 }
 
 let client;
-export const query = (statement, params = []) => (client ??= neon(process.env.DATABASE_URL)).query(statement, params);
+let localDb = null; // scripts/local-store.mjs runs the store on an in-memory PostgreSQL instead of Neon
+
+/** For local testing only: send every query to `db` (statement, params) => rows. */
+export const useLocalDatabase = (db) => {
+  localDb = db;
+};
+
+export const query = (statement, params = []) => (localDb ? localDb(statement, params) : (client ??= neon(process.env.DATABASE_URL)).query(statement, params));
 
 export function postgresStore(db = query) {
   const one = async (statement, params) => (await db(statement, params))[0] ?? null;

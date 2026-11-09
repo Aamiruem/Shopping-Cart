@@ -5,7 +5,8 @@
   "scripts": {
     "db:setup": "node --env-file=.env.local scripts/setup-db.mjs",
     "coupon": "node --env-file=.env.local scripts/coupon.mjs",
-    "make-admin": "node --env-file=.env.local scripts/make-admin.mjs"
+    "make-admin": "node --env-file=.env.local scripts/make-admin.mjs",
+    "local": "node scripts/local-store.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.0.2",

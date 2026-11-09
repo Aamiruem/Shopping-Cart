@@ -8,12 +8,12 @@ import Rating, { shownRating } from '../components/common/Rating';
 import ProductRail from '../components/product/ProductRail';
 import BuyBox from '../components/product/BuyBox';
 import Reviews from '../components/product/Reviews';
+import ShareButton from '../components/product/ShareButton';
 import StoreFacts from '../components/product/StoreFacts';
 import Lightbox from '../components/product/Lightbox';
 import Spin360 from '../components/product/Spin360';
 import { aisleLabel, categoryLabel, groupOf } from '../constants/catalog';
 import { useCart } from '../context/CartContext';
-import { useToast } from '../context/ToastContext';
 import { useWishlist } from '../context/WishlistContext';
 import usePageTint from '../hooks/usePageTint';
 import useShopActions from '../hooks/useShopActions';
@@ -24,6 +24,9 @@ import { productDescription, productTitle } from '../seo/copy';
 import { trackViewItem } from '../utils/analytics';
 import useSeo, { breadcrumbLd, productLd, productPath } from '../hooks/useSeo';
 import { addRecentlyViewed } from '../utils/recentlyViewed';
+
+// The "together" rail says honestly where its products come from (api/_recommend.mjs)
+const TOGETHER_TITLES = { bought_together: 'Frequently bought together', similar_shoppers: 'Customers also viewed' };
 
 // activeImage value that shows the 360° viewer instead of a photo
 const SPIN_VIEW = -1;
@@ -38,30 +41,6 @@ const OFFERS = [
 // Store mode (accounts and orders on the api/ functions, sample catalog): Amazon-style buy box on the right
 const STORE = PREVIEW && SHOPPING;
 
-// The phone's share sheet where there is one, otherwise copy the link
-function ShareButton({ product }) {
-  const toast = useToast();
-  const share = async () => {
-    const url = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: product.name, url });
-      } catch { /* the shopper closed the share sheet */ }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.show('Link copied');
-    } catch {
-      toast.show('Couldn’t copy the link. Copy it from the address bar.', 'error');
-    }
-  };
-  return (
-    <button type="button" className="share-btn" onClick={share} aria-label={`Share ${product.name}`} title="Share">
-      <Icon name="send" size={18} />
-    </button>
-  );
-}
 
 // Main photo that magnifies under the pointer (Flipkart-style hover zoom); touch screens just see the photo
 function ZoomImage({ src, alt, onOpen }) {
@@ -138,6 +117,7 @@ export default function ProductDetail() {
         if (p.images360?.length >= 4) setActiveImage(SPIN_VIEW);
         addRecentlyViewed(p);
         trackViewItem(p);
+        api.trackView(p._id); // a demand signal: what shoppers look at shapes recommendations
         // AI recommendations first; fall back to the same category if the AI service is down
         return api.recommend(id)
           .then((recs) => (recs?.length ? recs : Promise.reject()))
@@ -248,7 +228,7 @@ export default function ProductDetail() {
           {product.brand && <p className="detail-brand">{product.brand}</p>}
           <div className="detail-title">
             <h1>{product.name}</h1>
-            <ShareButton product={product} />
+            <ShareButton product={product} image={activeImage >= 0 ? images[activeImage] : product.image} />
           </div>
           {product.unit && <p className="detail-unit">Pack size: <strong>{product.unit}</strong></p>}
           <div className="detail-rating">
@@ -328,11 +308,11 @@ export default function ProductDetail() {
         {STORE && <BuyBox product={product} />}
       </div>
 
-      {!PREVIEW && <Reviews productId={product._id} />}
+      {SHOPPING && <Reviews productId={product._id} />}
 
       <ProductRail
-        title={PREVIEW ? 'You may also like' : together.strategy === 'bought_together' ? 'Frequently bought together' : 'Customers also viewed'}
-        subtitle={PREVIEW ? undefined : 'Based on what other shoppers bought and browsed'}
+        title={TOGETHER_TITLES[together.strategy] || 'You may also like'}
+        subtitle={together.strategy === 'bought_together' || together.strategy === 'similar_shoppers' ? 'Based on what other shoppers bought and browsed' : undefined}
         products={together.items}
       />
       <ProductRail title="Similar products" subtitle="You may also like" products={similar} viewAll={`/products?category=${product.category}`} />

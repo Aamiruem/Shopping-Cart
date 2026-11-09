@@ -14,7 +14,7 @@ import { StatusBadge } from './Orders';
 // Opens the address in Google Maps (no API key needed); the phone number is left out of the search
 const mapsLink = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.replace(/\. Phone: .*$/, ''))}`;
 
-const PAYMENT_LABELS = { cod: 'Cash on Delivery', upi: 'UPI', card: 'Card', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay Later', online: 'Online payment' };
+const PAYMENT_LABELS = { cod: 'Cash on Delivery', upi: 'UPI', card: 'Card', credit_card: 'Credit card', debit_card: 'Debit card', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay Later', online: 'Online payment' };
 const TRACK_STEPS = ['Ordered', 'Packed', 'Shipped', 'Delivered'];
 const STEP_OF = { pending: 0, packed: 1, shipped: 2, delivered: 3 };
 

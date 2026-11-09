@@ -80,7 +80,7 @@ test('online payment is offered only when both keys are set, and the secret is n
   assert.equal(paymentsConfig({}).enabled, false);
   assert.equal(paymentsConfig({ RAZORPAY_KEY_ID: 'rzp_test_key' }).enabled, false);
   const on = paymentsConfig(ENV);
-  assert.deepEqual([on.enabled, on.keyId, on.methods], [true, 'rzp_test_key', ['upi', 'card', 'netbanking', 'emi', 'paylater', 'wallet']]);
+  assert.deepEqual([on.enabled, on.keyId, on.methods], [true, 'rzp_test_key', ['upi', 'credit_card', 'debit_card', 'netbanking', 'emi', 'paylater', 'wallet']]);
   assert.ok(!JSON.stringify(on).includes('test_secret'));
 });
 

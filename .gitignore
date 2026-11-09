@@ -29,3 +29,6 @@ infra/aws/params.json
 
 .vercel
 .env*
+
+# Payment keys never go in git: set them in Vercel env (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET)
+*rzp-key*.csv

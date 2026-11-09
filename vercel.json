@@ -58,6 +58,10 @@
       "destination": "/api/seller-upload"
     },
     {
+      "source": "/api/uploads",
+      "destination": "/api/seller-upload"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/catalog?path=:path*"
     },

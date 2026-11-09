@@ -9,9 +9,13 @@ export const PAYMENT_LABELS = {
   cod: 'Cash on delivery',
   upi: 'UPI',
   card: 'Card',
+  credit_card: 'Credit card',
+  debit_card: 'Debit card',
   netbanking: 'Net banking',
   wallet: 'Wallet',
   emi: 'EMI',
+  paylater: 'Pay Later',
+  online: 'Online',
 };
 const PAYMENT_STATUS = { paid: 'Paid', refunded: 'Refunded', refund_pending: 'Refund pending', failed: 'Failed', created: 'Started' };
 

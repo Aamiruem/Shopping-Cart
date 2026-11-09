@@ -93,11 +93,12 @@ function ForYou() {
       cancelled = true;
     };
   }, [user?.id]);
-  const personal = state.strategy === 'personalised';
+  // 'personal' from the store API, 'personalised' from the full API
+  const personal = ['personal', 'personalised'].includes(state.strategy);
   return (
     <ProductRail
       title={personal ? `Recommended for you${user ? `, ${user.name.split(' ')[0]}` : ''}` : 'Trending now'}
-      subtitle={personal ? 'Picked by our AI from what you browse and buy' : 'What shoppers are loving this week'}
+      subtitle={personal ? 'Picked from what you browse, save and buy' : 'What shoppers are buying and browsing this week'}
       products={state.items}
       loading={state.loading}
     />

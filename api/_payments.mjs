@@ -50,7 +50,8 @@ export function razorpayClient(env = process.env) {
     keyId: configured ? keyId : null,
     // Razorpay works in paise (1 rupee = 100 paise)
     createOrder: (rupees, receipt, notes) => call('POST', '/orders', { amount: Math.round(rupees * 100), currency: 'INR', receipt, notes }),
-    fetchPayment: (paymentId) => call('GET', `/payments/${id(paymentId)}`),
+    // expand[]=card says whether a card was credit or debit
+    fetchPayment: (paymentId) => call('GET', `/payments/${id(paymentId)}?expand[]=card`),
     capture: (paymentId, paise) => call('POST', `/payments/${id(paymentId)}/capture`, { amount: paise, currency: 'INR' }),
     refund: (paymentId) => call('POST', `/payments/${id(paymentId)}/refund`, {}),
     // Checkout returns razorpay_signature = HMAC-SHA256(order_id|payment_id, key secret)
@@ -60,7 +61,13 @@ export function razorpayClient(env = process.env) {
   };
 }
 
-const methodOf = (details) => METHODS[details?.method] || 'online';
+const CARD_TYPES = { credit: 'credit_card', debit: 'debit_card', prepaid: 'card' };
+
+/** How the shopper paid, for the order: UPI, credit card, debit card, net banking, EMI, Pay Later or a wallet. */
+export function methodOf(details) {
+  if (details?.method === 'card') return CARD_TYPES[details.card?.type] || 'card';
+  return METHODS[details?.method] || 'online';
+}
 
 async function startPayment({ db, userId, body, rz, store }) {
   if (!rz.configured) throw new ApiError(503, 'Online payments are not set up yet. Please choose cash on delivery.');

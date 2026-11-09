@@ -1,7 +1,7 @@
 // The festive home page: which festival or season it is in India, its collections, and what shoppers want right now.
 //
 // Demand ranking: every product gets a score from real shopper activity in the database (orders count most, then cart
-// adds, then wishlist saves), with older activity fading (half-life about 5 days). Until there's enough activity the
+// adds, wishlist saves and product page views), with older activity fading (half-life about 5 days). Until there's enough activity the
 // catalog's popularity carries the ranking, then real demand takes over as it grows.
 //
 // Every collection is a real catalog filter, so its "Under ₹X" headline is true and its link shows exactly those products.
@@ -106,18 +106,36 @@ export function currentSeason(now = new Date()) {
   return { ...SEASONS.find((s) => s.months.includes(month)), kind: 'season', endsOn: null };
 }
 
-/** Demand score per product id from the last 60 days of orders, cart adds and wishlist saves. */
+const DEMAND_TTL_MS = 5 * 60 * 1000;
+let cachedDemand = null;
+
+/** Forgets the cached scores (tests, or right after a burst of activity that should show at once). */
+export const forgetDemand = () => {
+  cachedDemand = null;
+};
+
+/** demandScores, kept for 5 minutes per function instance: the ranking moves with demand without a query per page. */
+export async function currentDemand(db, now = Date.now()) {
+  if (cachedDemand && now - cachedDemand.at < DEMAND_TTL_MS) return cachedDemand.scores;
+  const scores = await demandScores(db);
+  cachedDemand = { at: now, scores };
+  return scores;
+}
+
+/** Demand score per product id from the last 60 days of orders, cart adds, wishlist saves and page views. */
 export async function demandScores(db) {
   const rows = await db(
     `SELECT product_id, SUM(weight * EXP(-EXTRACT(EPOCH FROM NOW() - at) / $1))::float AS score
        FROM (
          SELECT oi.product_id, oi.qty * 5.0 AS weight, o.created_at AS at
            FROM order_items oi JOIN orders o ON o.id = oi.order_id
-          WHERE o.status <> 'cancelled' AND o.created_at > NOW() - INTERVAL '60 days'
+          WHERE o.status NOT IN ('cancelled', 'returned') AND o.created_at > NOW() - INTERVAL '60 days'
          UNION ALL
          SELECT product_id, qty * 2.0, added_at FROM cart_items WHERE added_at > NOW() - INTERVAL '60 days'
          UNION ALL
          SELECT product_id, 1.0, added_at FROM wishlist_items WHERE added_at > NOW() - INTERVAL '60 days'
+         UNION ALL
+         SELECT product_id, 0.5, at FROM product_views WHERE at > NOW() - INTERVAL '60 days'
        ) activity
       GROUP BY product_id`,
     [DECAY_SECONDS],
@@ -171,7 +189,7 @@ export async function festiveStore(db, now = new Date()) {
   let demand = new Map();
   let signal = 'demand';
   try {
-    demand = await demandScores(db);
+    demand = await currentDemand(db);
   } catch (err) {
     console.error('demand scores unavailable', err.message);
     signal = 'popularity';

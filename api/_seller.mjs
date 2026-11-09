@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { ApiError, currentUserId, postgresStore, query, safely, session } from './_auth.mjs';
 import { setSellerProducts } from './_catalog.mjs';
 import { razorpayClient } from './_payments.mjs';
+import { listCatalog, resetCatalogProduct, updateCatalogProduct } from './_inventory.mjs';
 import { actOnReturn, listReturns } from './_returns.mjs';
 
 const CATEGORIES = ['mobiles', 'electronics', 'fashion', 'accessories', 'beauty', 'home', 'kitchen', 'sports', 'grocery'];
@@ -455,7 +456,15 @@ const ROUTES = {
   'GET earnings': earnings,
   'GET returns': listReturns,
   'PATCH returns/:id': actOnReturn,
+  // The store's own catalog: the admin edits price, stock, name, description, or hides a product
+  'GET catalog': adminOnly(listCatalog),
+  'PATCH catalog/:id': adminOnly(updateCatalogProduct),
+  'DELETE catalog/:id': adminOnly(resetCatalogProduct),
 };
+
+function adminOnly(route) {
+  return (ctx) => (ctx.role === 'admin' ? route(ctx) : fail('Only the store admin can edit the store’s catalog', 403));
+}
 
 function findRoute(method, rest) {
   const [first, second, third, ...extra] = rest;

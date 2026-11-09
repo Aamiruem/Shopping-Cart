@@ -13,6 +13,7 @@
 // A seller can handle returns for orders that hold only their products; anything mixed, and every manual bank or UPI
 // refund, is for the admin.
 import { ApiError } from './_auth.mjs';
+import { restockOrder } from './_inventory.mjs';
 import { refundPaidOrder } from './_payments.mjs';
 import { decrypt, encrypt } from './_seller.mjs';
 
@@ -262,6 +263,7 @@ export async function actOnReturn({ db, userId, role, id, body, rz }) {
     const done = await step('approved', "status = 'received', resolved_at = NOW(), note = COALESCE($3, note)", [note]);
     if (!done) fail(r.status === 'requested' ? 'Approve the return before marking it received' : `This return is already ${r.status}`, 409);
     await db("UPDATE orders SET status = 'returned' WHERE id = $1", [orderId]);
+    await restockOrder(db, orderId); // the item is back on the shelf
     await event(db, orderId, 'returned', 'Item picked up and returned');
     const refund = done.refund_to === 'original' ? await refundOnline(db, orderId, rz) : 'cod_manual';
     await recordRefund(db, { ...done, total: r.total }, refund);

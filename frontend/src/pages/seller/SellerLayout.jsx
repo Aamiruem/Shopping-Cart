@@ -10,6 +10,7 @@ import useApi from '../../hooks/useApi';
 const ALL_LINKS = [
   { to: '/seller/dashboard', icon: 'barChart', label: 'Analytics & AI', tone: 'blue' },
   { to: '/seller/products', icon: 'tag', label: 'Products', tone: 'orange' },
+  { to: '/seller/catalog', icon: 'store', label: 'Store catalog', tone: 'blue', admin: true },
   { to: '/seller/orders', icon: 'package', label: 'Orders', tone: 'green' },
   { to: '/seller/earnings', icon: 'wallet', label: 'Payments & Earnings', tone: 'purple' },
   { to: '/seller/settings', icon: 'settings', label: 'Store Settings', tone: 'slate' },

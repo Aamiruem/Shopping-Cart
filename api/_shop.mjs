@@ -4,11 +4,12 @@
 // Addresses and orders use the backend's own tables; the backend keeps carts and wishlists in MongoDB, so those two
 // tables exist only here (see _schema.mjs).
 //
-// Prices always come from the catalog on this server, never from the request. The catalog is a read-only file, so
-// stock is checked at checkout but doesn't go down as orders are placed.
+// Prices always come from the catalog on this server, never from the request. Stock is checked at checkout, taken
+// off when the order is placed and put back when it is cancelled or returned (api/_inventory.mjs).
 import { getProduct } from './_catalog.mjs';
 import { ApiError, currentUserId, limit, postgresStore, query, safely } from './_auth.mjs';
 import { razorpayClient, refundPaidOrder } from './_payments.mjs';
+import { restockOrder, syncCatalogState, TAKE_STOCK_SQL } from './_inventory.mjs';
 import { orderReturn, requestReturn, withdrawReturn } from './_returns.mjs';
 
 const MAX_QTY = 10;
@@ -287,7 +288,7 @@ export async function createOrder(db, { userId, address, method, summary }) {
          JOIN taken ON taken.product_id = x.product_id
      ), timeline AS (
        INSERT INTO order_events (order_id, status, note) SELECT id, 'placed', 'Order placed' FROM placed
-     )
+     )${TAKE_STOCK_SQL}
      SELECT * FROM placed`,
       [userId, summary.total, address, summary.deliveryFee, JSON.stringify(details), method, coupon, summary.couponDiscount],
     );
@@ -298,6 +299,7 @@ export async function createOrder(db, { userId, address, method, summary }) {
     throw err;
   }
   const [order] = rows;
+  if (order) await syncCatalogState(db, Date.now(), true); // this instance shows the new stock straight away
   return order ? orderJson(order) : null;
 }
 
@@ -331,6 +333,7 @@ async function cancelOrder({ db, userId, id, rz }) {
       )
     : [];
   if (!order) throw new ApiError(400, 'This order cannot be cancelled');
+  await restockOrder(db, order.id);
   // Paid online: the money goes back to the UPI app, bank or card it came from
   const refund = await refundPaidOrder(db, order.id, rz);
   if (refund) {

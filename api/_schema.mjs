@@ -95,4 +95,37 @@ CREATE TABLE IF NOT EXISTS ticket_messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS ticket_messages_ticket_idx ON ticket_messages (ticket_id, created_at);
+
+-- Reviews (api/_reviews.mjs) can carry up to 3 photos, uploaded to Vercel Blob
+ALTER TABLE product_reviews ADD COLUMN IF NOT EXISTS photos JSONB NOT NULL DEFAULT '[]';
+
+-- Product page views, one per visitor per product per day: a demand signal for recommendations (api/_recommend.mjs).
+-- visitor is "u<user id>" when signed in, otherwise a random id the browser keeps.
+CREATE TABLE IF NOT EXISTS product_views (
+  product_id VARCHAR(64) NOT NULL,
+  visitor    VARCHAR(40) NOT NULL,
+  user_id    INTEGER     REFERENCES users(id) ON DELETE SET NULL,
+  day        DATE        NOT NULL DEFAULT CURRENT_DATE,
+  at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (visitor, product_id, day)
+);
+CREATE INDEX IF NOT EXISTS product_views_product_idx ON product_views (product_id, at DESC);
+CREATE INDEX IF NOT EXISTS product_views_user_idx ON product_views (user_id, at DESC) WHERE user_id IS NOT NULL;
+
+-- The admin's edits to the store's own catalog (products.json is read-only): price, MRP, stock, name, description,
+-- listed or hidden. Applied over the file in api/_inventory.mjs.
+CREATE TABLE IF NOT EXISTS catalog_overrides (
+  product_id VARCHAR(64) PRIMARY KEY,
+  data       JSONB       NOT NULL,
+  updated_by INTEGER     REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Stock sold and given back for the store's own catalog: stock = (override or file stock) + delta. Orders take stock,
+-- cancellations and returns put it back. Seller products keep their stock in seller_products.data instead.
+CREATE TABLE IF NOT EXISTS stock_adjustments (
+  product_id VARCHAR(64) PRIMARY KEY,
+  delta      INTEGER     NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 `;

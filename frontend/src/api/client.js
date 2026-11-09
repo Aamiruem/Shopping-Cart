@@ -43,6 +43,21 @@ async function request(path, { method = 'GET', body } = {}) {
   return data;
 }
 
+// An anonymous id for this browser, so recommendations can learn from what a visitor looks at before signing in
+const VISITOR_KEY = 'visitor';
+function visitorId() {
+  try {
+    let id = localStorage.getItem(VISITOR_KEY);
+    if (!id) {
+      id = `v-${crypto.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`.slice(0, 40);
+      localStorage.setItem(VISITOR_KEY, id);
+    }
+    return id;
+  } catch {
+    return ''; // storage blocked: views just aren't counted
+  }
+}
+
 // multipart/form-data upload (the browser sets the boundary header itself)
 async function upload(path, file) {
   const token = localStorage.getItem(TOKEN_KEY);
@@ -117,8 +132,10 @@ export const api = {
   subcategories: (category) => request(`/products/subcategories?category=${category}`),
   facets: (params = {}) => request(`/products/facets?${query(params)}`),
 
-  reviews: (id) => request(`/products/${id}/reviews`),
+  reviews: (id, params = {}) => request(`/products/${id}/reviews?${query(params)}`),
   saveReview: (id, body) => request(`/products/${id}/reviews`, { method: 'POST', body }),
+  deleteReview: (id) => request(`/products/${id}/reviews/mine`, { method: 'DELETE' }),
+  uploadReviewPhoto: (file) => upload('/uploads?kind=review', file),
 
   // Delivery location
   pincode: (pin) => request(`/location/pincode/${pin}`),
@@ -176,6 +193,10 @@ export const api = {
   sellerEarnings: () => request('/seller/earnings'),
   // Returns: action approve | reject (note) | receive | refund (reference: the UTR of a manual transfer)
   sellerReturns: (params = {}) => request(`/seller/returns?${query(params)}`),
+  // Admin: the store's own catalog (price, stock, details, listed or hidden), saved in the database
+  catalog: (params = {}) => request(`/seller/catalog?${query(params)}`),
+  catalogUpdate: (id, body) => request(`/seller/catalog/${id}`, { method: 'PATCH', body }),
+  catalogReset: (id) => request(`/seller/catalog/${id}`, { method: 'DELETE' }),
   sellerReturnAction: (orderId, body) => request(`/seller/returns/${orderId}`, { method: 'PATCH', body }),
   uploadImage: (file) => upload('/seller/uploads?kind=image', file),
   uploadMedia: (file, kind) => upload(`/seller/uploads?kind=${kind}`, file),
@@ -201,7 +222,10 @@ export const api = {
   exportUrl: (params) => `${BASE}/api/analytics/export?${query(params)}`,
 
   // Personalised recommendations
-  forYou: () => request('/recommendations/for-you'),
+  forYou: () => request(`/recommendations/for-you?${query({ visitor: visitorId() })}`),
+  trending: (params = {}) => request(`/recommendations/trending?${query(params)}`),
+  // A product page view: a demand signal for recommendations. Never fails the page.
+  trackView: (productId) => request('/events/view', { method: 'POST', body: { productId, visitor: visitorId() } }).catch(() => {}),
   festive: () => request('/recommendations/festive'),
   together: (productId) => request(`/recommendations/together/${productId}`),
 
