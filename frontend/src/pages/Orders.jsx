@@ -28,7 +28,10 @@ export default function Orders() {
 
   return (
     <div className="page-orders container narrow">
-      <h1 className="page-title">My Orders</h1>
+      <div className="page-title-row">
+        <h1 className="page-title">My Orders</h1>
+        <Link to="/payments" className="btn btn-outline btn-sm"><Icon name="wallet" size={14} /> Payment history</Link>
+      </div>
       <ul className="order-list">
         {orders.map((o) => (
           <li key={o.id}>

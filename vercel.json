@@ -112,7 +112,7 @@
       "destination": "/_seo/shell/index.html"
     },
     {
-      "source": "/(cart|checkout|wishlist|account|login|register|orders|seller)",
+      "source": "/(cart|checkout|wishlist|account|login|register|orders|payments|seller)",
       "destination": "/_seo/shell/index.html"
     },
     {
@@ -161,7 +161,7 @@
       ]
     },
     {
-      "source": "/(cart|checkout|wishlist|account|login|register|orders|seller|_seo)(.*)",
+      "source": "/(cart|checkout|wishlist|account|login|register|orders|payments|seller|_seo)(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",

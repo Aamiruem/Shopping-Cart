@@ -1,0 +1,16 @@
+{
+  "name": "arvixa-store-mcp",
+  "private": true,
+  "version": "1.0.0",
+  "description": "MCP server for Arvixa Store: lets an AI assistant (Claude Desktop, Claude Code, any MCP client) search the catalog, check orders and run the store through the store's own API.",
+  "type": "module",
+  "bin": { "arvixa-store-mcp": "server.mjs" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "3.25.76"
+  }
+}

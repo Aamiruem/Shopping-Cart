@@ -36,6 +36,7 @@ export function useAccountLinks() {
     { to: '/products', icon: 'grid', label: 'Shop all products' },
     { to: '/account', icon: 'user', label: 'My Profile' },
     { to: '/orders', icon: 'package', label: 'Orders' },
+    { to: '/payments', icon: 'wallet', label: 'Payments & Refunds' },
     { to: '/wishlist', icon: 'heart', label: 'Wishlist', count: user ? wishCount : 0 },
     { to: '/cart', icon: 'cart', label: 'Cart', count: user ? cartCount : 0 },
     { to: '/account?tab=addresses', icon: 'mapPin', label: 'Saved Addresses' },

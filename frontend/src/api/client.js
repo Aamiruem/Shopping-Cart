@@ -175,6 +175,7 @@ export const api = {
   startPayment: (body) => request('/payments/razorpay/order', { method: 'POST', body }),
   verifyPayment: (body) => request('/payments/razorpay/verify', { method: 'POST', body }),
   myPayments: () => request('/payments/mine'),
+  paymentHistory: () => request('/payments/history'),
 
   // Seller hub
   becomeSeller: (body) => request('/seller/register', { method: 'POST', body }),

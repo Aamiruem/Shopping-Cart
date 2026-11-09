@@ -263,6 +263,7 @@ export default function Account() {
         </div>
         <nav className="panel account-nav">
           <Link to="/orders"><Icon name="package" size={18} /> My orders <Icon name="chevronRight" size={16} /></Link>
+          <Link to="/payments"><Icon name="wallet" size={18} /> Payments &amp; refunds <Icon name="chevronRight" size={16} /></Link>
           <Link to="/wishlist"><Icon name="heart" size={18} /> My wishlist <Icon name="chevronRight" size={16} /></Link>
           <p className="nav-group">Account settings</p>
           {TABS.map((t) => (
