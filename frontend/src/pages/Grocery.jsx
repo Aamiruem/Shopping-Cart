@@ -39,7 +39,7 @@ export default function Grocery() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [sort]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(load, [sort]);
 
   const set = (patch) => {
     const next = { ...Object.fromEntries(params), ...patch };

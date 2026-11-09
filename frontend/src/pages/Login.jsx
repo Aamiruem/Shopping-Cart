@@ -127,7 +127,9 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
   const isRegister = mode === 'register';
   const copy = COPY[mode];
   const from = location.state?.from;
-  const redirectTo = from ? `${from.pathname}${from.search || ''}` : '/';
+  // Back to where the shopper was, and only ever to a page on this site (never `//host` or `/\host`)
+  const target = from ? `${from.pathname}${from.search || ''}` : '/';
+  const redirectTo = /^\/(?![/\\])/.test(target) ? target : '/';
 
   const finish = useCallback((signedIn, isNew) => {
     playSound('success');

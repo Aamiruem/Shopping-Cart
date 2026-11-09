@@ -16,5 +16,8 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.11"
+  },
+  "overrides": {
+    "zod": "4.6.7"
   }
 }

@@ -41,7 +41,8 @@ function useProducts(params) {
     return () => {
       cancelled = true;
     };
-  }, [key]); // `params` is a fresh object each render; its JSON key is the stable dependency
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `params` is a fresh object each render; its JSON key is the stable dependency
+  }, [key]);
   return state;
 }
 

@@ -9,6 +9,7 @@ export default [
   react.configs.flat.recommended,
   react.configs.flat['jsx-runtime'],
   {
+    files: ['**/*.{js,jsx,mjs}'], // .jsx too: without this, ESLint 9 skips every React component
     plugins: { 'react-hooks': reactHooks },
     languageOptions: { globals: { ...globals.browser }, ecmaVersion: 'latest', sourceType: 'module' },
     settings: { react: { version: 'detect' } },

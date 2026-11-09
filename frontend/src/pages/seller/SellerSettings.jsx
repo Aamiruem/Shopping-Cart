@@ -121,7 +121,7 @@ export default function SellerSettings() {
           <div className="payout-box">
             <p className="payout-title"><Icon name="phone" size={16} /> UPI</p>
             <label className="field">UPI ID<input value={form.payoutUpi} onChange={set('payoutUpi', (v) => v.trim())} placeholder="yourstore@okhdfcbank" /></label>
-            <p className="muted small">Works with every UPI app: Google Pay, PhonePe, Paytm, BHIM and your bank's app.</p>
+            <p className="muted small">Works with every UPI app: Google Pay, PhonePe, Paytm, BHIM and your bank’s app.</p>
           </div>
           <div className="payout-box">
             <p className="payout-title"><Icon name="bank" size={16} /> Bank account (NEFT / IMPS)</p>
@@ -132,7 +132,7 @@ export default function SellerSettings() {
         </div>
         {payoutChanged && (
           <div className="payout-confirm">
-            <p className="payout-title"><Icon name="lock" size={16} /> Confirm it's you</p>
+            <p className="payout-title"><Icon name="lock" size={16} /> Confirm it’s you</p>
             {user.hasPassword ? (
               <label className="field">Account password
                 <input type="password" autoComplete="current-password" value={confirm.currentPassword} onChange={(e) => setConfirm({ ...confirm, currentPassword: e.target.value })} />
