@@ -245,9 +245,9 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .gallery-actions .wish-btn.large { position: static; }
 .share-wrap.floating .share-btn { width: 40px; height: 40px; border: 0; background: #fff; color: #5b5b66; box-shadow: var(--shadow-sm); transition: color var(--transition), transform var(--transition); }
 .share-wrap.floating .share-btn:hover, .share-wrap.floating .share-btn[aria-expanded="true"] { color: var(--brand); transform: scale(1.1); background: #fff; }
-.share-wrap.floating .share-menu { top: 0; right: calc(100% + 10px); }
+.share-wrap.floating .share-menu { position: fixed; top: var(--menu-top, 80px); left: var(--menu-left, 8px); right: auto; max-height: calc(100vh - var(--menu-top, 80px) - 12px); overflow-y: auto; z-index: 50; }
 @media (max-width: 600px) {
-  .share-wrap.floating .share-menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; width: auto; z-index: 300; }
+  .share-wrap.floating .share-menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; width: auto; max-height: 80vh; z-index: 300; }
 }
 
 /* Service buttons on the product page (StoreFacts.jsx): each opens its details */

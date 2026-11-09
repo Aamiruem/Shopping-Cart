@@ -29,6 +29,7 @@ export default function ShareButton({ product, image, floating = false }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [place, setPlace] = useState(null); // where a floating menu sits on screen (the photo frame clips anything inside it)
   const box = useRef(null);
   const url = `${SITE_URL}${productPath(product)}`;
   const message = `${product.name} for ${formatPrice(product.price)} on Arvixa Store`;
@@ -37,13 +38,27 @@ export default function ShareButton({ product, image, floating = false }) {
     if (!open) return undefined;
     const close = (e) => !box.current?.contains(e.target) && setOpen(false);
     const esc = (e) => e.key === 'Escape' && setOpen(false);
+    const shut = () => setOpen(false);
     document.addEventListener('pointerdown', close);
     document.addEventListener('keydown', esc);
+    window.addEventListener('scroll', shut, { passive: true });
+    window.addEventListener('resize', shut);
     return () => {
       document.removeEventListener('pointerdown', close);
       document.removeEventListener('keydown', esc);
+      window.removeEventListener('scroll', shut);
+      window.removeEventListener('resize', shut);
     };
   }, [open]);
+
+  const toggle = (e) => {
+    if (floating && !open) {
+      // Below the button, right edges lined up, kept on screen (phones get a bottom sheet from CSS instead)
+      const r = e.currentTarget.getBoundingClientRect();
+      setPlace({ top: r.bottom + 8, left: Math.max(8, Math.min(r.right - 280, window.innerWidth - 288)) });
+    }
+    setOpen(!open);
+  };
 
   const nativeShare = async () => {
     setBusy(true);
@@ -78,11 +93,11 @@ export default function ShareButton({ product, image, floating = false }) {
 
   return (
     <div className={`share-wrap ${floating ? 'floating' : ''}`} ref={box}>
-      <button type="button" className="share-btn" onClick={() => setOpen(!open)} aria-label={`Share ${product.name}`} aria-expanded={open} title="Share">
+      <button type="button" className="share-btn" onClick={toggle} aria-label={`Share ${product.name}`} aria-expanded={open} title="Share">
         <Icon name="send" size={floating ? 17 : 18} />
       </button>
       {open && (
-        <div className="share-menu panel" role="menu" aria-label="Share this product">
+        <div className="share-menu panel" role="menu" aria-label="Share this product" style={floating && place ? { '--menu-top': `${place.top}px`, '--menu-left': `${place.left}px` } : undefined}>
           <div className="share-preview">
             <img src={image || product.image} alt="" />
             <span><strong>{product.name}</strong><span className="muted small block">{formatPrice(product.price)}</span></span>
