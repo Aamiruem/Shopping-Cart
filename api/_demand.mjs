@@ -5,89 +5,14 @@
 // catalog's popularity carries the ranking, then real demand takes over as it grows.
 //
 // Every collection is a real catalog filter, so its "Under ₹X" headline is true and its link shows exactly those products.
+import { readFileSync } from 'node:fs';
 import { listProducts, loadProducts } from './_catalog.mjs';
 
-// Add festivals here (dates are India time). Outside them, the season of the year is used.
-export const FESTIVALS = [
-  {
-    id: 'diwali-2026',
-    name: 'Diwali',
-    greeting: 'Happy Diwali',
-    tagline: 'Lights, décor, festive wear, sweets and gifts for the festival of lights',
-    theme: 'diwali',
-    from: '2026-10-25',
-    to: '2026-11-15',
-    collections: [
-      { id: 'decor', title: 'Home & décor', params: { category: 'home' } },
-      { id: 'ethnic', title: 'Festive ethnic wear', params: { q: 'ethnic' } },
-      { id: 'sweets', title: 'Dry fruits & treats', params: { category: 'grocery', subCategory: 'dry-fruits-health' } },
-      { id: 'fragrances', title: 'Fragrances to gift', params: { category: 'beauty', subCategory: 'fragrances' } },
-      { id: 'watches', title: 'Watches to gift', params: { q: 'watches' } },
-    ],
-  },
-  {
-    id: 'christmas-2026',
-    name: 'Christmas & New Year',
-    greeting: 'Season’s greetings',
-    tagline: 'Warm wear, party looks, treats and gifts to close the year',
-    theme: 'christmas',
-    from: '2026-12-15',
-    to: '2027-01-02',
-    collections: [
-      { id: 'winterwear', title: 'Winter wear', params: { q: 'winterwear' } },
-      { id: 'treats', title: 'Snacks & treats', params: { category: 'grocery', subCategory: 'snacks' } },
-      { id: 'fragrances', title: 'Fragrances to gift', params: { category: 'beauty', subCategory: 'fragrances' } },
-      { id: 'audio', title: 'Music & audio', params: { category: 'electronics', subCategory: 'audio' } },
-      { id: 'decor', title: 'Home & décor', params: { category: 'home' } },
-    ],
-  },
-];
-
-// By month (1-12), when no festival is on
-const SEASONS = [
-  {
-    id: 'winter',
-    months: [11, 12, 1, 2],
-    name: 'Winter',
-    greeting: 'Winter store',
-    tagline: 'Stay warm: jackets, sweaters, skin care and hot drinks',
-    theme: 'winter',
-    collections: [
-      { id: 'winterwear', title: 'Winter wear', params: { q: 'winterwear' } },
-      { id: 'skin', title: 'Winter skin care', params: { category: 'beauty', subCategory: 'skin-care' } },
-      { id: 'drinks', title: 'Tea, coffee & drinks', params: { category: 'grocery', subCategory: 'tea-coffee-drinks' } },
-      { id: 'home', title: 'Home essentials', params: { category: 'home' } },
-    ],
-  },
-  {
-    id: 'summer',
-    months: [3, 4, 5, 6],
-    name: 'Summer',
-    greeting: 'Summer store',
-    tagline: 'Keep cool: light clothing, sunglasses, skin care and cold drinks',
-    theme: 'summer',
-    collections: [
-      { id: 'sunglasses', title: 'Sunglasses', params: { category: 'accessories', subCategory: 'sunglasses' } },
-      { id: 'tshirts', title: 'T-shirts', params: { category: 'fashion', subCategory: 'mens-tshirts' } },
-      { id: 'skin', title: 'Sun & skin care', params: { category: 'beauty', subCategory: 'skin-care' } },
-      { id: 'drinks', title: 'Drinks', params: { category: 'grocery', subCategory: 'tea-coffee-drinks' } },
-    ],
-  },
-  {
-    id: 'monsoon',
-    months: [7, 8, 9, 10],
-    name: 'Monsoon',
-    greeting: 'Monsoon store',
-    tagline: 'Rainy-day footwear, snacks, hot drinks and home comforts',
-    theme: 'monsoon',
-    collections: [
-      { id: 'footwear', title: 'Footwear', params: { category: 'fashion', subCategory: 'footwear' } },
-      { id: 'snacks', title: 'Snacks', params: { category: 'grocery', subCategory: 'snacks' } },
-      { id: 'drinks', title: 'Tea & coffee', params: { category: 'grocery', subCategory: 'tea-coffee-drinks' } },
-      { id: 'home', title: 'Home essentials', params: { category: 'home' } },
-    ],
-  },
-];
+// Festivals and seasons are in backend/app/data/seasons.json, shared with the FastAPI backend (services/festive.py).
+// Add festivals there (dates are India time). Outside them, the season of the year is used.
+const SEASON_DATA = JSON.parse(readFileSync(new URL('../backend/app/data/seasons.json', import.meta.url), 'utf8'));
+export const FESTIVALS = SEASON_DATA.festivals;
+const SEASONS = SEASON_DATA.seasons;
 
 const PRICE_CAPS = [299, 499, 699, 999, 1499, 1999, 2999, 4999, 9999];
 const MIN_IN_COLLECTION = 4;

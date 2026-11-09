@@ -48,7 +48,7 @@ async def create_order(amount_rupees: float, receipt: str, notes: dict | None = 
 
 
 async def fetch_payment(payment_id: str) -> dict:
-    return await _call("GET", f"/payments/{payment_id}")
+    return await _call("GET", f"/payments/{payment_id}?expand[]=card")  # card.type: credit or debit
 
 
 async def capture(payment_id: str, amount_paise: int) -> dict:

@@ -4,7 +4,9 @@ The product document keeps `reviewRating` and `reviewCount` so listings can show
 replace the catalog's sample `rating` and `ratingCount` wherever real shoppers are served.
 """
 
-from fastapi import APIRouter, Depends, Response
+import re
+
+from fastapi import APIRouter, Depends, File, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from ..core.cache import invalidate
@@ -15,6 +17,7 @@ from ..db.mongo import get_db
 from ..db.postgres import get_pool
 from ..deps import CurrentUser, get_current_user, get_optional_user
 from ..services.catalog import to_object_id
+from ..services.storage import MEDIA, save_media
 
 support = lazy_import("app.ml.support")  # the sentiment model pulls in scikit-learn
 
@@ -23,10 +26,17 @@ review_limiter = rate_limit(20, message="Too many reviews. Please try again late
 PAGE_SIZE = 20
 
 
+MAX_PHOTOS = 3
+# Only photos uploaded through POST /api/uploads?kind=review (stored as review-<id>.webp, locally or on S3)
+PHOTO_RE = re.compile(r"^(/api/uploads/review-[0-9a-f]{32}\.webp|https://\S+/media/reviews/\d+/review-[0-9a-f]{32}\.webp)$")
+SORTS = {"helpful": "r.rating DESC, length(r.body) DESC", "critical": "r.rating ASC, r.created_at DESC"}
+
+
 class ReviewIn(BaseModel):
     rating: int = Field(ge=1, le=5)
     title: str = Field(default="", max_length=120)
     body: str = Field(default="", max_length=2000)
+    photos: list[str] = Field(default_factory=list, max_length=MAX_PHOTOS)
 
 
 def _public_name(full_name: str) -> str:
@@ -50,7 +60,14 @@ async def _summary(product_id: str) -> dict:
     histogram = {stars: 0 for stars in range(1, 6)} | {r["rating"]: r["n"] for r in grouped}
     count = sum(histogram.values())
     average = round(sum(stars * n for stars, n in histogram.items()) / count, 1) if count else 0
-    return {"average": average, "count": count, "histogram": histogram}
+    # Ratings that came with words or photos ("120 Ratings, 45 Reviews"), and how many have photos
+    extra = await get_pool().fetchrow(
+        """SELECT COUNT(*) FILTER (WHERE body <> '' OR title <> '' OR jsonb_array_length(photos) > 0)::int AS written,
+                  COUNT(*) FILTER (WHERE jsonb_array_length(photos) > 0)::int AS with_photos
+             FROM product_reviews WHERE product_id = $1""",
+        product_id,
+    )
+    return {"average": average, "count": count, "written": extra["written"], "withPhotos": extra["with_photos"], "histogram": histogram}
 
 
 async def _refresh_product(product_id: str) -> None:
@@ -62,11 +79,14 @@ async def _refresh_product(product_id: str) -> None:
 
 
 @router.get("/{product_id}/reviews")
-async def list_reviews(product_id: str, page: int = 1, user: CurrentUser | None = Depends(get_optional_user)):
+async def list_reviews(
+    product_id: str, page: int = 1, sort: str = "recent", photos: str | None = None, user: CurrentUser | None = Depends(get_optional_user)
+):
+    with_photos = "AND jsonb_array_length(r.photos) > 0" if photos == "true" else ""
     records = await get_pool().fetch(
-        """SELECT r.id, r.rating, r.title, r.body, r.created_at, r.user_id, u.name
+        f"""SELECT r.id, r.rating, r.title, r.body, r.photos, r.created_at, r.updated_at, r.user_id, u.name
              FROM product_reviews r JOIN users u ON u.id = r.user_id
-            WHERE r.product_id = $1 ORDER BY r.created_at DESC LIMIT $2 OFFSET $3""",
+            WHERE r.product_id = $1 {with_photos} ORDER BY {SORTS.get(sort, "r.created_at DESC")} LIMIT $2 OFFSET $3""",
         product_id,
         PAGE_SIZE,
         (max(page, 1) - 1) * PAGE_SIZE,
@@ -77,8 +97,10 @@ async def list_reviews(product_id: str, page: int = 1, user: CurrentUser | None 
             "rating": r["rating"],
             "title": r["title"],
             "body": r["body"],
+            "photos": r["photos"] or [],
             "author": _public_name(r["name"]),
             "createdAt": r["created_at"].isoformat(),
+            "edited": (r["updated_at"] - r["created_at"]).total_seconds() > 60,
             "mine": bool(user and r["user_id"] == user.id),
         }
         for r in records
@@ -94,18 +116,21 @@ async def save_review(product_id: str, body: ReviewIn, user: CurrentUser = Depen
     if not await _has_received(user.id, product_id):
         raise ApiError(403, "You can review a product once it has been delivered to you")
     title, text = body.title.strip(), body.body.strip()
+    if any(not PHOTO_RE.match(url) for url in body.photos):
+        raise ApiError(400, "Please upload photos with the “Add photos” button")
     record = await get_pool().fetchrow(
-        """INSERT INTO product_reviews (product_id, user_id, rating, title, body, sentiment) VALUES ($1, $2, $3, $4, $5, $6)
+        """INSERT INTO product_reviews (product_id, user_id, rating, title, body, sentiment, photos) VALUES ($1, $2, $3, $4, $5, $6, $7)
            ON CONFLICT (product_id, user_id) DO UPDATE
-             SET rating = EXCLUDED.rating, title = EXCLUDED.title, body = EXCLUDED.body,
+             SET rating = EXCLUDED.rating, title = EXCLUDED.title, body = EXCLUDED.body, photos = EXCLUDED.photos,
                  sentiment = EXCLUDED.sentiment, updated_at = NOW()
-           RETURNING id, rating, title, body""",
+           RETURNING id, rating, title, body, photos""",
         product_id,
         user.id,
         body.rating,
         title,
         text,
         support.sentiment(f"{title}. {text}") if title or text else None,
+        body.photos,
     )
     await _refresh_product(product_id)
     return dict(record)
@@ -116,3 +141,24 @@ async def delete_review(product_id: str, user: CurrentUser = Depends(get_current
     await get_pool().execute("DELETE FROM product_reviews WHERE product_id = $1 AND user_id = $2", product_id, user.id)
     await _refresh_product(product_id)
     return Response(status_code=204)
+
+
+# ---------- Review photos: only buyers with a delivered order can upload them ----------
+upload_router = APIRouter(prefix="/api/uploads", tags=["reviews"])
+photo_limiter = rate_limit(15, message="Too many photos just now. Please try again in 15 minutes.")
+
+
+@upload_router.post("", status_code=201, dependencies=[Depends(photo_limiter)])
+async def upload_review_photo(kind: str = "review", file: UploadFile = File(...), user: CurrentUser = Depends(get_current_user)):
+    if kind != "review":
+        raise ApiError(400, "Only review photos can be uploaded here")
+    delivered = await get_pool().fetchval(
+        """SELECT 1 FROM order_items oi JOIN orders o ON o.id = oi.order_id
+            WHERE o.user_id = $1 AND oi.fulfilment = 'delivered' LIMIT 1""",
+        user.id,
+    )
+    if not delivered:
+        raise ApiError(403, "You can add photos to a review once your order has been delivered")
+    content = await file.read(MEDIA["image"]["max"] + 1)
+    url = await save_media(content, file.content_type or "", user.id, "image", folder="reviews")
+    return {"url": url, "kind": "image", "quality": None}

@@ -43,7 +43,9 @@ def _destination(r) -> str:
         return "your original payment method"
     if r["refund_to"] == "upi":
         return f"your UPI ID {r['refund_upi']}"
-    return f"your bank account ••••{r['refund_account_last4']}"
+    if r["refund_to"] == "bank":
+        return f"your bank account ••••{r['refund_account_last4']}"
+    return "you (we’ll contact you for your bank or UPI details)"  # an older client that didn't ask for them
 
 
 def return_json(r, admin: bool = False) -> dict | None:
@@ -132,7 +134,12 @@ async def request_return(user_id: int, order_id: int, body: dict) -> dict:
             f"The {RETURN_WINDOW_DAYS}-day return window for this order has closed. Please contact support if something is wrong with it.",
         )
 
-    account = {"to": "original"} if order["paid_online"] else _refund_account(body)
+    if order["paid_online"]:
+        account = {"to": "original"}
+    elif body.get("refundTo") or body.get("reasonCode"):
+        account = _refund_account(body)
+    else:  # an older client sends only `reason`: the store contacts the shopper to arrange a cash order's refund
+        account = {"to": None}
     reason = f"{RETURN_REASONS[code]}: {details}" if details else RETURN_REASONS[code]
     saved = await pool.fetchrow(
         """INSERT INTO order_returns (order_id, user_id, reason, reason_code, amount, refund_to, refund_upi,

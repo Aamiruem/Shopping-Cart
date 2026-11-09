@@ -236,7 +236,7 @@ export async function paymentHistory({ db, userId }) {
       entries.push({
         id: `refund-${o.id}`, kind: 'refund', reason: 'return', date: ret.refunded_at || ret.updated_at, amount: Number(ret.amount ?? o.total),
         method: ret.refund_to === 'original' ? payment?.method || o.payment_method : ret.refund_to,
-        to: ret.refund_to === 'original' ? 'original' : ret.refund_to === 'upi' ? `UPI ${ret.refund_upi}` : `Bank ••••${ret.refund_account_last4}`,
+        to: { original: 'original', upi: `UPI ${ret.refund_upi}`, bank: `Bank ••••${ret.refund_account_last4}` }[ret.refund_to] ?? 'Bank or UPI (we’ll contact you)',
         status: RETURN_REFUND[ret.refund] || 'processing', reference: ret.refund_reference, order,
       });
     } else if (o.status === 'cancelled' && payment && ['refunded', 'refund_pending'].includes(payment.status)) {

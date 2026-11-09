@@ -34,6 +34,7 @@ from .routers import (
     auth,
     automation,
     cart,
+    events,
     location,
     orders,
     payments,
@@ -111,8 +112,10 @@ def create_app() -> FastAPI:
         support,
         automation,
         seo,
+        events,
     ):
         app.include_router(module.router)
+    app.include_router(reviews.upload_router)  # POST /api/uploads?kind=review (before the static /api/uploads mount)
 
     # Locally stored product images (production uses S3 / CloudFront instead)
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)

@@ -42,7 +42,7 @@
   },
   "functions": {
     "api/catalog.mjs": {
-      "includeFiles": "backend/app/data/products.json"
+      "includeFiles": "backend/app/data/{products,seasons}.json"
     },
     "api/razorpay-webhook.mjs": {
       "includeFiles": "backend/app/data/products.json"

@@ -9,6 +9,7 @@ from ..db.mongo import get_db
 from ..deps import CurrentUser, get_optional_user
 from ..ml import cache
 from ..services.catalog import serialize_product, to_object_id
+from ..services.festive import festive_store
 
 # pandas / scikit-learn / xgboost load on the first recommendation request, not at API startup
 recommender = lazy_import("app.ml.recommender")
@@ -109,3 +110,9 @@ async def bought_together(product_id: str, k: int = 6):
         product = await get_db().products.find_one({"_id": to_object_id(product_id)}, {"category": 1}) if to_object_id(product_id) else None
         items += await _popular(k - len(items), {i["_id"] for i in items} | {product_id}, product and product.get("category"))
     return {"strategy": strategy, "items": items}
+
+
+@router.get("/festive")
+async def festive():
+    """The festival (or season) store for the home page: collections and what's trending, from real demand."""
+    return await cache.cached("festive", 5 * 60, festive_store)

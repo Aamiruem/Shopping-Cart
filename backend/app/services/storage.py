@@ -97,15 +97,16 @@ def optimise_image(content: bytes) -> bytes:
         raise ApiError(400, "The image could not be read. Please upload a JPEG, PNG or WebP photo.") from None
 
 
-async def save_media(content: bytes, content_type: str, seller_id: int, kind: str = "image") -> str:
-    """Stores a product image / video / audio file and returns its public URL."""
+async def save_media(content: bytes, content_type: str, seller_id: int, kind: str = "image", folder: str = "products") -> str:
+    """Stores a product image / video / audio file (or, with folder="reviews", a shopper's review photo) and returns
+    its public URL. Review photos are named review-<id> so reviews accept only photos uploaded for them."""
     ext = _validate(content, content_type, kind)
     if kind == "image":
         content, content_type, ext = await asyncio.to_thread(optimise_image, content), "image/webp", ".webp"
-    name = f"{uuid.uuid4().hex}{ext}"
+    name = f"{'review-' if folder == 'reviews' else ''}{uuid.uuid4().hex}{ext}"
     settings = get_settings()
     if settings.s3_bucket:
-        key = f"media/products/{seller_id}/{name}"  # CloudFront serves the bucket under /media/*
+        key = f"media/{folder}/{seller_id}/{name}"  # CloudFront serves the bucket under /media/*
         return await asyncio.to_thread(_put_s3, key, content, content_type)
 
     folder = Path(settings.upload_dir)

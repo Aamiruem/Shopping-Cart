@@ -49,7 +49,8 @@ const event = (db, orderId, status, note) => db('INSERT INTO order_events (order
 function destination(r) {
   if (r.refund_to === 'original') return 'your original payment method';
   if (r.refund_to === 'upi') return `your UPI ID ${r.refund_upi}`;
-  return `your bank account ••••${r.refund_account_last4}`;
+  if (r.refund_to === 'bank') return `your bank account ••••${r.refund_account_last4}`;
+  return 'you (we’ll contact you for your bank or UPI details)'; // an older client that didn't ask for them
 }
 
 /** A return as the shopper sees it, or with the full account number for the admin who makes a manual transfer. */
@@ -132,7 +133,8 @@ export async function requestReturn({ db, userId, id, body }) {
     fail(`The ${RETURN_WINDOW_DAYS}-day return window for this order has closed. Please contact support if something is wrong with it.`);
   }
 
-  const account = order.paid_online ? { to: 'original' } : refundAccount(body);
+  // An older client sends only `reason`: for a cash order the store then contacts the shopper to arrange the refund
+  const account = order.paid_online ? { to: 'original' } : body.refundTo || body.reasonCode ? refundAccount(body) : { to: null };
   const reason = details ? `${RETURN_REASONS[code]}: ${details}` : RETURN_REASONS[code];
   const [saved] = await db(
     `WITH saved AS (

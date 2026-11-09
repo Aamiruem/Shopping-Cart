@@ -27,7 +27,17 @@ log = logging.getLogger("payments")
 order_limiter = rate_limit(30, message="Too many payment attempts. Please try again in a few minutes.")
 
 # Razorpay payment.method -> our orders.payment_method
-METHODS = {"upi": "upi", "card": "card", "netbanking": "netbanking", "wallet": "wallet", "emi": "emi"}
+# Razorpay payment.method -> orders.payment_method (same as api/_payments.mjs). Unknown methods are kept as "online".
+METHODS = {
+    "upi": "upi",
+    "card": "card",
+    "netbanking": "netbanking",
+    "wallet": "wallet",
+    "emi": "emi",
+    "cardless_emi": "emi",
+    "paylater": "paylater",
+}
+CARD_TYPES = {"credit": "credit_card", "debit": "debit_card", "prepaid": "card"}
 
 
 class StartIn(BaseModel):
@@ -79,7 +89,10 @@ async def start_payment(body: StartIn, user: CurrentUser = Depends(get_current_u
 
 
 def _method(details: dict) -> str:
-    return METHODS.get(details.get("method"), "upi")
+    """How the shopper paid: UPI, credit card, debit card, net banking, EMI, Pay Later or a wallet."""
+    if details.get("method") == "card":
+        return CARD_TYPES.get((details.get("card") or {}).get("type"), "card")
+    return METHODS.get(details.get("method"), "online")
 
 
 async def _claim(payment_row_id: int) -> bool:
@@ -211,3 +224,131 @@ async def my_payments(user: CurrentUser = Depends(get_current_user)):
             user.id,
         )
     )
+
+
+# ---------- Payment history: every payment and refund in one timeline (same shape as api/_payments.mjs) ----------
+RETURN_REFUND = {"refunded": "refunded", "refund_pending": "processing", "processing": "processing", "cod_manual": "processing"}
+
+
+def _order_payment(o, payment) -> tuple[str, str | None]:
+    """What happened to the money on one order: paid, how, and is anything still owed back."""
+    if payment:
+        status = "paid" if payment["status"] in ("paid", "refunded", "refund_pending") else payment["status"]
+        return status, payment["provider_payment_id"]
+    if o["payment_method"] != "cod":
+        return "paid", None  # the development OTP demo
+    if o["status"] == "cancelled":
+        return "not_charged", None
+    return ("paid_on_delivery" if o["delivered"] else "due_on_delivery"), None
+
+
+@router.get("/history")
+async def payment_history(user: CurrentUser = Depends(get_current_user)):
+    pool = get_pool()
+    orders = await pool.fetch(
+        """SELECT o.id, o.created_at, o.status, o.total, o.payment_method,
+                  bool_and(oi.fulfilment = 'delivered') AS delivered, MAX(oi.fulfilled_at) AS delivered_at,
+                  (array_agg(oi.name ORDER BY oi.id))[1] AS first_item, (array_agg(oi.image ORDER BY oi.id))[1] AS image,
+                  COUNT(*)::int AS lines
+             FROM orders o JOIN order_items oi ON oi.order_id = o.id
+            WHERE o.user_id = $1 GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300""",
+        user.id,
+    )
+    payments = await pool.fetch("SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 300", user.id)
+    returns = {
+        r["order_id"]: r for r in await pool.fetch("SELECT * FROM order_returns WHERE user_id = $1 AND status <> 'withdrawn'", user.id)
+    }
+    payment_of = {p["order_id"]: p for p in payments if p["order_id"]}
+    entries = []
+    for o in orders:
+        payment = payment_of.get(o["id"])
+        order = {"id": o["id"], "item": o["first_item"], "image": o["image"], "items": o["lines"]}
+        status, reference = _order_payment(o, payment)
+        paid_later = o["status"] == "placed" and status == "paid_on_delivery"
+        entries.append(
+            {
+                "id": f"pay-{o['id']}",
+                "kind": "payment",
+                "date": (o["delivered_at"] or o["created_at"]) if paid_later else o["created_at"],
+                "amount": float(o["total"]),
+                "method": (payment and payment["method"]) or o["payment_method"],
+                "status": status,
+                "reference": reference,
+                "order": order,
+            }
+        )
+        ret = returns.get(o["id"])
+        if ret and ret["refund"]:
+            original = ret["refund_to"] == "original"
+            destinations = {
+                "original": "original",
+                "upi": f"UPI {ret['refund_upi']}",
+                "bank": f"Bank ••••{ret['refund_account_last4']}",
+            }
+            to = destinations.get(ret["refund_to"], "Bank or UPI (we’ll contact you)")  # older clients didn't ask
+            entries.append(
+                {
+                    "id": f"refund-{o['id']}",
+                    "kind": "refund",
+                    "reason": "return",
+                    "date": ret["refunded_at"] or ret["updated_at"],
+                    "amount": float(ret["amount"] if ret["amount"] is not None else o["total"]),
+                    "method": ((payment and payment["method"]) or o["payment_method"]) if original else ret["refund_to"],
+                    "to": to,
+                    "status": RETURN_REFUND.get(ret["refund"], "processing"),
+                    "reference": ret["refund_reference"],
+                    "order": order,
+                }
+            )
+        elif o["status"] == "cancelled" and payment and payment["status"] in ("refunded", "refund_pending"):
+            entries.append(
+                {
+                    "id": f"refund-{o['id']}",
+                    "kind": "refund",
+                    "reason": "cancelled",
+                    "date": payment["updated_at"],
+                    "amount": float(payment["amount"]),
+                    "method": payment["method"],
+                    "to": "original",
+                    "status": "refunded" if payment["status"] == "refunded" else "processing",
+                    "reference": None,
+                    "order": order,
+                }
+            )
+    # Attempts that never became an order: failed, or taken and given straight back
+    for p in payments:
+        if p["order_id"] or p["status"] not in ("failed", "refunded", "refund_pending"):
+            continue
+        failed = p["status"] == "failed"
+        entries.append(
+            {
+                "id": f"attempt-{p['id']}",
+                "kind": "failed" if failed else "refund",
+                "reason": "not_placed",
+                "date": p["updated_at"],
+                "amount": float(p["amount"]),
+                "method": p["method"] or "online",
+                "to": "original",
+                "status": "failed" if failed else ("refunded" if p["status"] == "refunded" else "processing"),
+                "reference": p["provider_payment_id"],
+                "order": None,
+                "note": "Payment didn’t go through. Nothing was charged."
+                if failed
+                else "The order couldn’t be placed, so the money was sent back.",
+            }
+        )
+    entries.sort(key=lambda e: e["date"], reverse=True)
+
+    def total(items) -> float:
+        return round(sum(e["amount"] for e in items), 2)
+
+    return {
+        "summary": {
+            "paid": total(e for e in entries if e["kind"] == "payment" and e["status"] in ("paid", "paid_on_delivery")),
+            "refunded": total(e for e in entries if e["kind"] == "refund" and e["status"] == "refunded"),
+            "refundPending": total(e for e in entries if e["kind"] == "refund" and e["status"] == "processing"),
+            "dueOnDelivery": total(e for e in entries if e["status"] == "due_on_delivery"),
+            "orders": len(orders),
+        },
+        "entries": entries,
+    }
