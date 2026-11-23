@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
-import { CONTACT_EMAIL, PREVIEW } from '../../config';
+import { CONTACT_EMAIL, PREVIEW, SHOPPING } from '../../config';
 import { CATEGORIES } from '../../constants/catalog';
 import Icon from '../common/Icon';
+import { NewsletterForm } from '../leads/EnquiryForm';
 
 const COLUMNS = [
   { title: 'Shop', links: [...CATEGORIES.slice(0, 5).map((c) => ({ label: c.label, to: `/products?category=${c.id}` })), { label: 'Grocery Store', to: '/grocery' }] },
@@ -60,7 +61,14 @@ export default function Footer() {
           <h4>Contact Us</h4>
           <p>Arvixa Store<br />India</p>
           {CONTACT_EMAIL && <a href={`mailto:${CONTACT_EMAIL}`}><Icon name="mail" size={14} /> {CONTACT_EMAIL}</a>}
+          {SHOPPING && <Link to="/help#enquiry"><Icon name="message" size={14} /> Send us an enquiry</Link>}
         </div>
+        {SHOPPING && (
+          <div className="footer-col footer-newsletter">
+            <h4>Offers &amp; new arrivals</h4>
+            <NewsletterForm />
+          </div>
+        )}
       </div>
 
       <div className="footer-bottom">

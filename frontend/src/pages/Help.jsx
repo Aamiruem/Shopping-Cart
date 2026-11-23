@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import { PREVIEW, SHOPPING } from '../config';
 import Icon from '../components/common/Icon';
+import EnquiryForm from '../components/leads/EnquiryForm';
 import { useAuth } from '../context/AuthContext';
 import useSeo from '../hooks/useSeo';
 import useApi from '../hooks/useApi';
@@ -120,6 +121,13 @@ export default function Help() {
     <div className="page-orders container narrow">
       <h1 className="page-title">Help Center</h1>
       {SHOPPING && <ContactForm />}
+      {SHOPPING && (
+        <section id="enquiry" className="panel help-section">
+          <h2><Icon name="briefcase" size={20} /> Product questions, bulk orders &amp; business</h2>
+          <p className="muted small">Not about an existing order? Ask us anything: no account needed. Our team replies within one working day.</p>
+          <EnquiryForm />
+        </section>
+      )}
       {SECTIONS.map((s) => (
         <section key={s.id} id={s.id} className="panel help-section">
           <h2><Icon name={s.icon} size={20} /> {s.title}</h2>

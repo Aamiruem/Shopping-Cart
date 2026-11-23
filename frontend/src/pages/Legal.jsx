@@ -27,6 +27,8 @@ export function Privacy() {
       <h1>Privacy Policy</h1>
       <h2>What we collect</h2>
       <p>While you browse, we may record the pages you visit, your approximate location, and your device and browser type. If you create an account, we keep the details you give us, such as your name, email address, mobile number, delivery addresses and orders.</p>
+      <h2>Enquiries and our newsletter</h2>
+      <p>When you send us an enquiry, we keep the name, contact details and message you give us, and the product you asked about, so our team can reply. We only do this when you tick the box to agree, and we use it to answer you, not to market to you. If you also choose to get offers by email, or sign up for our newsletter, we keep your email address for that until you unsubscribe. Ask us at any time and we’ll delete your enquiry or remove you from the list.</p>
       <h2>Analytics and cookies</h2>
       <p>We use Google Analytics to understand how the store is used. Its cookies are set only if you accept them in the consent banner. Google processes this data under its own <a href="https://policies.google.com/privacy" rel="noopener noreferrer" target="_blank">privacy policy</a>.</p>
       <h2>How we use your information</h2>

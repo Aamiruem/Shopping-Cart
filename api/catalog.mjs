@@ -170,6 +170,16 @@ export default async function handler(req, res) {
       return send(res, result.status, result.body);
     }
   }
+  if (area === 'leads') {
+    // Enquiries and newsletter sign-ups (api/_leads.mjs): sending one needs no account, reading them is for the admin
+    const leads = await import('./_leads.mjs');
+    if (leads.isLeadRoute(req.method, rest)) {
+      const ip = req.headers['x-real-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+      const result = await leads.handleLeads({ method: req.method, rest, body: bodyOf(req), params, authorization: req.headers.authorization, ip });
+      Object.entries(result.headers).forEach(([key, value]) => res.setHeader(key, value));
+      return send(res, result.status, result.body);
+    }
+  }
   if (['recommendations', 'ai', 'events'].includes(area)) {
     const answer = await recommendations(req, area, rest, params);
     if (answer) return send(res, answer.status ?? 200, answer.body, answer.cacheable);

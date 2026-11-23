@@ -66,4 +66,36 @@ CREATE TABLE IF NOT EXISTS stock_adjustments (
   delta      INTEGER     NOT NULL DEFAULT 0,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Enquiries people send the store themselves (contact form, product questions, bulk quotes, newsletter), each with the
+-- consent they ticked. kind / intent / summary come from keyword rules in api/_leads.mjs; matches are catalog ids.
+CREATE TABLE IF NOT EXISTS leads (
+  id                SERIAL       PRIMARY KEY,
+  source            VARCHAR(16)  NOT NULL,                 -- contact | product | quote | business | newsletter
+  kind              VARCHAR(20)  NOT NULL,                 -- product_enquiry | quote | support | business | newsletter
+  name              VARCHAR(80),
+  email             VARCHAR(254),
+  phone             VARCHAR(15),
+  user_id           INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  product_id        VARCHAR(64),
+  message           TEXT,
+  budget            INTEGER,                               -- rupees, given or read from the message
+  quantity          INTEGER,
+  intent            VARCHAR(8)   NOT NULL DEFAULT 'medium', -- high | medium | low
+  summary           TEXT,
+  matches           JSONB        NOT NULL DEFAULT '[]',
+  status            VARCHAR(16)  NOT NULL DEFAULT 'new',    -- new | contacted | qualified | won | lost | unsubscribed
+  assigned_to       INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  follow_up_on      DATE,
+  notes             JSONB        NOT NULL DEFAULT '[]',     -- [{ at, by, text }]
+  marketing_consent BOOLEAN      NOT NULL DEFAULT FALSE,
+  consent_at        TIMESTAMPTZ  NOT NULL,
+  created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  CHECK (email IS NOT NULL OR phone IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS leads_status_idx ON leads (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS leads_email_idx ON leads (lower(email)) WHERE email IS NOT NULL;
+-- One newsletter subscription per address
+CREATE UNIQUE INDEX IF NOT EXISTS leads_newsletter_idx ON leads (lower(email)) WHERE source = 'newsletter';
 `;

@@ -11,6 +11,7 @@ import Reviews from '../components/product/Reviews';
 import ShareButton from '../components/product/ShareButton';
 import StoreFacts from '../components/product/StoreFacts';
 import Lightbox from '../components/product/Lightbox';
+import EnquiryForm from '../components/leads/EnquiryForm';
 import Spin360 from '../components/product/Spin360';
 import { aisleLabel, categoryLabel, groupOf } from '../constants/catalog';
 import { useCart } from '../context/CartContext';
@@ -307,6 +308,12 @@ export default function ProductDetail() {
               </tbody>
             </table>
           </div>
+          {SHOPPING && (
+            <details className="detail-section product-enquiry">
+              <summary><Icon name="message" size={16} /> Have a question, or buying in bulk? Ask us</summary>
+              <EnquiryForm key={product._id} productId={product._id} productName={product.name} />
+            </details>
+          )}
         </div>
         {STORE && <BuyBox product={product} />}
       </div>

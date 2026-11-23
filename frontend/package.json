@@ -8,7 +8,7 @@
     "build": "vite build",
     "build:static": "vite build && node scripts/prerender.mjs",
     "preview": "vite preview",
-    "test": "node --test scripts/catalog.test.mjs scripts/auth.test.mjs scripts/shop.test.mjs scripts/payments.test.mjs scripts/location.test.mjs scripts/coupons.test.mjs scripts/seller.test.mjs scripts/returns.test.mjs scripts/demand.test.mjs",
+    "test": "node --test scripts/catalog.test.mjs scripts/auth.test.mjs scripts/shop.test.mjs scripts/payments.test.mjs scripts/location.test.mjs scripts/coupons.test.mjs scripts/seller.test.mjs scripts/returns.test.mjs scripts/demand.test.mjs scripts/leads.test.mjs",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -24,6 +24,6 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^17.14.0",
-    "vite": "^5.4.8"
+    "vite": "6.4.5"
   }
 }

@@ -68,6 +68,27 @@ stack; without it each feature uses a lighter method, and shopping works even wh
 | Experiment tracking | MLflow (`MLFLOW_TRACKING_URI`) | Off |
 | Automation: refund retries, stuck payments, low-stock and late-order emails | `POST /api/automation/run`, called by a scheduler | Off until `AUTOMATION_KEY` is set |
 
+## Leads and enquiries (CRM)
+
+People can send the store a product question (product page), a bulk / corporate quote request or a business enquiry
+(Help -> "Product questions, bulk orders & business"), or join the newsletter (footer). No account is needed, and nothing
+is saved unless they tick the consent box; newsletter sign-up has its own separate consent. Admins work them in
+**Seller Hub -> Leads & enquiries**: status (new, contacted, qualified, won, lost, unsubscribed), assignee, follow-up date
+and notes, with every change logged on the lead, plus deletion when someone asks.
+
+- **Classification is keyword rules, not a model** (`api/_leads.mjs`): kind (product enquiry, quote, business, support,
+  newsletter), hot / warm / cold purchase intent, budget and quantity read from the message, and a one-line summary.
+- **Product matches come from the live catalog**: in stock and within the budget, re-read with current prices each
+  time. If nothing fits, the page says so; no product is ever suggested that the store doesn't have.
+- **Conversion** counts a lead as converted when the same person (account or email) places an order that isn't
+  cancelled after the enquiry.
+- The suggested reply is for staff to copy into an email or WhatsApp. **Nothing is sent automatically** until an email
+  or WhatsApp provider is configured.
+- Spam protection: a hidden honeypot field and a per-visitor rate limit in the database.
+
+Store mode only (the `api/` functions); the full FastAPI backend doesn't have these routes yet. The `leads` table is
+in `api/_schema.mjs`, so run `npm run db:setup` against Neon before deploying this.
+
 ## Real orders
 
 - **Payments:** Razorpay (UPI, net banking, cards, wallets), or cash on delivery. A payment can only become one order,
@@ -236,6 +257,7 @@ Full interactive docs at `/docs`. Errors always come back as `{"error": "message
 | Analytics | `GET /api/analytics/overview` · `/forecast` · `/bestsellers` · `/customers` · `/support` · `/export` · `POST /retrain` |
 | Recommendations | `GET /api/recommendations/for-you` · `/together/{productId}` · `/trending` |
 | Support | `POST/GET /api/support/tickets` · `PATCH /api/support/tickets/{id}` |
+| Leads (store mode) | `POST /api/leads` (public) · admin: `GET /api/leads` · `GET /api/leads/summary` · `PATCH/DELETE /api/leads/{id}` |
 | AI service | `POST /api/ai/ask` · `POST /api/ai/agent` · `GET /api/ai/recommend/{id}` · `POST /api/ai/analyst` · `GET /api/ai/insights` · `GET /api/ai/forecast` |
 
 ## Deploy to Vercel (browsable storefront)

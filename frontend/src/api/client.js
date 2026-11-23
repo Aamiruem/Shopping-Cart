@@ -170,6 +170,13 @@ export const api = {
   requestReturn: (id, body) => request(`/orders/${id}/return`, { method: 'POST', body }),
   withdrawReturn: (id) => request(`/orders/${id}/return`, { method: 'DELETE' }),
 
+  // Enquiries and newsletter sign-ups (anyone can send one; the admin works them in the Seller Hub)
+  sendEnquiry: (body) => request('/leads', { method: 'POST', body }),
+  leads: (params = {}) => request(`/leads?${query(params)}`),
+  leadSummary: () => request('/leads/summary'),
+  updateLead: (id, body) => request(`/leads/${id}`, { method: 'PATCH', body }),
+  deleteLead: (id) => request(`/leads/${id}`, { method: 'DELETE' }),
+
   // Online payments (Razorpay: UPI, net banking, cards, wallets)
   paymentsConfig: () => request('/payments/config'),
   startPayment: (body) => request('/payments/razorpay/order', { method: 'POST', body }),

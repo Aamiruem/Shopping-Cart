@@ -8,13 +8,14 @@
 //   asha@example.com    customer: delivered orders to review or return, one on its way, a return, a complaint
 //   ravi@example.com    customer with a few orders, so "bought together" and trending have data
 //   seller@example.com  seller with their own listed product and an order to ship
-//   owner@example.com   admin: returns, refunds, complaints and the store catalog in the Seller Hub
+//   owner@example.com   admin: returns, refunds, complaints, leads and the store catalog in the Seller Hub
 // Online payments stay off (no Razorpay keys) and photo uploads need Vercel Blob, so those two answer with their
 // usual "not set up yet" messages.
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { PGlite } from '@electric-sql/pglite';
 import { handleAuth, postgresStore, useLocalDatabase } from '../api/_auth.mjs';
+import { handleLeads } from '../api/_leads.mjs';
 import { listProducts } from '../api/_catalog.mjs';
 import { syncCatalogState } from '../api/_inventory.mjs';
 import { recordView } from '../api/_recommend.mjs';
@@ -101,6 +102,11 @@ for (const p of byCategory('fashion').slice(0, 6)) await recordView(db, { produc
 const ticket = await asha.support('POST', 'tickets', { subject: 'Where is my parcel?', message: 'My shoes were shipped yesterday but tracking has not moved (demo).' });
 await owner.support('POST', `tickets/${ticket.body.id}/messages`, { message: 'Thanks for waiting, the courier says it arrives tomorrow.' });
 await syncCatalogState(db, Date.now(), true);
+// Enquiries for Seller Hub -> Leads & enquiries (as owner@example.com)
+const enquiry = (body, ip) => handleLeads({ method: 'POST', rest: [], body: { consent: true, ...body }, ip }, { db });
+await enquiry({ source: 'quote', name: 'Kiran (demo)', email: 'kiran@example.com', phone: '9876543210', quantity: 25, message: 'Quote for 25 over-ear headphones for our office, budget 1 lakh, we want to buy this week.' }, 'demo-1');
+await enquiry({ source: 'contact', name: 'Neha (demo)', email: 'neha@example.com', message: 'I need a laptop for machine learning under 70,000.' }, 'demo-2');
+await enquiry({ source: 'newsletter', email: 'asha@example.com', marketingConsent: true }, 'demo-3');
 
 // ---------- A small stand-in for Vercel's request handling ----------
 function vercelRequest(req, url, raw) {
