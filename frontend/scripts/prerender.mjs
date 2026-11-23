@@ -258,7 +258,7 @@ write('manifest.webmanifest', JSON.stringify({
   start_url: '/',
   display: 'standalone',
   background_color: '#ffffff',
-  theme_color: '#2874f0',
+  theme_color: '#0b1530',
   icons: [
     { src: '/brand/arvixa-mark-192.png', sizes: '192x192', type: 'image/png' },
     { src: LOGO_PATH, sizes: '512x512', type: 'image/png' },

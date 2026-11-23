@@ -1,5 +1,5 @@
-import { createContext, useContext } from 'react';
-import { Navigate, NavLink, Outlet } from 'react-router-dom';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { api } from '../../api/client';
 import Icon from '../../components/common/Icon';
 import { PREVIEW } from '../../config';
@@ -24,9 +24,41 @@ const LINKS = PREVIEW ? ALL_LINKS.filter((l) => l.to !== '/seller/dashboard') : 
 const SellerProfileContext = createContext({ profile: null, reload: () => {} });
 export const useSellerProfile = () => useContext(SellerProfileContext);
 
+const THEME_KEY = 'hub-theme';
+const savedTheme = () => {
+  try {
+    return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+};
+
+// The hub is dark by default (easier on the eyes for long sessions), with a switch. The analytics dashboard stays light:
+// its charts are drawn for a white background.
+function useHubTheme() {
+  const { pathname } = useLocation();
+  const [theme, setTheme] = useState(savedTheme);
+  const dark = theme === 'dark' && pathname !== '/seller/dashboard';
+  useEffect(() => {
+    document.body.classList.toggle('hub-dark', dark);
+    return () => document.body.classList.remove('hub-dark');
+  }, [dark]);
+  const toggle = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      /* storage blocked: the choice lasts for this visit */
+    }
+  };
+  return { theme, toggle };
+}
+
 // Shell for the seller hub. Customers are sent to the onboarding page first.
 export default function SellerLayout() {
   const { user } = useAuth();
+  const { theme, toggle } = useHubTheme();
   const isSeller = ['seller', 'admin'].includes(user.role);
   const { data: profile, reload } = useApi(() => (isSeller ? api.sellerProfile() : Promise.resolve(null)), [isSeller]);
   if (!isSeller) return <Navigate to="/seller/register" replace />;
@@ -54,6 +86,9 @@ export default function SellerLayout() {
             <Icon name="help" size={16} />
             <span>Need help? <a href="/help">Seller support</a></span>
           </div>
+          <button type="button" className="hub-theme-toggle" onClick={toggle} aria-pressed={theme === 'dark'}>
+            <Icon name={theme === 'dark' ? 'eye' : 'eyeOff'} size={15} /> {theme === 'dark' ? 'Dark theme' : 'Light theme'}
+          </button>
         </aside>
         <section className="seller-main">
           <Outlet />

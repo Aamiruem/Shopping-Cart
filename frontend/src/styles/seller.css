@@ -258,7 +258,7 @@ a.insight-name:hover { color: var(--brand); }
 .store-logo { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-light); flex-shrink: 0; }
 .seller-help { display: flex; align-items: center; gap: 8px; margin: 12px 16px 4px; padding: 10px 12px; border-radius: var(--radius); background: var(--bg); color: var(--text-muted); font-size: var(--fs-xs); }
 .seller-help a { color: var(--brand); font-weight: 600; }
-.seller-main h1, .seller-main h2, .seller-store strong { font-family: 'Poppins', var(--font); letter-spacing: -0.01em; }
+.seller-main h1, .seller-main h2, .seller-store strong { font-family: var(--font-display); letter-spacing: -0.01em; }
 .seller-head h1 { font-size: 22px; font-weight: 800; }
 .seller-head h2 { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xl); font-weight: 700; }
 .seller-card { padding-bottom: 18px; }
@@ -295,7 +295,7 @@ a.insight-name:hover { color: var(--brand); }
 .stat-card .nav-chip { background: #fff; }
 .stat-card div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .stat-card span { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
-.stat-card strong { font-family: 'Poppins', var(--font); font-size: 20px; color: var(--tone); }
+.stat-card strong { font-family: var(--font-display); font-size: 20px; color: var(--tone); }
 .stat-card small { color: var(--text-muted); font-size: 11px; }
 .earnings-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--gap); margin: var(--gap) 0; }
 .seller-earnings > .panel + .panel { margin-top: var(--gap); }
@@ -351,7 +351,7 @@ a.insight-name:hover { color: var(--brand); }
 .growth-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
 .g-stat { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
 .g-stat span { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
-.g-stat strong { font-family: 'Poppins', var(--font); font-size: 20px; }
+.g-stat strong { font-family: var(--font-display); font-size: 20px; }
 .g-stat small { color: var(--text-muted); font-size: 11px; }
 .g-stat.highlight { background: linear-gradient(120deg, #16a34a, #22c55e); color: #fff; }
 .g-stat.highlight span, .g-stat.highlight small { color: #e7fbe9; }

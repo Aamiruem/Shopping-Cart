@@ -5,6 +5,7 @@ import DealTimer from '../components/home/DealTimer';
 import ClothingShortcuts from '../components/home/ClothingShortcuts';
 import FestiveStore from '../components/home/FestiveStore';
 import HeroCarousel from '../components/home/HeroCarousel';
+import HomeHero from '../components/home/HomeHero';
 import OfferBanners from '../components/home/OfferBanners';
 import PromoVideo from '../components/home/PromoVideo';
 import QuickLinks from '../components/home/QuickLinks';
@@ -115,6 +116,7 @@ export default function Home() {
   return (
     <div className="page-home container">
       <h1 className="sr-only">{SITE_NAME}: Online Shopping in India</h1>
+      <HomeHero />
       <QuickLinks />
       <FestiveStore />
       {/* Fashion first: clothing shortcuts, then women's and men's styles, straight after the festive store */}

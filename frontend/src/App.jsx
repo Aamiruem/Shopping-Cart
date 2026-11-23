@@ -7,6 +7,7 @@ import CategoryBar from './components/layout/CategoryBar';
 import Footer from './components/layout/Footer';
 import Navbar from './components/layout/Navbar';
 import { ConsentBanner, PreviewBanner } from './components/layout/NoticeBars';
+import MobileTabBar, { showsTabBar } from './components/layout/MobileTabBar';
 import PageToolbar from './components/layout/PageToolbar';
 import SiteHeader from './components/layout/SiteHeader';
 import { AuthModalProvider } from './context/AuthModalContext';
@@ -62,7 +63,7 @@ export default function App() {
 
   return (
     <AuthModalProvider>
-    <div className="app">
+    <div className={`app ${showsTabBar(pathname) ? 'with-tabbar' : ''}`}>
       <ScrollToTop />
       <PreviewBanner />
       <SiteHeader>
@@ -120,6 +121,7 @@ export default function App() {
       </main>
 
       <Footer />
+      <MobileTabBar />
       {!PREVIEW && <ChatWidget />}
       <ConsentBanner />
     </div>

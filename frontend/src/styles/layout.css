@@ -7,7 +7,7 @@
 .logo { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .logo-mark { flex-shrink: 0; width: 42px; height: 42px; object-fit: contain; mix-blend-mode: multiply; }
 .logo-text { display: flex; flex-direction: column; line-height: 1; }
-.logo-word { font-family: 'Poppins', var(--font); font-size: 25px; font-weight: 800; letter-spacing: -0.01em; color: var(--brand-ink); }
+.logo-word { font-family: var(--font-display); font-size: 25px; font-weight: 800; letter-spacing: -0.01em; color: var(--brand-ink); }
 .logo-tag { font-size: 9px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--brand); margin-top: 2px; white-space: nowrap; }
 
 .searchbar { position: relative; flex: 1; max-width: 760px; display: flex; align-items: center; background: var(--brand-faint); border: 1.5px solid transparent; border-radius: var(--radius); transition: border-color var(--transition), background var(--transition); }
