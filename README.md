@@ -249,21 +249,34 @@ npx vercel deploy --prod
 - **Pages:** `frontend/scripts/prerender.mjs` writes real HTML for every public page, plus `sitemap.xml`, `robots.txt`
   and the web app manifest. Crawlers need neither JavaScript nor an API.
 - **API:** `api/catalog.mjs` serves `backend/app/data/products.json` with the same response shapes as the FastAPI
-  backend. `api/_auth.mjs` handles sign-up, login, profile and password, and `api/_shop.mjs` handles the cart, wishlist,
-  saved addresses and cash-on-delivery orders. Seller, support and review routes answer 503 with an "opening soon"
-  message.
-- **Store mode** (`VITE_STORE_MODE=store`, the Vercel default): people can register and order, paying cash on delivery.
-  Sample ratings, discounts, offers, delivery promises and `Product` structured data stay hidden until there's real data
-  behind them. `VITE_STORE_MODE=preview` is browse-only. Run the store with the full API and databases, and a real
-  catalog, before setting `VITE_STORE_MODE=live`.
+  backend, and loads the rest on demand: accounts and password reset (`_auth.mjs`), cart, wishlist, addresses and
+  orders (`_shop.mjs`), Razorpay (`_payments.mjs`, `razorpay-webhook.mjs`), returns, reviews, support tickets, the
+  Seller Hub (`_seller.mjs`), recommendations, the shopping assistant (`_assistant.mjs`), leads (`_leads.mjs`) and
+  email (`_notify.mjs`).
+- **Store mode** (`VITE_STORE_MODE=store`): people can register and order. `vercel.json` builds `preview` (browse-only)
+  unless `VITE_STORE_MODE` is set in Vercel. Sample ratings, discounts, offers, delivery promises and `Product`
+  structured data stay hidden until there's real data behind them. Run the store with a real catalog before setting
+  `VITE_STORE_MODE=live`.
 - **Accounts and orders** use the backend's tables, bcrypt hashes and token format, so they carry over to the full API
   when it uses the same database and `JWT_SECRET`. Carts and wishlists are PostgreSQL tables here (`api/_schema.mjs`) and
-  MongoDB in the full API. With no email service yet, sign-up doesn't verify the address, and there is no password reset,
-  one-time-code login, Google sign-in or order email.
-- **Limits of store mode:** stock doesn't go down as orders are placed, because the catalog is a read-only file, and
-  there's no Seller Hub. Read new orders in the Neon dashboard (Tables -> `orders`, `order_items`).
-- **Product URLs** use ids derived from the product name (`stable_product_id`), so they stay the same after moving
-  to MongoDB. Marked-up ratings stay off until real customer reviews exist.
+  MongoDB in the full API. Sign-up doesn't verify the email address, and there's no one-time-code login or Google sign-in
+  here yet.
+- **Shopping assistant** (the Help button): reads what the shopper wants (product, use, brand, budget, in English or
+  Hinglish), searches the live catalog and answers with real in-stock products and prices, plus delivery, payment and
+  return policies. Product cards have an *Add to cart* button; the assistant itself never changes the cart or places
+  orders. With `ANTHROPIC_API_KEY` set, Claude (`ASSISTANT_MODEL`, default `claude-opus-5-5`) answers through tools that
+  read the catalog, capped at 40 messages per connection per 15 minutes; without it, or if Claude is down, rules answer.
+  Server-side refusal fallback (`fallbacks: "default"`) is on.
+- **Leads** (Seller Hub -> Leads, admin only): the product page's *Ask a question or request a bulk quote* form and
+  assistant conversations that state a clear need become leads, scored high / medium / low intent with a summary, a
+  suggested next step and in-stock products that fit. An order placed afterwards by the same account or email counts as a
+  conversion. Contact details are only what people typed, with a consent box; assistant leads from signed-out
+  shoppers hold no identity at all. `POST /api/leads` also accepts `source: "contact"` and `"newsletter"`.
+- **Email** (Resend): order confirmation to the shopper, new-order and high-intent-lead alerts to `ADMIN_EMAIL`, and
+  password-reset links (single use, 30 minutes). Every attempt is logged in the `notifications` table as sent, failed
+  or skipped. Until `RESEND_API_KEY` and `MAIL_FROM` are set nothing is sent and "Forgot password?" says it isn't
+  available yet.
+- Read orders, leads and the email log in the Neon dashboard too (Tables -> `orders`, `leads`, `notifications`).
 
 One-time database setup: add a Neon database to the Vercel project (it sets `DATABASE_URL`), add a random
 `JWT_SECRET` of at least 32 characters, then create the tables from the repository root:
@@ -283,6 +296,16 @@ Other settings are build-time environment variables (add them in Vercel, then re
 | `VITE_BING_SITE_VERIFICATION` | The `content` value of Bing Webmaster Tools' tag |
 | `VITE_CONTACT_EMAIL` | Real support address for the footer and legal pages |
 | `VITE_SITE_URL` | Only if the canonical domain differs from the Vercel project's production domain |
+
+Server-side settings (Vercel -> Settings -> Environment Variables; no rebuild needed, but redeploy to apply):
+
+| Variable | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | Turns on Claude for the shopping assistant (rules answer without it) |
+| `ASSISTANT_MODEL` | Optional: another Claude model id, e.g. a cheaper one for high traffic |
+| `RESEND_API_KEY`, `MAIL_FROM` | Email through Resend, from a domain verified there, e.g. `Arvixa Store <orders@your-domain>` |
+| `ADMIN_EMAIL` | Where new-order and high-intent-lead alerts go |
+| `SITE_URL` | Links in emails, if the site isn't on the Vercel production domain |
 
 Vercel's Hobby plan is for non-commercial use, so move to Pro before selling.
 

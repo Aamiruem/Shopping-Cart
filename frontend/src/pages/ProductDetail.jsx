@@ -7,6 +7,7 @@ import Price from '../components/common/Price';
 import Rating, { shownRating } from '../components/common/Rating';
 import ProductRail from '../components/product/ProductRail';
 import BuyBox from '../components/product/BuyBox';
+import ProductEnquiry from '../components/product/ProductEnquiry';
 import Reviews from '../components/product/Reviews';
 import ShareButton from '../components/product/ShareButton';
 import StoreFacts from '../components/product/StoreFacts';
@@ -307,6 +308,7 @@ export default function ProductDetail() {
               </tbody>
             </table>
           </div>
+          {SHOPPING && <ProductEnquiry key={product._id} product={product} />}
         </div>
         {STORE && <BuyBox product={product} />}
       </div>

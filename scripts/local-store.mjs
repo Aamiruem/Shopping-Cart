@@ -18,6 +18,7 @@ import { handleAuth, postgresStore, useLocalDatabase } from '../api/_auth.mjs';
 import { listProducts } from '../api/_catalog.mjs';
 import { syncCatalogState } from '../api/_inventory.mjs';
 import { recordView } from '../api/_recommend.mjs';
+import { handleLeads } from '../api/_leads.mjs';
 import { handleReviews } from '../api/_reviews.mjs';
 import { STORE_SCHEMA } from '../api/_schema.mjs';
 import { handleSeller, syncSellerProducts } from '../api/_seller.mjs';
@@ -100,6 +101,11 @@ if (listed.status === 201) await order(ravi, [listed.body], { daysAgo: 0 });
 for (const p of byCategory('fashion').slice(0, 6)) await recordView(db, { productId: p._id, userId: asha.id });
 const ticket = await asha.support('POST', 'tickets', { subject: 'Where is my parcel?', message: 'My shoes were shipped yesterday but tracking has not moved (demo).' });
 await owner.support('POST', `tickets/${ticket.body.id}/messages`, { message: 'Thanks for waiting, the courier says it arrives tomorrow.' });
+// Two demo leads for the Seller Hub's Leads page (local demo data, not real people)
+for (const lead of [
+  { source: 'quote', name: 'Demo Buyer', email: 'buyer@example.com', consent: true, message: 'Need 50 pieces of cotton t-shirts for our office team, urgent.' },
+  { source: 'contact', name: 'Asha Rao', email: 'asha@example.com', consent: true, message: 'Looking for running shoes under 3000 for my daily runs.' },
+]) await handleLeads({ method: 'POST', rest: [], body: lead, ip: 'seed' }, { db });
 await syncCatalogState(db, Date.now(), true);
 
 // ---------- A small stand-in for Vercel's request handling ----------

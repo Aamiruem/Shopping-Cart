@@ -42,6 +42,8 @@ export function AuthProvider({ children }) {
     },
     verifySignup: async (email, code) => saveSession(await api.verifySignup({ email, code })),
     googleLogin: async (credential) => saveSession(await api.googleLogin(credential)),
+    // From the emailed reset link: sets the new password and signs in
+    resetPassword: async (token, password) => saveSession(await api.resetPassword(token, password)),
     setUser,
     updateProfile: async (form) => setUser(await api.updateProfile(form)),
     logout: () => {

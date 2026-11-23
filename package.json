@@ -9,6 +9,7 @@
     "local": "node scripts/local-store.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.6.0",
     "@neondatabase/serverless": "1.0.2",
     "@vercel/blob": "^2.8.2",
     "bcryptjs": "3.0.3",

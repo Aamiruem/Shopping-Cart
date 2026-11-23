@@ -438,3 +438,18 @@ a.insight-name:hover { color: var(--brand); }
 .sig-badge.no { background: #f1f1ee; color: #52514e; }
 .insight-rows { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-xs); color: #52514e; }
 @media (max-width: 560px) { .ask-data-form { flex-direction: column; } }
+
+/* Leads */
+.lead-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.lead-stats div { display: flex; flex-direction: column; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--bg); }
+.lead-stats strong { font-size: var(--fs-xl); }
+.lead-stats span { font-size: var(--fs-xs); color: var(--text-muted); }
+.lead-status-filter { margin-bottom: 12px; flex-wrap: wrap; }
+.lead-detail { padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.lead-message { margin: 0; padding: 8px 12px; border-left: 3px solid var(--brand-light); background: var(--bg); white-space: pre-wrap; }
+.lead-facts { margin: 0; display: grid; gap: 6px; font-size: var(--fs-sm); }
+.lead-facts div { display: grid; grid-template-columns: 140px 1fr; gap: 8px; }
+.lead-facts dt { color: var(--text-muted); }
+.lead-facts dd { margin: 0; }
+.lead-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+@media (max-width: 600px) { .lead-facts div { grid-template-columns: 1fr; gap: 0; } }

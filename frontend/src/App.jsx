@@ -43,6 +43,8 @@ const SellerEarnings = lazy(() => import('./pages/seller/SellerEarnings'));
 const SellerSettings = lazy(() => import('./pages/seller/SellerSettings'));
 const SellerSupport = lazy(() => import('./pages/seller/SellerSupport'));
 const SellerCatalog = lazy(() => import('./pages/seller/SellerCatalog'));
+const SellerLeads = lazy(() => import('./pages/seller/SellerLeads'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
 // Pages that show the category strip under the navbar
 const WITH_CATEGORY_BAR = ['/', '/products', '/grocery'];
@@ -81,6 +83,7 @@ export default function App() {
             <Route path="/grocery" element={<Grocery />} />
             <Route path="/login" element={SHOPPING ? <Login /> : <OpeningSoon />} />
             <Route path="/register" element={SHOPPING ? <Login mode="register" /> : <OpeningSoon />} />
+            <Route path="/reset-password" element={SHOPPING ? <ResetPassword /> : <OpeningSoon />} />
             <Route path="/help" element={<Help />} />
             <Route path="/sell" element={<Sell />} />
             <Route path="/visual-search" element={<VisualSearch />} />
@@ -110,6 +113,7 @@ export default function App() {
               <Route path="settings" element={<SellerSettings />} />
               <Route path="support" element={<SellerSupport />} />
               <Route path="catalog" element={<SellerCatalog />} />
+              <Route path="leads" element={<SellerLeads />} />
           </Route>
 
             <Route path="*" element={<NotFound />} />
@@ -118,7 +122,7 @@ export default function App() {
       </main>
 
       <Footer />
-      {!PREVIEW && <ChatWidget />}
+      {SHOPPING && <ChatWidget />}
       <ConsentBanner />
     </div>
     </AuthModalProvider>

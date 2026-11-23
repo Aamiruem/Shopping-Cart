@@ -170,6 +170,23 @@ export default async function handler(req, res) {
       return send(res, result.status, result.body);
     }
   }
+  const ip = req.headers['x-real-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+  if (area === 'ai') {
+    const assistant = await import('./_assistant.mjs');
+    if (assistant.isAssistantRoute(req.method, rest)) {
+      const result = await assistant.handleAssistant({ rest, body: bodyOf(req), ip, authorization: req.headers.authorization });
+      Object.entries(result.headers).forEach(([key, value]) => res.setHeader(key, value));
+      return send(res, result.status, result.body);
+    }
+  }
+  if (area === 'leads') {
+    const leads = await import('./_leads.mjs');
+    if (leads.isLeadRoute(req.method, rest)) {
+      const result = await leads.handleLeads({ method: req.method, rest, body: bodyOf(req), params, ip, authorization: req.headers.authorization });
+      Object.entries(result.headers).forEach(([key, value]) => res.setHeader(key, value));
+      return send(res, result.status, result.body);
+    }
+  }
   if (['recommendations', 'ai', 'events'].includes(area)) {
     const answer = await recommendations(req, area, rest, params);
     if (answer) return send(res, answer.status ?? 200, answer.body, answer.cacheable);

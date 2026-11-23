@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { PREVIEW } from '../config';
 import CodeVerify from '../components/account/CodeVerify';
+import { ForgotPassword } from '../components/account/ForgotPassword';
 import GoogleButton from '../components/account/GoogleButton';
 import Icon from '../components/common/Icon';
 import { useAuth } from '../context/AuthContext';
@@ -123,6 +124,7 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
   const [identifier, setIdentifier] = useState('');
   const [channel, setChannel] = useState('sms');
   const [otpSent, setOtpSent] = useState(null); // { identifier, sentTo, channel, devCode? }
+  const [forgot, setForgot] = useState(false); // the emailed reset-link form (store mode)
 
   const isRegister = mode === 'register';
   const copy = COPY[mode];
@@ -250,6 +252,11 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
             <img className="auth-logo" src="/brand/arvixa-logo.webp" alt="Arvixa — Shop Beyond Limits" width="240" height="96" />
             {codeStep}
           </div>
+        ) : forgot ? (
+          <div className="auth-form">
+            <img className="auth-logo" src="/brand/arvixa-logo.webp" alt="Arvixa — Shop Beyond Limits" width="240" height="96" />
+            <ForgotPassword initialEmail={form.email} onBack={() => setForgot(false)} />
+          </div>
         ) : (
           <form className="auth-form" onSubmit={onSubmit} noValidate>
             <img className="auth-logo" src="/brand/arvixa-logo.webp" alt="Arvixa — Shop Beyond Limits" width="240" height="96" />
@@ -326,6 +333,11 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
                     <Icon name={showPassword ? 'eyeOff' : 'eye'} size={18} />
                   </button>
                 </Field>
+                {!isRegister && PREVIEW && (
+                  <button type="button" className="btn-link auth-forgot" onClick={() => setForgot(true)}>
+                    Forgot password?
+                  </button>
+                )}
                 {!isRegister && !PREVIEW && (
                   <button type="button" className="btn-link auth-forgot" onClick={() => switchMethod('otp', 'No problem — log in with a one-time code instead, then set a new password in My Profile.')}>
                     Forgot password?

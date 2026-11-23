@@ -124,6 +124,8 @@ export const api = {
   me: () => request('/auth/me'),
   updateProfile: (body) => request('/auth/me', { method: 'PUT', body }),
   changePassword: (body) => request('/auth/password', { method: 'PUT', body }),
+  forgotPassword: (email) => request('/auth/forgot', { method: 'POST', body: { email } }),
+  resetPassword: (token, password) => request('/auth/reset', { method: 'POST', body: { token, password } }),
 
   // Catalog
   products: (params = {}) => request(`/products?${query(params)}`),
@@ -245,4 +247,8 @@ export const api = {
   recommend: (productId) => request(`/ai/recommend/${productId}`),
   ask: (question) => request('/ai/ask', { method: 'POST', body: { question } }),
   agent: (messages) => request('/ai/agent', { method: 'POST', body: { messages } }),
+  // Leads: anyone can send one; the admin lists and updates them
+  sendLead: (body) => request('/leads', { method: 'POST', body }),
+  leads: (params = {}) => request(`/leads?${query(params)}`),
+  updateLead: (id, body) => request(`/leads/${id}`, { method: 'PATCH', body }),
 };

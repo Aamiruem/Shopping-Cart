@@ -378,3 +378,9 @@
   .product-grid .product-card:hover, .department:hover { transform: none; }
 }
 .rail-highlight .rail-head p { color: rgba(255, 255, 255, 0.85); }
+
+/* "Ask about this product" */
+.product-enquiry-open { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; }
+.product-enquiry { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.enquiry-contact { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.enquiry-actions { display: flex; align-items: center; gap: 12px; }

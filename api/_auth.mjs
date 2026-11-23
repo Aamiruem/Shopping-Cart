@@ -2,8 +2,9 @@
 // backend/app/routers/auth.py. Password hashes (bcrypt) and login tokens (HS256 JWT with id, email, role) match the
 // FastAPI backend, so accounts and sessions carry over when the full store takes these routes.
 //
-// There is no email service yet, so signup skips the backend's emailed code and accounts stay email_verified = FALSE.
-import { createHash } from 'node:crypto';
+// Signup skips the backend's emailed code, so accounts stay email_verified = FALSE. Password reset by email works once
+// the email service is set up (api/_notify.mjs); until then "forgot password" says so.
+import { createHash, randomBytes } from 'node:crypto';
 import { resolveMx } from 'node:dns/promises';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
@@ -161,15 +162,51 @@ async function changePassword(body, ctx) {
   return { body: await publicUser(updated, ctx.store) };
 }
 
+const RESET_MINUTES = 30;
+const FORGOT_REPLY = { message: 'If that email has an Arvixa account, we’ve sent a link to reset the password. Check your inbox and spam folder.' };
+const sha256 = (value) => createHash('sha256').update(value).digest('hex');
+
+// Same answer whether or not the account exists, so the form can't be used to find out who shops here
+async function forgotPassword(body, ctx) {
+  const { emailEnabled, sendEmail, siteUrl } = await import('./_notify.mjs');
+  if (!emailEnabled()) throw new ApiError(503, 'Password reset by email isn’t available yet. Please contact support from the Help page.');
+  const email = normalizeEmail(body.email);
+  if (emailError(email)) throw new ApiError(400, 'Please enter a valid email address');
+  await limit(ctx.store, `forgot:${ctx.ip}`, IP_LIMIT, 'Too many requests. Please try again in 15 minutes.');
+  await limit(ctx.store, `forgot-email:${email}`, 3, 'We’ve already sent a few links. Please check your inbox or try again in 15 minutes.');
+  const user = await ctx.store.findByEmail(email);
+  if (user) {
+    const token = randomBytes(32).toString('base64url');
+    await ctx.store.saveResetToken(user, sha256(token), RESET_MINUTES);
+    const link = `${siteUrl()}/reset-password?token=${token}`;
+    await sendEmail(ctx.store.db, { to: user.email, template: 'password_reset', data: { name: user.name, link, minutes: RESET_MINUTES } });
+  }
+  return { body: FORGOT_REPLY };
+}
+
+async function resetPassword(body, ctx) {
+  const token = text(body.token);
+  await limit(ctx.store, `reset:${ctx.ip}`, IP_LIMIT, 'Too many attempts. Please try again in 15 minutes.');
+  const error = passwordError(body.password);
+  if (error) throw new ApiError(400, error);
+  if (!/^[\w-]{40,64}$/.test(token)) throw new ApiError(400, 'This reset link is invalid or has expired. Please ask for a new one.');
+  const hash = await bcrypt.hash(body.password, BCRYPT_ROUNDS);
+  const user = await ctx.store.useResetToken(sha256(token), hash);
+  if (!user) throw new ApiError(400, 'This reset link is invalid or has expired. Please ask for a new one.');
+  return { body: await session(user, ctx.store) };
+}
+
 const ROUTES = {
   'POST register': register,
+  'POST forgot': forgotPassword,
+  'POST reset': resetPassword,
   'POST login': login,
   'GET me': async (_, ctx) => ({ body: await publicUser(await signedInUser(ctx), ctx.store) }),
   'PUT me': updateProfile,
   'PUT password': changePassword,
 };
 
-/** The routes above; anything else (one-time codes, Google, phone) needs a service this deployment doesn't have. */
+/** The routes above; anything else (one-time codes, Google, phone) needs a service this deployment doesn't have yet. */
 export const isAuthRoute = (method, rest) => `${method} ${rest}` in ROUTES;
 
 /** Runs a route: expected errors become their status and message, anything else a plain 500 with no details. */
@@ -197,12 +234,37 @@ export const useLocalDatabase = (db) => {
   localDb = db;
 };
 
+/** True when there is a database to use: Neon on Vercel, or the local store's in-memory one. */
+export const databaseConfigured = () => Boolean(localDb || process.env.DATABASE_URL);
+
 export const query = (statement, params = []) => (localDb ? localDb(statement, params) : (client ??= neon(process.env.DATABASE_URL)).query(statement, params));
 
 export function postgresStore(db = query) {
   const one = async (statement, params) => (await db(statement, params))[0] ?? null;
   return {
+    db,
     findByEmail: (email) => one('SELECT * FROM users WHERE email = $1', [email]),
+    // A new link replaces any earlier one that wasn't used
+    saveResetToken: (user, tokenHash, minutes) =>
+      one(
+        `WITH old AS (
+           UPDATE verification_codes SET used_at = NOW() WHERE purpose = 'reset' AND user_id = $1 AND used_at IS NULL
+         )
+         INSERT INTO verification_codes (purpose, target, channel, user_id, code_hash, expires_at)
+         VALUES ('reset', $2, 'email', $1, $3, NOW() + make_interval(mins => $4)) RETURNING id`,
+        [user.id, user.email, tokenHash, minutes],
+      ),
+    // Uses the link and sets the password in one statement: a link works once, even if clicked twice at the same moment
+    useResetToken: (tokenHash, passwordHash) =>
+      one(
+        `WITH used AS (
+           UPDATE verification_codes SET used_at = NOW()
+            WHERE purpose = 'reset' AND code_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+           RETURNING user_id
+         )
+         UPDATE users SET password_hash = $2, email_verified = TRUE, last_login = NOW() WHERE id = (SELECT user_id FROM used) RETURNING *`,
+        [tokenHash, passwordHash],
+      ),
     findById: (id) => one('SELECT * FROM users WHERE id = $1', [id]),
     create: ({ name, email, phone, passwordHash }) =>
       one(

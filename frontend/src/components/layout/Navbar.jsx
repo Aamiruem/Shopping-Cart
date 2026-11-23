@@ -5,7 +5,7 @@ import { useAuthModal } from '../../context/AuthModalContext';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
 import { useWishlist } from '../../context/WishlistContext';
-import { PREVIEW } from '../../config';
+import { SHOPPING } from '../../config';
 import { installApp, installStore, isInstalled, manualInstallHint } from '../../utils/install';
 import { soundStore } from '../../utils/sound';
 import Icon from '../common/Icon';
@@ -171,8 +171,8 @@ function MoreMenu() {
           {isSellerRole(user) && <MenuLink to="/seller/dashboard" icon="barChart" label="Seller Hub" />}
           <MenuLink to="/help" icon="headphones" label="Customer Care" />
           <MenuLink to="/orders" icon="package" label="Track your orders" />
-          {/* The chat assistant needs the full API; in store mode there's no chat window to open */}
-          {!PREVIEW && (
+          {/* The shopping assistant answers wherever people can shop (api/_assistant.mjs in store mode) */}
+          {SHOPPING && (
             <button type="button" className="menu-link" onClick={() => { setOpen(false); window.dispatchEvent(new Event(OPEN_CHAT_EVENT)); }}>
               <Icon name="message" size={18} /> <span>Chat with our assistant</span>
             </button>

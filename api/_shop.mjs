@@ -11,6 +11,7 @@ import { ApiError, currentUserId, limit, postgresStore, query, safely } from './
 import { razorpayClient, refundPaidOrder } from './_payments.mjs';
 import { restockOrder, syncCatalogState, TAKE_STOCK_SQL } from './_inventory.mjs';
 import { orderReturn, requestReturn, withdrawReturn } from './_returns.mjs';
+import { notifyOrderPlaced } from './_notify.mjs';
 
 const MAX_QTY = 10;
 const MAX_CART_LINES = 50;
@@ -299,8 +300,12 @@ export async function createOrder(db, { userId, address, method, summary }) {
     throw err;
   }
   const [order] = rows;
-  if (order) await syncCatalogState(db, Date.now(), true); // this instance shows the new stock straight away
-  return order ? orderJson(order) : null;
+  if (!order) return null;
+  await syncCatalogState(db, Date.now(), true); // this instance shows the new stock straight away
+  // Confirmation to the shopper, alert to the store. Awaited (a serverless function stops when it answers) but never
+  // fatal: notifyOrderPlaced logs and swallows its own errors.
+  await notifyOrderPlaced(db, order, summary.items);
+  return orderJson(order);
 }
 
 async function listOrders({ db, userId }) {

@@ -42,7 +42,8 @@
   },
   "functions": {
     "api/catalog.mjs": {
-      "includeFiles": "backend/app/data/{products,seasons}.json"
+      "includeFiles": "backend/app/data/{products,seasons}.json",
+      "maxDuration": 60
     },
     "api/razorpay-webhook.mjs": {
       "includeFiles": "backend/app/data/products.json"
@@ -112,7 +113,7 @@
       "destination": "/_seo/shell/index.html"
     },
     {
-      "source": "/(cart|checkout|wishlist|account|login|register|orders|payments|seller)",
+      "source": "/(cart|checkout|wishlist|account|login|register|reset-password|orders|payments|seller)",
       "destination": "/_seo/shell/index.html"
     },
     {
@@ -139,6 +140,10 @@
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=(self)"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains"
         }
       ]
     },
@@ -161,7 +166,7 @@
       ]
     },
     {
-      "source": "/(cart|checkout|wishlist|account|login|register|orders|payments|seller|_seo)(.*)",
+      "source": "/(cart|checkout|wishlist|account|login|register|reset-password|orders|payments|seller|_seo)(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",

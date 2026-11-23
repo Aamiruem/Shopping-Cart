@@ -66,4 +66,48 @@ CREATE TABLE IF NOT EXISTS stock_adjustments (
   delta      INTEGER     NOT NULL DEFAULT 0,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Enquiries for the sales team (api/_leads.mjs): contact and product-enquiry forms, quote requests, newsletter sign-ups
+-- and shopping-assistant conversations. Name, email and phone are only what the person typed in, with consent.
+CREATE TABLE IF NOT EXISTS leads (
+  id           SERIAL PRIMARY KEY,
+  source       VARCHAR(20)  NOT NULL,                  -- contact | product | quote | newsletter | assistant
+  kind         VARCHAR(20)  NOT NULL,                  -- purchase | product_enquiry | support | business | newsletter
+  intent       VARCHAR(10)  NOT NULL,                  -- high | medium | low
+  status       VARCHAR(12)  NOT NULL DEFAULT 'new',    -- new | contacted | qualified | won | lost
+  user_id      INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  name         VARCHAR(100),
+  email        VARCHAR(254),
+  phone        VARCHAR(15),
+  product_id   VARCHAR(64),
+  category     VARCHAR(40),
+  brand        VARCHAR(60),
+  budget       NUMERIC(12, 2),
+  message      TEXT,
+  summary      TEXT         NOT NULL,
+  next_step    TEXT,
+  recommended  JSONB        NOT NULL DEFAULT '[]',      -- ids of in-stock products that fit, when the lead was made
+  notes        TEXT,
+  consent      BOOLEAN      NOT NULL DEFAULT FALSE,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS leads_created_idx ON leads (created_at DESC);
+CREATE INDEX IF NOT EXISTS leads_user_idx ON leads (user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS leads_email_idx ON leads (email) WHERE email IS NOT NULL;
+
+-- Every email the store tried to send (api/_notify.mjs): what, to whom, and whether the provider took it
+CREATE TABLE IF NOT EXISTS notifications (
+  id          SERIAL PRIMARY KEY,
+  channel     VARCHAR(10)  NOT NULL DEFAULT 'email',
+  template    VARCHAR(40)  NOT NULL,
+  recipient   VARCHAR(254) NOT NULL,
+  subject     VARCHAR(200) NOT NULL,
+  status      VARCHAR(10)  NOT NULL,                   -- sent | failed | skipped (no email service set up)
+  provider_id VARCHAR(100),
+  error       TEXT,
+  attempts    INTEGER      NOT NULL DEFAULT 1,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS notifications_created_idx ON notifications (created_at DESC);
 `;

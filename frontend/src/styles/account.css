@@ -132,3 +132,7 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-modal-backdrop, .auth-modal { animation: none; }
 }
+
+/* Password reset page */
+.reset-page { padding-block: 24px; }
+.reset-page .auth-form { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
