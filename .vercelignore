@@ -18,3 +18,5 @@ backend/app/*
 # Local secrets (the Vercel CLI writes a token to .env.local)
 .env*
 !.env.example
+# Payment keys exported from the Razorpay dashboard (git ignores them too)
+**/*rzp-key*.csv

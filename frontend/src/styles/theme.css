@@ -245,8 +245,8 @@ body.hub-dark .hero-tile-tag { background: rgba(22, 26, 34, 0.75); border-color:
 @media (max-width: 860px) { .hub-theme-toggle { margin-top: 0; } }
 
 /* ---------- Full width: no empty bands at the sides on any page ---------- */
-.container.narrow, .legal-page { max-width: none; }
-.legal-page { width: auto; margin-inline: 12px; }
+.container.narrow, .legal-page.panel { max-width: none; } /* .panel: beats the later rule in index.css */
+.legal-page.panel { width: auto; margin-inline: 12px; }
 .legal-page > p, .legal-page > ul, .legal-page > ol, .legal-page > dl { max-width: 90ch; } /* text lines stay readable */
 @media (min-width: 1600px) {
   .home-hero-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
