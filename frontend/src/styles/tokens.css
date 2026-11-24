@@ -50,7 +50,7 @@
   --shadow-lg: 0 18px 44px rgba(16, 24, 40, 0.12);
 
   /* Layout */
-  --container: 1440px;
+  --container: none;            /* full width: pages use the whole screen */
   --nav-height: 68px;
   --gap: 16px;
   --transition: 0.18s ease;

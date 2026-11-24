@@ -243,3 +243,12 @@ body.hub-dark .hero-tile-tag { background: rgba(22, 26, 34, 0.75); border-color:
 .hub-theme-toggle { display: flex; align-items: center; gap: 8px; margin: 8px 16px 6px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-pill); color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
 .hub-theme-toggle:hover { color: var(--text); border-color: var(--text-muted); }
 @media (max-width: 860px) { .hub-theme-toggle { margin-top: 0; } }
+
+/* ---------- Full width: no empty bands at the sides on any page ---------- */
+.container.narrow, .legal-page { max-width: none; }
+.legal-page { width: auto; margin-inline: 12px; }
+.legal-page > p, .legal-page > ul, .legal-page > ol, .legal-page > dl { max-width: 90ch; } /* text lines stay readable */
+@media (min-width: 1600px) {
+  .home-hero-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hero-tile-img { aspect-ratio: 16 / 10; } /* wide screens: tiles grow wider, not taller */
+}
