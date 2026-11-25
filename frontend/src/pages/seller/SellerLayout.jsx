@@ -17,8 +17,8 @@ const ALL_LINKS = [
   { to: '/seller/support', icon: 'message', label: 'Complaints', tone: 'orange', admin: true },
   { to: '/seller/leads', icon: 'users', label: 'Leads & enquiries', tone: 'green', admin: true },
 ];
-// The analytics & ML dashboard needs the full Python API
-const LINKS = PREVIEW ? ALL_LINKS.filter((l) => l.to !== '/seller/dashboard') : ALL_LINKS;
+// Store mode has its own dashboard (StoreDashboard.jsx); the analytics & ML dashboard needs the full Python API
+const LINKS = PREVIEW ? ALL_LINKS.map((l) => (l.to === '/seller/dashboard' ? { ...l, icon: 'grid', label: 'Dashboard' } : l)) : ALL_LINKS;
 
 // The store profile, shared with the hub pages (settings edits it, the sidebar shows the logo)
 const SellerProfileContext = createContext({ profile: null, reload: () => {} });
@@ -33,12 +33,12 @@ const savedTheme = () => {
   }
 };
 
-// The hub is dark by default (easier on the eyes for long sessions), with a switch. The analytics dashboard stays light:
-// its charts are drawn for a white background.
+// The hub is dark by default (easier on the eyes for long sessions), with a switch. The ML analytics dashboard stays
+// light: its charts are drawn for a white background. The store-mode dashboard follows the switch.
 function useHubTheme() {
   const { pathname } = useLocation();
   const [theme, setTheme] = useState(savedTheme);
-  const dark = theme === 'dark' && pathname !== '/seller/dashboard';
+  const dark = theme === 'dark' && (PREVIEW || pathname !== '/seller/dashboard');
   useEffect(() => {
     document.body.classList.toggle('hub-dark', dark);
     return () => document.body.classList.remove('hub-dark');

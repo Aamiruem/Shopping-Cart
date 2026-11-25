@@ -38,6 +38,8 @@ const VisualSearch = lazy(() => import('./pages/VisualSearch'));
 const SellerLayout = lazy(() => import('./pages/seller/SellerLayout'));
 const SellerOnboarding = lazy(() => import('./pages/seller/SellerOnboarding'));
 const AnalyticsDashboard = lazy(() => import('./pages/seller/AnalyticsDashboard'));
+// Store mode: the dashboard reads the store API's own database (the ML dashboard needs the full Python API)
+const StoreDashboard = lazy(() => import('./pages/seller/StoreDashboard'));
 const SellerProducts = lazy(() => import('./pages/seller/SellerProducts'));
 const SellerOrders = lazy(() => import('./pages/seller/SellerOrders'));
 const SellerEarnings = lazy(() => import('./pages/seller/SellerEarnings'));
@@ -104,8 +106,8 @@ export default function App() {
             {/* Seller hub (sellers & admins; customers are sent to onboarding) */}
             <Route path="/seller/register" element={sellerRoute(<SellerOnboarding />)} />
             <Route path="/seller" element={sellerRoute(<SellerLayout />)}>
-              <Route index element={<Navigate to={PREVIEW ? 'products' : 'dashboard'} replace />} />
-              <Route path="dashboard" element={PREVIEW ? <Navigate to="/seller/products" replace /> : <AnalyticsDashboard />} />
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={PREVIEW ? <StoreDashboard /> : <AnalyticsDashboard />} />
               <Route path="products" element={<SellerProducts />} />
               <Route path="orders" element={<SellerOrders />} />
               <Route path="earnings" element={<SellerEarnings />} />
