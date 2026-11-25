@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import { Spinner } from './components/common/Feedback';
 import ChatWidget from './components/chat/ChatWidget';
 import { PREVIEW, SHOPPING } from './config';
@@ -56,6 +57,11 @@ const shopRoute = (element) => (SHOPPING ? privateRoute(element) : <OpeningSoon 
 // The Seller Hub runs on the api/ functions too; only its analytics dashboard needs the full API
 const sellerRoute = (element) => (SHOPPING ? privateRoute(element) : <OpeningSoon />);
 
+function ProductRedirect() {
+  const { id, slug } = useParams();
+  return <Navigate to={`/products/${id}${slug ? `/${slug}` : ''}`} replace />;
+}
+
 export default function App() {
   const { pathname, search } = useLocation();
 
@@ -75,8 +81,12 @@ export default function App() {
 
       <main className="app-main">
         <PageToolbar />
+        <ErrorBoundary resetKey={pathname}>
         <Suspense fallback={<Spinner />}>
           <Routes>
+            {/* Old and guessed addresses: /product/:id and /admin go to the real pages */}
+            <Route path="/product/:id/:slug?" element={<ProductRedirect />} />
+            <Route path="/admin/*" element={<Navigate to="/seller/dashboard" replace />} />
             {/* Public */}
             <Route path="/" element={<Home />} />
             <Route path="/products" element={<Products />} />
@@ -120,6 +130,7 @@ export default function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
+        </ErrorBoundary>
       </main>
 
       <Footer />

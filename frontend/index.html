@@ -23,7 +23,35 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
     <link rel="preconnect" href="https://cdn.dummyjson.com" />
     <title>Arvixa Store — Online Shopping in India: Mobiles, Fashion, Grocery & More</title>
-    <style>.seo-static{max-width:1100px;margin:0 auto;padding:16px;font:16px/1.6 system-ui,sans-serif;color:#212121}.seo-static img{max-width:100%;height:auto}</style>
+    <!--
+      First paint, before the app's code arrives (scripts/prerender.mjs fills #root):
+      .app-boot   a branded shell laid out like the real header, with skeleton cards. React replaces it when it starts.
+      .seo-static the page as plain HTML for search engines and screen readers; hidden from sight while the app loads,
+                  shown as a readable page when JavaScript is off (noscript) or the app fails to start (.boot-slow).
+    -->
+    <style>
+      body{margin:0;background:#f5f6f8;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+      .seo-static{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+      .app-boot-bar{background:#fff;border-bottom:1px solid #eceef2}
+      .app-boot-bar>div{max-width:1440px;margin:0 auto;min-height:72px;padding:0 16px;display:flex;align-items:center;gap:20px;box-sizing:border-box}
+      .app-boot-logo{height:44px;width:auto;flex-shrink:0}
+      .app-boot-search{flex:1;max-width:720px;height:46px;border-radius:999px;background:#f1f3f6}
+      .app-boot-main{max-width:1440px;margin:0 auto;padding:20px 16px;box-sizing:border-box}
+      .app-boot-hero{height:clamp(160px,28vw,320px);border-radius:24px;margin-bottom:20px}
+      .app-boot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+      .app-boot-card{aspect-ratio:3/4;border-radius:16px}
+      .app-boot-hero,.app-boot-card{background:linear-gradient(90deg,#eceef2 25%,#f7f8fa 50%,#eceef2 75%);background-size:200% 100%;animation:app-boot-shine 1.3s linear infinite}
+      @keyframes app-boot-shine{to{background-position:-200% 0}}
+      @media (prefers-reduced-motion:reduce){.app-boot-hero,.app-boot-card{animation:none}}
+      @media (max-width:600px){.app-boot-bar>div{min-height:60px}.app-boot-search{display:none}.app-boot-logo{height:36px}.app-boot-grid{grid-template-columns:repeat(2,1fr);gap:10px}}
+      .app-boot-msg{display:none;max-width:560px;margin:0 auto 20px;padding:14px 16px;border-radius:14px;background:#fff4e5;color:#7a4a00;font-size:15px;line-height:1.5}
+      .app-boot-msg button{margin-left:6px;padding:6px 14px;border:0;border-radius:999px;background:#0b1530;color:#fff;font:inherit;font-weight:600;cursor:pointer}
+      .boot-slow .app-boot-msg{display:block}
+      .boot-slow .app-boot-hero,.boot-slow .app-boot-grid{display:none}
+      .boot-slow .seo-static{position:static;width:auto;height:auto;margin:0 auto;overflow:visible;clip:auto;white-space:normal;max-width:1100px;padding:16px;font:16px/1.6 system-ui,sans-serif;color:#212121}
+      .boot-slow .seo-static img{max-width:100%;height:auto}
+    </style>
+    <noscript><style>.app-boot{display:none}.seo-static{position:static;width:auto;height:auto;margin:0 auto;overflow:visible;clip:auto;white-space:normal;max-width:1100px;padding:16px;font:16px/1.6 system-ui,sans-serif;color:#212121}</style></noscript>
   </head>
   <body>
     <div id="root"></div>

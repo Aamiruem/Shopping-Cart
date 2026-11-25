@@ -84,8 +84,19 @@ function render(headTags, body) {
     .replace(/<meta (?:name="(?:description|robots|twitter:[\w:]+)"|property="og:[\w:]+")[^>]*>\s*/g, '')
     .replace(/<!-- Link-preview defaults[\s\S]*?-->\s*/, '')
     .replace('</head>', () => `    ${headTags}\n  </head>`);
-  return page.replace('<div id="root"></div>', () => `<div id="root"><div class="seo-static">${body}</div></div>`);
+  return page.replace('<div id="root"></div>', () => `<div id="root">${BOOT_SHELL}<div class="seo-static">${body}</div></div>${BOOT_WATCH}`);
 }
+
+// What a visitor sees until the app's code has loaded (styles in index.html): the real header's layout with skeleton
+// cards, instead of the plain SEO copy below it. React replaces all of #root when it starts.
+const BOOT_SHELL = `<div class="app-boot" aria-hidden="true">
+<div class="app-boot-bar"><div><img class="app-boot-logo" src="/brand/arvixa-logo.webp" width="110" height="44" alt=""><span class="app-boot-search"></span></div></div>
+<div class="app-boot-main"><p class="app-boot-msg" role="status">Arvixa is taking longer than usual to load. Check your connection, or <button type="button" onclick="location.reload()">Reload</button></p>
+<div class="app-boot-hero"></div><div class="app-boot-grid">${'<div class="app-boot-card"></div>'.repeat(10)}</div></div>
+</div>`;
+// If the app hasn't started after 10 s (no network, a blocked script), say so and show the readable page instead of a
+// skeleton that never ends. Inline and tiny: it must work even when the app's code doesn't arrive.
+const BOOT_WATCH = '<script>setTimeout(function(){var r=document.getElementById("root");if(r&&r.querySelector(".app-boot"))document.documentElement.classList.add("boot-slow")},10000)</script>';
 
 function write(file, content) {
   const target = join(DIST, file);

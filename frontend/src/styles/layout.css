@@ -181,3 +181,9 @@
 .cat-tab.active .cat-icon { background: var(--tab-color, var(--accent)); color: #fff; box-shadow: 0 4px 12px color-mix(in srgb, var(--tab-color, var(--brand)) 35%, transparent); }
 .cat-tab::after { background: var(--tab-color, var(--brand)); }
 .cat-tab .cat-icon { transition: background var(--transition), color var(--transition), transform var(--transition); }
+
+/* ---------- Crash page (components/common/ErrorBoundary.jsx) ---------- */
+.crash-page { max-width: 520px; margin: 48px auto; padding: 32px 24px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; background: var(--surface); border-radius: var(--radius-lg); }
+.crash-page h1 { font-size: 22px; }
+.crash-page p { color: var(--text-muted); }
+.crash-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
