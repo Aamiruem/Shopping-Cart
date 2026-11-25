@@ -6,9 +6,10 @@
 // Each function instance reloads this every 30 s (and straight after its own changes), like the seller products.
 import { ApiError, query } from './_auth.mjs';
 import { baseProduct, setCatalogState, storeCatalog } from './_catalog.mjs';
+import { validateVariants } from './_variants.mjs';
 
 const SYNC_MS = 30_000;
-const EDITABLE = ['price', 'mrp', 'stock', 'name', 'description', 'active'];
+const EDITABLE = ['price', 'mrp', 'stock', 'name', 'description', 'active', 'sizes', 'colors', 'colorHex', 'colorImages'];
 const MAX_PRICE = 1_000_000;
 const MAX_STOCK = 100_000;
 
@@ -53,7 +54,7 @@ export const TAKE_STOCK_SQL = `
   ), stock_seller AS (
     UPDATE seller_products sp
        SET data = jsonb_set(sp.data, '{stock}', to_jsonb(GREATEST(COALESCE((sp.data->>'stock')::int, 0) - taken.qty, 0)))
-      FROM taken
+      FROM (SELECT product_id, SUM(qty)::int AS qty FROM taken GROUP BY product_id) taken -- one row per product: sizes share stock
      WHERE sp.id = taken.product_id AND EXISTS (SELECT 1 FROM placed)
   )`;
 
@@ -111,6 +112,10 @@ export function validateEdit(body, current) {
     edit.description = description;
   }
   if (body.active !== undefined) edit.active = Boolean(body.active);
+  if (['sizes', 'colors', 'colorHex', 'colorImages'].some((k) => body[k] !== undefined)) {
+    // Sizes and colours replace the old ones together; a colour's photo must be one of the product's photos
+    Object.assign(edit, validateVariants({ sizes: current.sizes, colors: current.colors, colorHex: current.colorHex, colorImages: current.colorImages, ...body }, current.images || [current.image]));
+  }
   if (!Object.keys(edit).length) fail(`Nothing to change. Editable: ${EDITABLE.join(', ')}`);
   return edit;
 }

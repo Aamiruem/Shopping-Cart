@@ -43,20 +43,22 @@ export default function useShopActions() {
   };
 
   return {
-    addToCart: (product, qty = 1) =>
+    addToCart: (product, qty = 1, options = {}) =>
       requireLogin() && run(async () => {
-        await cart.add(product._id, qty);
+        await cart.add(product._id, qty, options);
         trackAddToCart(product, qty);
       }, `${product.name} added to cart`, 'add'),
 
     // Straight to checkout with this product at the chosen quantity
-    buyNow: async (product, qty = 1) => {
+    buyNow: async (product, qty = 1, options = {}) => {
       if (!requireLogin()) return;
-      const line = cart.cart.items.find((i) => i.productId === product._id);
+      // The same product in the same size and colour (a product without options matches on its id alone)
+      const line = cart.cart.items.find((i) => i.productId === product._id
+        && (!options.size || i.size === options.size) && (!options.color || i.color === options.color));
       const ok = line
-        ? line.qty === qty || qty === 1 || (await run(() => cart.update(product._id, qty), null, 'add'))
+        ? line.qty === qty || qty === 1 || (await run(() => cart.update(line.lineId ?? line.productId, qty), null, 'add'))
         : await run(async () => {
-          await cart.add(product._id, qty);
+          await cart.add(product._id, qty, options);
           trackAddToCart(product, qty);
         }, null, 'add');
       if (ok) navigate('/checkout');
@@ -76,7 +78,7 @@ export default function useShopActions() {
     saveForLater: (item) =>
       run(async () => {
         await wishlist.add(item.productId);
-        await cart.remove(item.productId);
+        await cart.remove(item.lineId ?? item.productId);
       }, `${item.name} moved to wishlist`, 'wishlist'),
   };
 }

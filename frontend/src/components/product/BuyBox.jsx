@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
-import { useCart } from '../../context/CartContext';
 import useShopActions from '../../hooks/useShopActions';
 import { deliveryDate, formatPrice } from '../../utils/format';
 import Icon from '../common/Icon';
@@ -75,9 +74,9 @@ function DeliverTo() {
 }
 
 // The right-hand panel on a product page: price, stock, quantity, buttons, delivery and who sells it
-export default function BuyBox({ product }) {
+// options = the chosen { size, color }; ready() checks a size was picked; inCart = this exact line is in the cart
+export default function BuyBox({ product, options = {}, ready = () => true, inCart = false }) {
   const [qty, setQty] = useState(1);
-  const { has: inCart } = useCart();
   const { addToCart, buyNow } = useShopActions();
   const online = useOnlinePayments();
   const outOfStock = !product.stock;
@@ -97,14 +96,14 @@ export default function BuyBox({ product }) {
           </select>
         </label>
       )}
-      {inCart(product._id) ? (
+      {inCart ? (
         <Link to="/cart" className="btn btn-cart btn-block"><Icon name="cart" size={18} /> Go to cart</Link>
       ) : (
-        <button type="button" className="btn btn-cart btn-block" disabled={outOfStock} onClick={() => addToCart(product, qty)}>
+        <button type="button" className="btn btn-cart btn-block" disabled={outOfStock} onClick={() => ready() && addToCart(product, qty, options)}>
           <Icon name="cart" size={18} /> Add to cart
         </button>
       )}
-      <button type="button" className="btn btn-buy btn-block" disabled={outOfStock} onClick={() => buyNow(product, qty)}>
+      <button type="button" className="btn btn-buy btn-block" disabled={outOfStock} onClick={() => ready() && buyNow(product, qty, options)}>
         <Icon name="zap" size={18} filled /> Buy now
       </button>
       <dl className="buy-box-meta">

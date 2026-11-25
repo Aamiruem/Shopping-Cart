@@ -92,7 +92,7 @@ export default function SellerOrders() {
                     <td title={o.address}>{o.customer}<span className="muted small block">Customer ID {o.customer_id}</span></td>
                     <td>
                       <div className="order-items-cell">
-                        {o.items.map((i) => <span key={i.productId + i.name} title={i.name}><img src={i.image} alt="" /> {i.qty}× {i.name.length > 28 ? `${i.name.slice(0, 27)}…` : i.name}</span>)}
+                        {o.items.map((i, n) => <span key={`${i.productId}-${n}`} title={i.name}><img src={i.image} alt="" /> {i.qty}× {i.name.length > 28 ? `${i.name.slice(0, 27)}…` : i.name}{(i.options?.size || i.options?.color) && <strong className="item-variant"> ({[i.options.size, i.options.color].filter(Boolean).join(', ')})</strong>}</span>)}
                       </div>
                     </td>
                     <td>

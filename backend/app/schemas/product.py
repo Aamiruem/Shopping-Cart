@@ -34,11 +34,26 @@ class ProductIn(BaseModel):
     # Clothing & footwear details: shoppers pick a size (and colour) before adding to cart
     sizes: list[str] = Field(default_factory=list, max_length=20)  # e.g. ["S", "M", "L"] or ["28", "30", "32"]
     colors: list[str] = Field(default_factory=list, max_length=20)
+    # Per colour: a swatch code (#rrggbb) and which of the product's photos shows it (same rules as api/_variants.mjs)
+    colorHex: dict[str, str] = Field(default_factory=dict)
+    colorImages: dict[str, str] = Field(default_factory=dict)
     ageGroups: list[Literal["18-25", "26-35", "36-50", "50+"]] = Field(default_factory=list, max_length=4)
     material: str = Field(default="", max_length=80)
     fit: str = Field(default="", max_length=40)  # e.g. Slim, Regular, Relaxed
     active: bool = True
     featured: bool = False  # only admins may set this
+
+    @model_validator(mode="after")
+    def colour_details(self) -> "ProductIn":
+        colours = set(self.colors)
+        self.colorHex = {c: h.lower() for c, h in self.colorHex.items() if c in colours}
+        if any(not re.fullmatch(r"#[0-9a-f]{6}", h) for h in self.colorHex.values()):
+            raise ValueError("colour swatches must be colour codes like #1f3a93")
+        photos = set(self.images) | ({self.image} if self.image else set())
+        self.colorImages = {c: url for c, url in self.colorImages.items() if c in colours}
+        if any(url not in photos for url in self.colorImages.values()):
+            raise ValueError("a colour's photo must be one of this product's photos")
+        return self
 
     @field_validator("name", "brand", "description", "subCategory")
     @classmethod

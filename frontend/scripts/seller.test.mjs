@@ -153,7 +153,7 @@ test('an order for a seller’s product reaches that seller, who ships it; the s
 
   const buyer = await account('buyer@example.com');
   const address = (await buyer.shop('POST', 'addresses', { name: 'Buyer', phone: '9876543210', line1: '1 MG Road', city: 'Pune', state: 'Maharashtra', pincode: '411001' })).body.id;
-  await buyer.shop('POST', 'cart', { productId: kurta._id, qty: 2 });
+  await buyer.shop('POST', 'cart', { productId: kurta._id, qty: 2, size: 'M' });
   const order = (await buyer.shop('POST', 'orders', { addressId: address, paymentMethod: 'cod' })).body;
 
   const mine = (await asha.seller('GET', 'orders')).body;
@@ -179,7 +179,7 @@ test('a cancelled order can’t be moved forward', async () => {
   await sync();
   const buyer = await account('buyer@example.com');
   const address = (await buyer.shop('POST', 'addresses', { name: 'Buyer', phone: '9876543210', line1: '1 MG Road', city: 'Pune', state: 'Maharashtra', pincode: '411001' })).body.id;
-  await buyer.shop('POST', 'cart', { productId: kurta._id });
+  await buyer.shop('POST', 'cart', { productId: kurta._id, size: 'M' });
   const order = (await buyer.shop('POST', 'orders', { addressId: address, paymentMethod: 'cod' })).body;
   await buyer.shop('PATCH', `orders/${order.id}/cancel`);
   assert.match((await asha.seller('PATCH', `orders/${order.id}`, { fulfilment: 'packed' })).body.error, /cancelled/);
@@ -251,7 +251,7 @@ test('dashboard overview: each seller sees only their own sales and stock; the a
 
   const buyer = await account('buyer@example.com');
   const address = (await buyer.shop('POST', 'addresses', { name: 'Buyer', phone: '9876543210', line1: '1 MG Road', city: 'Pune', state: 'Maharashtra', pincode: '411001' })).body.id;
-  await buyer.shop('POST', 'cart', { productId: kurta._id, qty: 2 });
+  await buyer.shop('POST', 'cart', { productId: kurta._id, qty: 2, size: 'M' });
   const order = (await buyer.shop('POST', 'orders', { addressId: address, paymentMethod: 'cod' })).body;
   await asha.seller('PATCH', `orders/${order.id}`, { fulfilment: 'packed' });
 
@@ -280,4 +280,58 @@ test('dashboard overview: each seller sees only their own sales and stock; the a
   assert.equal(store.leads.stages[0].hot, 1);
 
   assert.equal((await buyer.seller('GET', 'overview')).status, 403);
+});
+
+test('sizes and colours: one cart line per size and colour, recorded on the order; stock is shared', async () => {
+  // Running the schema again is harmless, and the cart key covers size and colour
+  await pg.exec(STORE_SCHEMA);
+  const [{ cols }] = await db(`SELECT array_length(conkey, 1) AS cols FROM pg_constraint WHERE conrelid = 'cart_items'::regclass AND contype = 'p'`);
+  assert.equal(cols, 4);
+
+  const asha = await account('asha@example.com');
+  await asha.becomeSeller('Asha Crafts');
+  const NAVY = 'https://example.public.blob.vercel-storage.com/products/1/navy.jpg';
+  const bad = await asha.seller('POST', 'products', { ...PRODUCT, colors: ['Navy'], colorImages: { Navy: 'https://elsewhere.example/x.jpg' } });
+  assert.match(bad.body.error, /one of this product’s photos/);
+  assert.match((await asha.seller('POST', 'products', { ...PRODUCT, colors: ['Navy'], colorHex: { Navy: 'blue' } })).body.error, /colour code/);
+  const { body: kurta } = await asha.seller('POST', 'products', {
+    ...PRODUCT, stock: 3, images: [PHOTO, NAVY], sizes: ['S', 'M', 'L', 'm'], colors: ['Maroon', 'Navy'],
+    colorHex: { Navy: '#1F2A44', Maroon: '#7a1f2b', Teal: '#008080' }, colorImages: { Navy: NAVY },
+  });
+  assert.deepEqual([kurta.sizes, kurta.colors, kurta.colorHex, kurta.colorImages], [['S', 'M', 'L'], ['Maroon', 'Navy'], { Navy: '#1f2a44', Maroon: '#7a1f2b' }, { Navy: NAVY }]);
+  await sync();
+
+  const buyer = await account('buyer@example.com');
+  assert.match((await buyer.shop('POST', 'cart', { productId: kurta._id })).body.error, /select a size/);
+  assert.match((await buyer.shop('POST', 'cart', { productId: kurta._id, size: 'XXL' })).body.error, /XXL is not available/);
+  assert.match((await buyer.shop('POST', 'cart', { productId: kurta._id, size: 'M', color: 'Pink' })).body.error, /Pink is not available/);
+  await buyer.shop('POST', 'cart', { productId: kurta._id, size: 'm', color: 'navy' }); // case doesn't matter
+  await buyer.shop('POST', 'cart', { productId: kurta._id, size: 'M', color: 'Navy' });
+  let cart = (await buyer.shop('POST', 'cart', { productId: kurta._id, size: 'L' })).body; // first colour by default
+  assert.deepEqual(cart.items.map((i) => [i.lineId, i.size, i.color, i.qty, i.image]), [
+    [`${kurta._id}~M~Navy`, 'M', 'Navy', 2, NAVY],
+    [`${kurta._id}~L~Maroon`, 'L', 'Maroon', 1, PHOTO],
+  ]);
+
+  cart = (await buyer.shop('PUT', `cart/${kurta._id}~L~Maroon`, { qty: 2 })).body;
+  assert.deepEqual(cart.items.map((i) => i.qty), [2, 2]);
+  const address = (await buyer.shop('POST', 'addresses', { name: 'Buyer', phone: '9876543210', line1: '1 MG Road', city: 'Pune', state: 'Maharashtra', pincode: '411001' })).body.id;
+  // 4 wanted across two sizes, 3 in stock: the check adds the sizes up
+  assert.match((await buyer.shop('POST', 'orders', { addressId: address, paymentMethod: 'cod' })).body.error, /Only 3 left/);
+  await buyer.shop('DELETE', `cart/${kurta._id}~L~Maroon`);
+  await buyer.shop('POST', 'cart', { productId: kurta._id, size: 'S', color: 'Maroon' });
+  const order = (await buyer.shop('POST', 'orders', { addressId: address, paymentMethod: 'cod' })).body;
+  assert.equal(order.total, 3 * PRODUCT.price);
+
+  const seen = (await buyer.shop('GET', `orders/${order.id}`)).body;
+  assert.deepEqual(seen.items.map((i) => [i.qty, i.options]), [[2, { size: 'M', color: 'Navy' }], [1, { size: 'S', color: 'Maroon' }]]);
+  assert.deepEqual((await asha.seller('GET', 'orders')).body[0].items.map((i) => i.options), [{ size: 'M', color: 'Navy' }, { size: 'S', color: 'Maroon' }]);
+  assert.equal((await asha.seller('GET', `products/${kurta._id}`)).body.stock, 0, 'both sizes came off the one stock count');
+
+  // A product without options still works by its plain id
+  const { body: plain } = await asha.seller('POST', 'products', { ...PRODUCT, name: 'Cotton Tote Bag', sizes: [], colors: [] });
+  await sync();
+  cart = (await buyer.shop('POST', 'cart', { productId: plain._id, size: 'M' })).body;
+  assert.deepEqual(cart.items.map((i) => [i.lineId, i.size, i.color]), [[plain._id, null, null]]);
+  assert.equal((await buyer.shop('DELETE', `cart/${plain._id}`)).body.items.length, 0);
 });

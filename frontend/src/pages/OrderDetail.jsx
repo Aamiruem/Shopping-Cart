@@ -10,6 +10,7 @@ import { deliveryDate, formatDate, formatPrice } from '../utils/format';
 import { paymentStatus } from '../utils/orders';
 import { RETURN_WINDOW_DAYS } from '../utils/returns';
 import { StatusBadge } from './Orders';
+import ItemOptions from '../components/product/ItemOptions';
 
 // Opens the address in Google Maps (no API key needed); the phone number is left out of the search
 const mapsLink = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.replace(/\. Phone: .*$/, ''))}`;
@@ -132,6 +133,7 @@ export default function OrderDetail() {
                 {i.image ? <img src={i.image} alt="" /> : <Icon name="package" size={40} />}
                 <div>
                   <Link to={`/products/${i.product_id}`}>{i.name}</Link>
+                  <ItemOptions options={i.options} />
                   <p className="muted small">Qty: {i.qty} · {formatPrice(i.price)} each</p>
                   <p className="muted small id-line">Product ID: {i.product_id}</p>
                 </div>

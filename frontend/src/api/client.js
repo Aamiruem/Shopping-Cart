@@ -143,9 +143,11 @@ export const api = {
 
   // Cart
   cart: () => request('/cart'),
-  addToCart: (productId, qty = 1) => request('/cart', { method: 'POST', body: { productId, qty } }),
-  updateCart: (productId, qty) => request(`/cart/${productId}`, { method: 'PUT', body: { qty } }),
-  removeFromCart: (productId) => request(`/cart/${productId}`, { method: 'DELETE' }),
+  // options = { size, color } for products that have them
+  addToCart: (productId, qty = 1, options = {}) => request('/cart', { method: 'POST', body: { productId, qty, ...options } }),
+  // A cart line's lineId ("productId~size~colour"), or the product id for products without options
+  updateCart: (lineId, qty) => request(`/cart/${encodeURIComponent(lineId)}`, { method: 'PUT', body: { qty } }),
+  removeFromCart: (lineId) => request(`/cart/${encodeURIComponent(lineId)}`, { method: 'DELETE' }),
   applyCoupon: (code) => request('/cart/coupon', { method: 'POST', body: { code } }),
   removeCoupon: () => request('/cart/coupon', { method: 'DELETE' }),
   coupons: () => request('/cart/coupons'),

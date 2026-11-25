@@ -9,6 +9,7 @@ import { razorpayClient } from './_payments.mjs';
 import { listCatalog, resetCatalogProduct, updateCatalogProduct } from './_inventory.mjs';
 import { actOnReturn, listReturns } from './_returns.mjs';
 import { overview } from './_overview.mjs';
+import { validateVariants } from './_variants.mjs';
 
 const CATEGORIES = ['mobiles', 'electronics', 'fashion', 'accessories', 'beauty', 'home', 'kitchen', 'sports', 'grocery'];
 const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -204,8 +205,7 @@ export function validateProduct(body, { admin = false, featured = false } = {}) 
     videos: mediaList(body.videos, 4, 'Videos'),
     audio: text(body.audio) && MEDIA_URL.test(text(body.audio)) ? text(body.audio) : '',
     unit: short(body.unit, 40, 'Pack size'),
-    sizes: unique(list(body.sizes, 20, (s) => s.slice(0, 20))),
-    colors: unique(list(body.colors, 20, (s) => s.slice(0, 20))),
+    ...validateVariants(body, images.length ? images : image ? [image] : []), // sizes, colours, swatches, colour photos
     ageGroups,
     material: short(body.material, 80, 'Material'),
     fit: short(body.fit, 40, 'Fit'),

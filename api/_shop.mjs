@@ -11,6 +11,7 @@ import { ApiError, currentUserId, limit, postgresStore, query, safely } from './
 import { razorpayClient, refundPaidOrder } from './_payments.mjs';
 import { restockOrder, syncCatalogState, TAKE_STOCK_SQL } from './_inventory.mjs';
 import { orderReturn, requestReturn, withdrawReturn } from './_returns.mjs';
+import { chooseOptions, lineId, parseLineId } from './_variants.mjs';
 
 const MAX_QTY = 10;
 const MAX_CART_LINES = 50;
@@ -27,8 +28,10 @@ const text = (value) => (typeof value === 'string' ? value.trim() : '');
 const clampQty = (qty, stock) => Math.max(1, Math.min(Math.trunc(Number(qty)) || 1, MAX_QTY, stock));
 
 async function loadCart(db, userId) {
-  const rows = await db('SELECT product_id, qty FROM cart_items WHERE user_id = $1 ORDER BY added_at, product_id', [userId]);
-  return rows.map((r) => ({ product: getProduct(r.product_id), qty: r.qty })).filter((line) => line.product);
+  const rows = await db('SELECT product_id, qty, size, color FROM cart_items WHERE user_id = $1 ORDER BY added_at, product_id, size, color', [userId]);
+  return rows
+    .map((r) => ({ product: getProduct(r.product_id), qty: r.qty, size: r.size || null, color: r.color || null }))
+    .filter((line) => line.product);
 }
 
 const COUPON_RE = /^[A-Z0-9_-]{3,30}$/;
@@ -65,14 +68,14 @@ async function loadCoupon(db, userId) {
 
 // mrp equals the price: the catalog's MRPs are samples, so no discount is claimed. Coupons are real: the owner sets them.
 function summarize(lines, applied = null) {
-  const items = lines.map(({ product: p, qty }) => ({
-    lineId: p._id,
+  const items = lines.map(({ product: p, qty, size = null, color = null }) => ({
+    lineId: lineId(p._id, size, color),
     productId: p._id,
-    size: null,
-    color: null,
+    size,
+    color,
     name: p.name,
     brand: p.brand ?? '',
-    image: p.image ?? null,
+    image: (color && p.colorImages?.[color]) || p.image || null, // the photo of the colour they chose
     category: p.category ?? null,
     sellerId: p.sellerId ?? null,
     price: p.price,
@@ -153,27 +156,36 @@ async function addToCart({ db, userId, body }) {
   if ((item.stock ?? 0) < 1) throw new ApiError(409, `${item.name} is out of stock`);
   const [{ lines }] = await db('SELECT count(*)::int AS lines FROM cart_items WHERE user_id = $1', [userId]);
   if (lines >= MAX_CART_LINES) throw new ApiError(400, 'Your cart is full');
+  const { size, color } = chooseOptions(item, body);
   const most = Math.min(MAX_QTY, item.stock);
   await db(
-    `INSERT INTO cart_items (user_id, product_id, qty) VALUES ($1, $2, $3)
-     ON CONFLICT (user_id, product_id) DO UPDATE SET qty = LEAST(cart_items.qty + EXCLUDED.qty, $4)`,
-    [userId, item._id, clampQty(body.qty ?? 1, item.stock), most],
+    `INSERT INTO cart_items (user_id, product_id, qty, size, color) VALUES ($1, $2, $3, $5, $6)
+     ON CONFLICT (user_id, product_id, size, color) DO UPDATE SET qty = LEAST(cart_items.qty + EXCLUDED.qty, $4)`,
+    [userId, item._id, clampQty(body.qty ?? 1, item.stock), most, size ?? '', color ?? ''],
   );
   return { status: 201, body: await cartResponse(db, userId) };
 }
 
+// :id is the line's lineId ("productId~size~colour"), or the product id for products without options
+const LINE_SQL = 'user_id = $1 AND product_id = $2 AND size = $3 AND color = $4';
+const lineKey = (userId, id) => {
+  const { productId, size, color } = parseLineId(id);
+  return [userId, productId, size ?? '', color ?? ''];
+};
+
 async function updateCart({ db, userId, id, body }) {
-  const item = getProduct(id);
+  const key = lineKey(userId, id);
+  const item = getProduct(key[1]);
   if (!item || Number(body.qty) < 1) {
-    await db('DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2', [userId, id]);
+    await db(`DELETE FROM cart_items WHERE ${LINE_SQL}`, key);
   } else {
-    await db('UPDATE cart_items SET qty = $1 WHERE user_id = $2 AND product_id = $3', [clampQty(body.qty, item.stock), userId, id]);
+    await db(`UPDATE cart_items SET qty = $5 WHERE ${LINE_SQL}`, [...key, clampQty(body.qty, item.stock)]);
   }
   return { body: await cartResponse(db, userId) };
 }
 
 async function removeFromCart({ db, userId, id }) {
-  await db('DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2', [userId, id]);
+  await db(`DELETE FROM cart_items WHERE ${LINE_SQL}`, lineKey(userId, id));
   return { body: await cartResponse(db, userId) };
 }
 
@@ -241,7 +253,10 @@ export async function checkoutSummary(db, userId) {
   const lines = await loadCart(db, userId);
   const summary = summarize(lines, await loadCoupon(db, userId));
   if (!summary.items.length) throw new ApiError(400, 'Your cart is empty');
-  for (const { product: p, qty } of lines) {
+  // Stock is per product: two sizes of one shirt share it
+  const wanted = new Map();
+  for (const { product: p, qty } of lines) wanted.set(p._id, { p, qty: (wanted.get(p._id)?.qty ?? 0) + qty });
+  for (const { p, qty } of wanted.values()) {
     if ((p.stock ?? 0) < qty) throw new ApiError(409, `Only ${p.stock ?? 0} left of ${p.name}`);
   }
   return { lines, summary };
@@ -264,13 +279,15 @@ async function placeOrder({ db, userId, body, store, ip }) {
  * gone and creates nothing (returns null).
  */
 export async function createOrder(db, { userId, address, method, summary }) {
-  const details = summary.items.map((i) => ({ product_id: i.productId, name: i.name, price: i.price, image: i.image, category: i.category, seller_id: i.sellerId }));
+  const details = summary.items.map((i) => ({
+    product_id: i.productId, size: i.size ?? '', color: i.color ?? '', name: i.name, price: i.price, image: i.image, category: i.category, seller_id: i.sellerId,
+  }));
   const coupon = summary.couponDiscount > 0 ? summary.coupon.code : null; // only a coupon that actually applied
   let rows;
   try {
     rows = await db(
       `WITH taken AS (
-       DELETE FROM cart_items WHERE user_id = $1 RETURNING product_id, qty
+       DELETE FROM cart_items WHERE user_id = $1 RETURNING product_id, qty, size, color
      ), placed AS (
        INSERT INTO orders (user_id, total, address, payment_method, delivery_fee, coupon_code, coupon_discount)
        SELECT $1::int, $2::numeric, $3::text, $6::text, $4::numeric, $7::text, $8::numeric WHERE EXISTS (SELECT 1 FROM taken)
@@ -281,11 +298,12 @@ export async function createOrder(db, { userId, address, method, summary }) {
      ), coupon_done AS (
        DELETE FROM cart_coupons WHERE user_id = $1 AND EXISTS (SELECT 1 FROM placed)
      ), lines AS (
-       INSERT INTO order_items (order_id, product_id, name, price, qty, image, category, seller_id)
-       SELECT placed.id, x.product_id, x.name, x.price, taken.qty, x.image, x.category, x.seller_id
+       INSERT INTO order_items (order_id, product_id, name, price, qty, image, category, seller_id, options)
+       SELECT placed.id, x.product_id, x.name, x.price, taken.qty, x.image, x.category, x.seller_id,
+              NULLIF(jsonb_strip_nulls(jsonb_build_object('size', NULLIF(x.size, ''), 'color', NULLIF(x.color, ''))), '{}'::jsonb)
          FROM placed
-        CROSS JOIN jsonb_to_recordset($5::jsonb) AS x(product_id text, name text, price numeric, image text, category text, seller_id int)
-         JOIN taken ON taken.product_id = x.product_id
+        CROSS JOIN jsonb_to_recordset($5::jsonb) AS x(product_id text, size text, color text, name text, price numeric, image text, category text, seller_id int)
+         JOIN taken ON taken.product_id = x.product_id AND taken.size = x.size AND taken.color = x.color
      ), timeline AS (
        INSERT INTO order_events (order_id, status, note) SELECT id, 'placed', 'Order placed' FROM placed
      )${TAKE_STOCK_SQL}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { EmptyState, Spinner } from '../components/common/Feedback';
@@ -7,6 +7,7 @@ import Price from '../components/common/Price';
 import Rating, { shownRating } from '../components/common/Rating';
 import ProductRail from '../components/product/ProductRail';
 import BuyBox from '../components/product/BuyBox';
+import VariantPicker, { needsSize } from '../components/product/VariantPicker';
 import Reviews from '../components/product/Reviews';
 import ShareButton from '../components/product/ShareButton';
 import StoreFacts from '../components/product/StoreFacts';
@@ -97,7 +98,11 @@ export default function ProductDetail() {
   const [fullView, setFullView] = useState(false);
   const [similar, setSimilar] = useState([]);
   const [together, setTogether] = useState({ items: [], strategy: '' });
-  const { has: inCart } = useCart();
+  const { cart } = useCart();
+  // The size and colour being chosen; `sizeAttention` is set after a buy attempt without a size
+  const [options, setOptions] = useState({ size: null, color: null });
+  const [sizeAttention, setSizeAttention] = useState(false);
+  const pickerRef = useRef(null);
   const { has: inWishlist } = useWishlist();
   const { addToCart, buyNow, toggleWishlist } = useShopActions();
   usePageTint(product?.category);
@@ -115,6 +120,8 @@ export default function ProductDetail() {
       .then((p) => {
         if (cancelled) return;
         setProduct(p);
+        setOptions({ size: p.sizes?.length === 1 ? p.sizes[0] : null, color: p.colors?.[0] ?? null }); // one size: nothing to choose
+        setSizeAttention(false);
         if (p.images360?.length >= 4) setActiveImage(SPIN_VIEW);
         addRecentlyViewed(p);
         trackViewItem(p);
@@ -150,6 +157,23 @@ export default function ProductDetail() {
   const outOfStock = product.stock === 0;
   const wished = inWishlist(product._id);
   const rating = shownRating(product);
+  const chosen = { size: options.size, color: options.color };
+  // "Go to cart" only when this exact size and colour is already there
+  const lineInCart = cart.items.some((i) => i.productId === product._id
+    && (i.size ?? null) === (options.size ?? null) && (!product.colors?.length || i.color === options.color));
+  const changeOptions = (next) => {
+    setOptions(next);
+    if (next.size) setSizeAttention(false);
+    const photo = next.color !== options.color && product.colorImages?.[next.color];
+    if (photo && images.includes(photo)) setActiveImage(images.indexOf(photo)); // show the colour they picked
+  };
+  // Before adding to the cart: a product with sizes needs one picked
+  const ready = () => {
+    if (!needsSize(product, options)) return true;
+    setSizeAttention(true);
+    pickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return false;
+  };
 
   return (
     <div className="page-detail container">
@@ -199,14 +223,14 @@ export default function ProductDetail() {
               <button type="button" className="btn btn-cart btn-lg coming-soon" disabled>Coming soon</button>
             ) : (
               <>
-                {inCart(product._id) ? (
+                {lineInCart ? (
                   <Link to="/cart" className="btn btn-cart btn-lg"><Icon name="cart" size={18} /> Go to cart</Link>
                 ) : (
-                  <button type="button" className="btn btn-cart btn-lg" disabled={outOfStock} onClick={() => addToCart(product)}>
+                  <button type="button" className="btn btn-cart btn-lg" disabled={outOfStock} onClick={() => ready() && addToCart(product, 1, chosen)}>
                     <Icon name="cart" size={18} /> Add to cart
                   </button>
                 )}
-                <button type="button" className="btn btn-buy btn-lg" disabled={outOfStock} onClick={() => buyNow(product)}>
+                <button type="button" className="btn btn-buy btn-lg" disabled={outOfStock} onClick={() => ready() && buyNow(product, 1, chosen)}>
                   <Icon name="zap" size={18} filled /> Buy now
                 </button>
               </>
@@ -246,6 +270,7 @@ export default function ProductDetail() {
           </div>
           {!PREVIEW && product.discount > 0 && <p className="text-success special">Special price</p>}
           <Price price={product.price} mrp={product.mrp} size="lg" />
+          <VariantPicker product={product} value={options} onChange={changeOptions} attention={sizeAttention} pickerRef={pickerRef} />
           {STORE && <StoreFacts product={product} />}
           {!PREVIEW && (
             <>
@@ -315,7 +340,7 @@ export default function ProductDetail() {
             </details>
           )}
         </div>
-        {STORE && <BuyBox product={product} />}
+        {STORE && <BuyBox product={product} options={chosen} ready={ready} inCart={lineInCart} />}
       </div>
 
       {SHOPPING && <Reviews productId={product._id} />}

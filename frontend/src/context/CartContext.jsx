@@ -33,9 +33,10 @@ export function CartProvider({ children }) {
     count: cart.items.reduce((n, i) => n + i.qty, 0),
     has: (id) => cart.items.some((i) => String(i.productId) === String(id)),
     refresh,
-    add: async (id, qty = 1) => setCart(await api.addToCart(id, qty)),
-    update: async (id, qty) => setCart(await api.updateCart(id, qty)),
-    remove: async (id) => setCart(await api.removeFromCart(id)),
+    add: async (id, qty = 1, options = {}) => setCart(await api.addToCart(id, qty, options)),
+    // update / remove take the line's lineId: one product can be in the cart in several sizes and colours
+    update: async (lineId, qty) => setCart(await api.updateCart(lineId, qty)),
+    remove: async (lineId) => setCart(await api.removeFromCart(lineId)),
     applyCoupon: async (code) => setCart(await api.applyCoupon(code)),
     removeCoupon: async () => setCart(await api.removeCoupon()),
   }), [cart, loading, refresh]);

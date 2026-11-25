@@ -27,7 +27,7 @@ function ProductCard({ product }) {
   const [adding, setAdding] = useState(false);
   const add = async () => {
     setAdding(true);
-    await addToCart(product);
+    await addToCart(product, 1, { size: product.sizes?.[0], color: product.colors?.[0] });
     setAdding(false);
   };
   const out = product.stock <= 0;
@@ -45,9 +45,13 @@ function ProductCard({ product }) {
         <span className="chat-card-rating"><Icon name="star" size={11} /> {product.rating.toFixed(1)}</span>
       )}
       {product.stock > 0 && product.stock <= 5 && <span className="chat-card-low">Only {product.stock} left</span>}
-      <button type="button" className="chat-card-add" onClick={add} disabled={adding || out} aria-label={`Add ${product.name} to cart`}>
-        {out ? 'Out of stock' : <><Icon name="plus" size={14} /><Icon name="cart" size={15} /></>}
-      </button>
+      {product.sizes?.length > 1 && !out ? (
+        <Link to={`/products/${product._id}`} className="chat-card-add">Select size</Link>
+      ) : (
+        <button type="button" className="chat-card-add" onClick={add} disabled={adding || out} aria-label={`Add ${product.name} to cart`}>
+          {out ? 'Out of stock' : <><Icon name="plus" size={14} /><Icon name="cart" size={15} /></>}
+        </button>
+      )}
     </article>
   );
 }

@@ -17,6 +17,7 @@ import { deliveryDate, formatPrice } from '../utils/format';
 import { playSound } from '../utils/sound';
 import { trackBeginCheckout, trackPurchase } from '../utils/analytics';
 import useSeo from '../hooks/useSeo';
+import ItemOptions from '../components/product/ItemOptions';
 
 const COD = { id: 'cod', icon: 'truck', label: 'Cash on Delivery', note: 'Pay when your order arrives' };
 // Real payments through Razorpay (an RBI-authorised payment aggregator) once the store has Razorpay keys. Each choice
@@ -246,9 +247,9 @@ export default function Checkout() {
     }
   };
 
-  const setQty = async (productId, qty) => {
+  const setQty = async (lineId, qty) => {
     try {
-      await update(productId, qty);
+      await update(lineId, qty);
     } catch (err) {
       toast.show(err.message, 'error');
     }
@@ -304,13 +305,14 @@ export default function Checkout() {
           )}
           <ul className="summary-list checkout-items">
             {cart.items.map((i) => (
-              <li key={i.productId}>
+              <li key={i.lineId ?? i.productId}>
                 <img src={i.image} alt="" />
                 <div>
                   <p className="item-name">{i.name}</p>
+                  <ItemOptions size={i.size} color={i.color} />
                   {i.brand && <p className="muted small">{i.brand}</p>}
                   <label className="qty-pick small">Qty:{' '}
-                    <select value={i.qty} onChange={(e) => setQty(i.productId, Number(e.target.value))} aria-label={`Quantity of ${i.name}`}>
+                    <select value={i.qty} onChange={(e) => setQty(i.lineId ?? i.productId, Number(e.target.value))} aria-label={`Quantity of ${i.name}`}>
                       {Array.from({ length: Math.max(1, Math.min(10, i.stock || 10)) }, (_, n) => n + 1).map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </label>

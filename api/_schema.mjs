@@ -15,6 +15,17 @@ CREATE TABLE IF NOT EXISTS cart_items (
   added_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (user_id, product_id)
 );
+-- Sizes and colours (api/_variants.mjs): one cart line per product + size + colour. '' = the product has no such option.
+-- Existing rows keep working as lines without options; the key widens once, and running this again changes nothing.
+ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS size  VARCHAR(20) NOT NULL DEFAULT '';
+ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS color VARCHAR(20) NOT NULL DEFAULT '';
+DO $$
+BEGIN
+  IF (SELECT array_length(conkey, 1) FROM pg_constraint WHERE conrelid = 'cart_items'::regclass AND contype = 'p') = 2 THEN
+    ALTER TABLE cart_items DROP CONSTRAINT cart_items_pkey;
+    ALTER TABLE cart_items ADD PRIMARY KEY (user_id, product_id, size, color);
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS wishlist_items (
   user_id    INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,

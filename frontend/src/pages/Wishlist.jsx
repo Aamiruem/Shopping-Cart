@@ -35,9 +35,13 @@ export default function Wishlist() {
                 {p.stock === 0 && <p className="text-error small">Currently unavailable</p>}
               </div>
               <div className="wish-actions">
-                <button type="button" className="btn btn-cart btn-sm" disabled={p.stock === 0} onClick={() => addToCart(p)}>
-                  <Icon name="cart" size={14} /> Add to cart
-                </button>
+                {p.sizes?.length > 1 && p.stock > 0 ? (
+                  <Link to={`/products/${p._id}`} className="btn btn-cart btn-sm"><Icon name="shirt" size={14} /> Select size</Link>
+                ) : (
+                  <button type="button" className="btn btn-cart btn-sm" disabled={p.stock === 0} onClick={() => addToCart(p, 1, { size: p.sizes?.[0], color: p.colors?.[0] })}>
+                    <Icon name="cart" size={14} /> Add to cart
+                  </button>
+                )}
                 <button type="button" className="icon-btn" onClick={() => toggleWishlist(p)} aria-label={`Remove ${p.name} from wishlist`}>
                   <Icon name="trash" size={18} />
                 </button>

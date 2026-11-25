@@ -5,9 +5,10 @@ import { AUDIENCES, CATEGORIES } from '../../constants/catalog';
 import { discountPercent } from '../../utils/format';
 import Icon from '../common/Icon';
 import Spin360 from '../product/Spin360';
+import VariantEditor, { variantsBody, variantsFromProduct, variantsProblem } from './VariantEditor';
 import { PREVIEW } from '../../config';
 
-const EMPTY = { name: '', brand: '', category: 'electronics', audience: '', description: '', price: '', mrp: '', stock: '10', tags: '', images: [], images360: [], videos: [], audio: '', unit: '', active: true };
+const EMPTY = { name: '', brand: '', category: 'electronics', audience: '', description: '', price: '', mrp: '', stock: '10', tags: '', images: [], images360: [], videos: [], audio: '', unit: '', active: true, variants: { sizes: [], colors: [] } };
 const MAX_IMAGES = { images: 8, images360: 36, videos: 4 };
 
 const fromProduct = (p) => ({
@@ -15,6 +16,7 @@ const fromProduct = (p) => ({
   price: String(p.price), mrp: p.mrp ? String(p.mrp) : '', stock: String(p.stock ?? 0),
   tags: (p.tags || []).join(', '), images: p.images?.length ? p.images : p.image ? [p.image] : [], active: p.active !== false,
   audience: p.audience || '', images360: p.images360 || [], videos: p.videos || [], audio: p.audio || '', unit: p.unit || '',
+  variants: variantsFromProduct(p),
 });
 
 function validate(f) {
@@ -25,7 +27,7 @@ function validate(f) {
   if (!f.images.length) return 'Add at least one product image';
   if (f.category === 'fashion' && !f.audience) return 'Choose who this fashion item is for (Women, Men or Unisex)';
   if (f.images360.length > 0 && f.images360.length < 4) return 'A 360° view needs at least 4 frames (or remove them)';
-  return '';
+  return variantsProblem(f.variants);
 }
 
 // Create / edit dialog. `product` = null for a new product.
@@ -132,6 +134,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
       videos: form.videos, audio: form.audio, unit: form.unit.trim(),
       price: Number(form.price), mrp: form.mrp ? Number(form.mrp) : null, stock: Number(form.stock),
       tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean), images: form.images, image: form.images[0], active: form.active,
+      ...variantsBody(form.variants, form.images), // sent every time: saving without them would clear them
     };
     try {
       onSaved(product ? await api.sellerUpdateProduct(product._id, body) : await api.sellerCreateProduct(body), !product);
@@ -220,6 +223,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
             </div>
           </div>
 
+          <VariantEditor value={form.variants} images={form.images} onChange={(variants) => setForm((f) => ({ ...f, variants }))} />
           <div className="image-manager">
             <p className="field-label"><Icon name="video" size={15} /> Videos <span className="muted small">(optional · up to 4 · MP4 or WebM, 50 MB each)</span></p>
             <div className="media-grid">

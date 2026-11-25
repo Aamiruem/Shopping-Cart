@@ -56,7 +56,8 @@ async function account(name, email, role = 'customer') {
 
 async function order(who, products, { delivered = false, shipped = false, daysAgo = 2 } = {}) {
   const [address] = await db('SELECT id FROM addresses WHERE user_id = $1', [who.id]);
-  for (const p of products) await who.shop('POST', 'cart', { productId: p._id, qty: 1 });
+  // Demo shoppers take the first size and colour of products that have them
+  for (const p of products) await who.shop('POST', 'cart', { productId: p._id, qty: 1, size: p.sizes?.[0], color: p.colors?.[0] });
   const placed = await who.shop('POST', 'orders', { addressId: address.id, paymentMethod: 'cod' });
   if (placed.status !== 201) throw new Error(`demo order failed: ${placed.body.error}`);
   const id = placed.body.id;
