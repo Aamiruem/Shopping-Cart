@@ -154,8 +154,11 @@ test('a database failure gives a clean error, not the details', async () => {
   assert.ok(!JSON.stringify(body).includes('postgres'));
 });
 
-test('routes that need email or SMS are not served here', () => {
-  for (const [method, rest] of [['POST', 'otp'], ['POST', 'register/verify'], ['POST', 'google'], ['GET', 'register'], ['DELETE', 'me'], ['GET', 'constructor']]) {
+test('one-time-code routes are served here (api/_otp.mjs); Google sign-in and unknown routes are not', () => {
+  for (const [method, rest] of [['POST', 'otp'], ['POST', 'otp/verify'], ['POST', 'register/verify'], ['POST', 'password/forgot'], ['GET', 'otp/channels']]) {
+    assert.equal(isAuthRoute(method, rest), true, `${method} ${rest}`);
+  }
+  for (const [method, rest] of [['POST', 'google'], ['GET', 'register'], ['DELETE', 'me'], ['GET', 'constructor']]) {
     assert.equal(isAuthRoute(method, rest), false);
   }
   assert.equal(isAuthRoute('POST', 'login'), true);

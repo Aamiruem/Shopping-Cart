@@ -3,6 +3,8 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { PREVIEW } from '../config';
 import CodeVerify from '../components/account/CodeVerify';
+import ForgotPassword from '../components/account/ForgotPassword';
+import useOtpChannels from '../hooks/useOtpChannels';
 import GoogleButton from '../components/account/GoogleButton';
 import Icon from '../components/common/Icon';
 import { useAuth } from '../context/AuthContext';
@@ -123,6 +125,10 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
   const [identifier, setIdentifier] = useState('');
   const [channel, setChannel] = useState('sms');
   const [otpSent, setOtpSent] = useState(null); // { identifier, sentTo, channel, devCode? }
+  const [forgot, setForgot] = useState(false);
+  // Code options appear only for channels that are really connected (store mode asks the API)
+  const channels = useOtpChannels();
+  const codesOffered = !PREVIEW || channels.any;
 
   const isRegister = mode === 'register';
   const copy = COPY[mode];
@@ -155,7 +161,11 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
 
   const usingOtp = !isRegister && method === 'otp';
   const errors = usingOtp ? {} : validate(form, isRegister);
-  const idError = usingOtp ? identifierError(identifier) : '';
+  const unavailable = !looksLikeMobile(identifier) ? !channels.email && 'Email codes aren’t available right now. Please log in with your password.'
+    : !channels.mobile && 'Codes by SMS or WhatsApp aren’t available right now. Please use your email.';
+  const idError = usingOtp ? identifierError(identifier) || (identifier.trim() && unavailable) || '' : '';
+  // The chosen mobile channel, or the first one that's connected
+  const mobileChannel = channels[channel] ? channel : channels.sms ? 'sms' : 'whatsapp';
   // Show a field's error once the user has left it, or after a submit attempt
   const shown = (name) => (submitted || touched[name]) && (name === 'identifier' ? idError : errors[name]);
   // Only once something was typed: leaving an empty field (to switch to sign-up, say) mustn't flash an error that
@@ -177,7 +187,7 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
 
   const requestOtp = async () => {
     const value = mobile ? toMobile(identifier) : identifier.trim();
-    const sent = await api.otpLogin(value, channel);
+    const sent = await api.otpLogin(value, mobile ? mobileChannel : 'email');
     setOtpSent({ identifier: value, ...sent });
   };
 
@@ -221,7 +231,9 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
     'aria-describedby': shown(name) ? `${name}-error` : undefined,
   });
 
-  const codeStep = pending ? (
+  const codeStep = forgot ? (
+    <ForgotPassword channels={channels} initialIdentifier={form.email} onDone={(signedIn) => finish(signedIn, false)} onBack={() => setForgot(false)} />
+  ) : pending ? (
     <CodeVerify
       title="Verify your email"
       info={pending}
@@ -235,6 +247,7 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
       title="Enter verification code"
       info={otpSent}
       verifyLabel="Verify & login"
+      note={(s) => <>If an Arvixa account uses <strong>{s?.sentTo}</strong>, we’ve sent it a 6-digit code.</>}
       onVerify={async (code) => finish(await otpLogin(otpSent.identifier, code), false)}
       onResend={async () => ({ identifier: otpSent.identifier, ...(await api.otpLogin(otpSent.identifier, otpSent.channel)) })}
       onBack={() => { setOtpSent(null); setBusy(false); }}
@@ -254,7 +267,7 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
           <form className="auth-form" onSubmit={onSubmit} noValidate>
             <img className="auth-logo" src="/brand/arvixa-logo.webp" alt="Arvixa — Shop Beyond Limits" width="240" height="96" />
 
-            {!isRegister && !PREVIEW && (
+            {!isRegister && codesOffered && (
               <div className="auth-tabs" role="tablist" aria-label="How do you want to log in?">
                 <button type="button" role="tab" aria-selected={method === 'otp'} className={method === 'otp' ? 'active' : ''} onClick={() => switchMethod('otp')}>
                   <Icon name="phone" size={16} /> Login with OTP
@@ -284,8 +297,8 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
                 {mobile && (
                   <div className="otp-channel" role="radiogroup" aria-label="Send the code by">
                     <span className="muted small">Send code by</span>
-                    {[['sms', 'SMS', 'message'], ['whatsapp', 'WhatsApp', 'phone']].map(([id, label, icon]) => (
-                      <button key={id} type="button" role="radio" aria-checked={channel === id} className={`otp-chip ${id} ${channel === id ? 'active' : ''}`} onClick={() => setChannel(id)}>
+                    {[['sms', 'SMS', 'message'], ['whatsapp', 'WhatsApp', 'phone']].filter(([id]) => channels[id]).map(([id, label, icon]) => (
+                      <button key={id} type="button" role="radio" aria-checked={mobileChannel === id} className={`otp-chip ${id} ${mobileChannel === id ? 'active' : ''}`} onClick={() => setChannel(id)}>
                         <Icon name={icon} size={14} /> {label}
                       </button>
                     ))}
@@ -326,6 +339,12 @@ export function LoginForm({ mode = 'login', embedded = false, onDone, onSwitch }
                     <Icon name={showPassword ? 'eyeOff' : 'eye'} size={18} />
                   </button>
                 </Field>
+                {!isRegister && PREVIEW && channels.any && (
+                  // Store API: a real reset by code
+                  <button type="button" className="btn-link auth-forgot" onClick={() => { setError(''); setForgot(true); }}>
+                    Forgot password?
+                  </button>
+                )}
                 {!isRegister && !PREVIEW && (
                   <button type="button" className="btn-link auth-forgot" onClick={() => switchMethod('otp', 'No problem — log in with a one-time code instead, then set a new password in My Profile.')}>
                     Forgot password?

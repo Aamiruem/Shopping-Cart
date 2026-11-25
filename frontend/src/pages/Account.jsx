@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
-import { PREVIEW } from '../config';
 import AddressForm from '../components/account/AddressForm';
 import CodeVerify from '../components/account/CodeVerify';
 import { Spinner } from '../components/common/Feedback';
@@ -13,6 +12,7 @@ import useApi from '../hooks/useApi';
 import { formatDate } from '../utils/format';
 import { PASSWORD_MIN, validatePassword } from '../utils/validation';
 import useSeo from '../hooks/useSeo';
+import useOtpChannels from '../hooks/useOtpChannels';
 
 const ALL_TABS = [
   { id: 'profile', label: 'Profile information', icon: 'user' },
@@ -51,6 +51,7 @@ function SupportTab() {
 // Mobile number verification by SMS or WhatsApp (OTP)
 function PhoneVerification({ phone }) {
   const { user, setUser } = useAuth();
+  const channels = useOtpChannels();
   const toast = useToast();
   const [sent, setSent] = useState(null);
   const [channel, setChannel] = useState('sms');
@@ -58,6 +59,7 @@ function PhoneVerification({ phone }) {
 
   if (!phone) return <p className="muted small phone-hint"><Icon name="phone" size={14} /> Add your mobile number to get order updates by SMS and WhatsApp.</p>;
   if (user.phoneVerified && user.phone === phone) return null;
+  if (!channels.mobile) return null; // no SMS or WhatsApp provider connected: nothing to offer yet
 
   const send = async (via) => {
     setError('');
@@ -86,8 +88,8 @@ function PhoneVerification({ phone }) {
         <>
           <p><Icon name="shield" size={16} /> Verify <strong>{phone}</strong> to secure your account and get order updates.</p>
           <div className="phone-verify-actions">
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => send('sms')}><Icon name="phone" size={14} /> Send code by SMS</button>
-            <button type="button" className="btn btn-outline btn-sm whatsapp" onClick={() => send('whatsapp')}><Icon name="message" size={14} /> Send code on WhatsApp</button>
+            {channels.sms && <button type="button" className="btn btn-outline btn-sm" onClick={() => send('sms')}><Icon name="phone" size={14} /> Send code by SMS</button>}
+            {channels.whatsapp && <button type="button" className="btn btn-outline btn-sm whatsapp" onClick={() => send('whatsapp')}><Icon name="message" size={14} /> Send code on WhatsApp</button>}
           </div>
           {error && <p className="alert alert-error" role="alert">{error}</p>}
         </>
@@ -156,7 +158,7 @@ function ProfileTab() {
       )}
       {user.createdAt && <p className="muted small">Member since {formatDate(user.createdAt, { month: 'long', year: 'numeric' })}</p>}
     </form>
-    {!editing && !PREVIEW && <PhoneVerification phone={user.phone} />}
+    {!editing && <PhoneVerification phone={user.phone} />}
     </>
   );
 }

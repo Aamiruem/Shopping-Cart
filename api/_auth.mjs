@@ -2,12 +2,15 @@
 // backend/app/routers/auth.py. Password hashes (bcrypt) and login tokens (HS256 JWT with id, email, role) match the
 // FastAPI backend, so accounts and sessions carry over when the full store takes these routes.
 //
-// There is no email service yet, so signup skips the backend's emailed code and accounts stay email_verified = FALSE.
+// One-time codes (api/_otp.mjs): with an email provider configured, signup works like the backend's: the account is
+// created, verified, only after the emailed code is confirmed. Without one, signup creates the account straight away
+// with email_verified = FALSE. Passwordless login, password reset and phone verification need a configured channel.
 import { createHash } from 'node:crypto';
 import { resolveMx } from 'node:dns/promises';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { availableChannels, checkCode, otpReport, sendCode, sentResponse } from './_otp.mjs';
 
 const BCRYPT_ROUNDS = 10;
 const TOKEN_SECONDS = 7 * 24 * 60 * 60;
@@ -17,6 +20,8 @@ const EMAIL_LIMIT = 10; // stops password guessing against one account from many
 const PASSWORD_MIN = 8;
 const EMAIL_RE = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
 const PHONE_RE = /^[6-9]\d{9}$/;
+const OTP_IP_LIMIT = 8; // code requests per connection per 15 minutes, like the backend's otp_limiter
+const VERIFY_IP_LIMIT = 20;
 
 export class ApiError extends Error {
   constructor(status, message, headers = {}) {
@@ -114,9 +119,139 @@ async function register(body, ctx) {
   const error = nameError(name) || emailError(email) || phoneError(phone) || passwordError(body.password) || (await ctx.domainError(email));
   if (error) throw new ApiError(400, error);
   const hash = await bcrypt.hash(body.password, BCRYPT_ROUNDS);
+  if (availableChannels(ctx.env).email) {
+    // Step 1 of 2: email a code; the account is created only when it comes back (POST register/verify)
+    await emailFree(ctx, email);
+    await limit(ctx.store, `otp:${ctx.ip}`, OTP_IP_LIMIT, 'Too many code requests. Please try again in 15 minutes.');
+    const sent = await sendCode(ctx.store.db, { purpose: 'signup', target: email, channel: 'email', payload: { name, phone, password_hash: hash } }, ctx.otp);
+    return { status: 202, body: { verify: 'email', ...sent } };
+  }
   const user = await ctx.store.create({ name, email, phone, passwordHash: hash });
   if (!user) throw new ApiError(409, 'An account with this email already exists. Please log in.');
   return { status: 201, body: await session(user, ctx.store) };
+}
+
+async function emailFree(ctx, email) {
+  const existing = await ctx.store.findByEmail(email);
+  if (existing) {
+    throw new ApiError(409, existing.google_id ? 'This email is registered with Google. Please use “Continue with Google”.' : 'An account with this email already exists. Please log in.');
+  }
+}
+
+async function resendSignup(body, ctx) {
+  const email = normalizeEmail(body.email);
+  if (emailError(email)) throw new ApiError(400, 'Please enter a valid email address');
+  await limit(ctx.store, `otp:${ctx.ip}`, OTP_IP_LIMIT, 'Too many code requests. Please try again in 15 minutes.');
+  const [pending] = await ctx.store.db(
+    "SELECT payload FROM verification_codes WHERE purpose = 'signup' AND target = $1 AND payload IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+    [email],
+  );
+  if (!pending) throw new ApiError(404, 'Please start signing up again');
+  await emailFree(ctx, email);
+  const payload = typeof pending.payload === 'string' ? JSON.parse(pending.payload) : pending.payload;
+  return { body: { verify: 'email', ...(await sendCode(ctx.store.db, { purpose: 'signup', target: email, channel: 'email', payload }, ctx.otp)) } };
+}
+
+async function verifySignup(body, ctx) {
+  const email = normalizeEmail(body.email);
+  await limit(ctx.store, `verify:${ctx.ip}`, VERIFY_IP_LIMIT, 'Too many attempts. Please try again in 15 minutes.');
+  const row = await checkCode(ctx.store.db, { purpose: 'signup', target: email, code: body.code }, ctx.otp);
+  const data = row.payload || {};
+  await emailFree(ctx, email);
+  const user = await ctx.store.create({ name: data.name, email, phone: data.phone ?? null, passwordHash: data.password_hash, emailVerified: true });
+  if (!user) throw new ApiError(409, 'An account with this email already exists. Please log in.');
+  return { status: 201, body: await session(user, ctx.store) };
+}
+
+// ---------- Codes for an existing account: passwordless login and password reset ----------
+/** Email, or an Indian mobile number in any common form ("+91 98765 43210"). */
+function loginTarget(identifier) {
+  const raw = text(identifier).trim();
+  if (raw.includes('@')) {
+    const email = normalizeEmail(raw);
+    const error = emailError(email);
+    if (error) throw new ApiError(400, error);
+    return { target: email, isEmail: true };
+  }
+  let digits = raw.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+  if (!digits || phoneError(digits)) throw new ApiError(400, phoneError(digits) || 'Please enter your email address or mobile number');
+  return { target: digits, isEmail: false };
+}
+
+// Mobile codes only go to numbers the owner has verified: a number typed at signup proves nothing
+async function accountFor(ctx, { target, isEmail }) {
+  if (isEmail) return ctx.store.findByEmail(target);
+  const [user] = await ctx.store.db('SELECT * FROM users WHERE phone = $1 AND phone_verified ORDER BY id LIMIT 1', [target]);
+  return user ?? null;
+}
+
+const CHANNEL_LABEL = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' };
+
+/** Step 1 of passwordless login or password reset. The reply is the same whether or not the account exists. */
+async function sendAccountCode(purpose, body, ctx) {
+  const who = loginTarget(body.identifier);
+  const channel = who.isEmail ? 'email' : ['sms', 'whatsapp'].includes(body.channel) ? body.channel : 'sms';
+  if (!availableChannels(ctx.env)[channel]) {
+    throw new ApiError(503, `${CHANNEL_LABEL[channel]} codes aren’t available right now. Please choose another way.`);
+  }
+  await limit(ctx.store, `otp:${ctx.ip}`, OTP_IP_LIMIT, 'Too many code requests. Please try again in 15 minutes.');
+  const user = await accountFor(ctx, who);
+  if (!user) return { body: sentResponse(who.target, channel, ctx.env) }; // nothing sent, and nothing revealed
+  return { body: await sendCode(ctx.store.db, { purpose, target: who.target, channel, userId: user.id }, ctx.otp) };
+}
+
+async function verifyAccountCode(purpose, body, ctx) {
+  const who = loginTarget(body.identifier);
+  await limit(ctx.store, `verify:${ctx.ip}`, VERIFY_IP_LIMIT, 'Too many attempts. Please try again in 15 minutes.');
+  const row = await checkCode(ctx.store.db, { purpose, target: who.target, code: body.code }, ctx.otp);
+  const [user] = await ctx.store.db(
+    `UPDATE users SET last_login = NOW()${who.isEmail ? ', email_verified = TRUE' : ''} WHERE id = $1 RETURNING *`, // the code proves the email
+    [row.user_id],
+  );
+  if (!user) throw new ApiError(404, 'User not found');
+  return user;
+}
+
+async function otpLoginVerify(body, ctx) {
+  return { body: await session(await verifyAccountCode('login', body, ctx), ctx.store) };
+}
+
+async function resetPassword(body, ctx) {
+  const error = passwordError(body.password);
+  if (error) throw new ApiError(400, error);
+  const user = await verifyAccountCode('reset', body, ctx);
+  const updated = await ctx.store.updatePassword(user.id, await bcrypt.hash(body.password, BCRYPT_ROUNDS));
+  return { body: await session(updated, ctx.store) }; // signed in with the new password
+}
+
+// ---------- Verifying a mobile number (signed in) ----------
+async function phoneOtp(body, ctx) {
+  const user = await signedInUser(ctx);
+  const phone = text(body.phone).trim();
+  const error = phone ? phoneError(phone) : 'Please enter your mobile number';
+  if (error) throw new ApiError(400, error);
+  const channel = body.channel === 'whatsapp' ? 'whatsapp' : 'sms';
+  const [taken] = await ctx.store.db('SELECT 1 FROM users WHERE phone = $1 AND phone_verified AND id <> $2', [phone, user.id]);
+  if (taken) throw new ApiError(409, 'This mobile number is already verified on another account');
+  await limit(ctx.store, `otp:${ctx.ip}`, OTP_IP_LIMIT, 'Too many code requests. Please try again in 15 minutes.');
+  return { body: await sendCode(ctx.store.db, { purpose: 'phone', target: phone, channel, userId: user.id }, ctx.otp) };
+}
+
+async function phoneVerify(body, ctx) {
+  const user = await signedInUser(ctx);
+  const phone = text(body.phone).trim();
+  await limit(ctx.store, `verify:${ctx.ip}`, VERIFY_IP_LIMIT, 'Too many attempts. Please try again in 15 minutes.');
+  const row = await checkCode(ctx.store.db, { purpose: 'phone', target: phone, code: body.code }, ctx.otp);
+  if (row.user_id !== user.id) throw new ApiError(400, 'This code was sent for another account');
+  const [updated] = await ctx.store.db('UPDATE users SET phone = $1, phone_verified = TRUE WHERE id = $2 RETURNING *', [phone, user.id]);
+  return { body: await publicUser(updated, ctx.store) };
+}
+
+async function otpStatus(_, ctx) {
+  const user = await signedInUser(ctx);
+  if (user.role !== 'admin') throw new ApiError(403, 'Only the store admin can see this');
+  return { body: await otpReport(ctx.store.db, ctx.env) };
 }
 
 async function login(body, ctx) {
@@ -167,9 +302,20 @@ const ROUTES = {
   'GET me': async (_, ctx) => ({ body: await publicUser(await signedInUser(ctx), ctx.store) }),
   'PUT me': updateProfile,
   'PUT password': changePassword,
+  // One-time codes: which channels work, signup, passwordless login, password reset, phone numbers, admin report
+  'GET otp/channels': async (_, ctx) => ({ body: availableChannels(ctx.env) }),
+  'POST register/resend': resendSignup,
+  'POST register/verify': verifySignup,
+  'POST otp': (body, ctx) => sendAccountCode('login', body, ctx),
+  'POST otp/verify': otpLoginVerify,
+  'POST password/forgot': (body, ctx) => sendAccountCode('reset', body, ctx),
+  'POST password/reset': resetPassword,
+  'POST phone/otp': phoneOtp,
+  'POST phone/verify': phoneVerify,
+  'GET otp/status': otpStatus,
 };
 
-/** The routes above; anything else (one-time codes, Google, phone) needs a service this deployment doesn't have. */
+/** The routes above; Google sign-in needs the full backend. */
 export const isAuthRoute = (method, rest) => `${method} ${rest}` in ROUTES;
 
 /** Runs a route: expected errors become their status and message, anything else a plain 500 with no details. */
@@ -185,8 +331,10 @@ export async function safely(route) {
   }
 }
 
-export function handleAuth({ method, rest, body, ip, authorization }, { store = postgresStore(), domainError = emailDomainError } = {}) {
-  return safely(() => ROUTES[`${method} ${rest}`](body ?? {}, { store, ip, authorization, domainError }));
+// `env` and `send` (the code delivery function) are for tests; the live store uses process.env and the real providers
+export function handleAuth({ method, rest, body, ip, authorization }, { store = postgresStore(), domainError = emailDomainError, env = process.env, send } = {}) {
+  const otp = { env, ...(send ? { send } : {}) };
+  return safely(() => ROUTES[`${method} ${rest}`](body ?? {}, { store, ip, authorization, domainError, env, otp }));
 }
 
 let client;
@@ -204,11 +352,12 @@ export function postgresStore(db = query) {
   return {
     findByEmail: (email) => one('SELECT * FROM users WHERE email = $1', [email]),
     findById: (id) => one('SELECT * FROM users WHERE id = $1', [id]),
-    create: ({ name, email, phone, passwordHash }) =>
+    db,
+    create: ({ name, email, phone, passwordHash, emailVerified = false }) =>
       one(
-        `INSERT INTO users (name, email, phone, password_hash, last_login) VALUES ($1, $2, $3, $4, NOW())
+        `INSERT INTO users (name, email, phone, password_hash, email_verified, last_login) VALUES ($1, $2, $3, $4, $5, NOW())
          ON CONFLICT (email) DO NOTHING RETURNING *`,
-        [name, email, phone, passwordHash],
+        [name, email, phone, passwordHash, emailVerified],
       ),
     touchLogin: (id) => one('UPDATE users SET last_login = NOW() WHERE id = $1', [id]),
     updateProfile: (id, { name, phone }) =>

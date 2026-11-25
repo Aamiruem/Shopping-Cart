@@ -369,7 +369,9 @@ def test_login_with_one_time_code_by_email_or_verified_mobile(client):
     # Mobile: refused until the owner has verified the number, then works with +91 / spaces
     phone = f"8{time.time_ns() % 1_000_000_000:09d}"
     client.put("/api/auth/me", json={"name": "Test Shopper", "phone": phone}, headers=headers)
-    assert client.post("/api/auth/otp", json={"identifier": phone}).status_code == 404
+    # Not verified yet: the reply looks the same as for a real account, but no code exists to use
+    unverified = client.post("/api/auth/otp", json={"identifier": phone})
+    assert unverified.status_code == 200 and "devCode" not in unverified.json()
     code = client.post("/api/auth/phone/otp", json={"phone": phone}, headers=headers).json()["devCode"]
     client.post("/api/auth/phone/verify", json={"phone": phone, "code": code}, headers=headers)
     spaced = f"+91 {phone[:5]} {phone[5:]}"
@@ -378,7 +380,10 @@ def test_login_with_one_time_code_by_email_or_verified_mobile(client):
     ok = client.post("/api/auth/otp/verify", json={"identifier": phone, "code": sent["devCode"]})
     assert ok.status_code == 200 and ok.json()["user"]["phoneVerified"] is True
     # Unknown accounts and junk input
-    assert client.post("/api/auth/otp", json={"identifier": f"nobody{time.time_ns()}@gmail.com"}).status_code == 404
+    nobody = f"nobody{time.time_ns()}@gmail.com"
+    unknown = client.post("/api/auth/otp", json={"identifier": nobody})
+    assert unknown.status_code == 200 and unknown.json()["channel"] == "email" and "devCode" not in unknown.json()
+    assert client.post("/api/auth/otp/verify", json={"identifier": nobody, "code": "123456"}).status_code == 400
     assert client.post("/api/auth/otp", json={"identifier": "12345"}).status_code == 400
 
 

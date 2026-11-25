@@ -4,6 +4,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { api } from '../../api/client';
 import { ChartTooltip, DataTable, fmt } from '../../components/charts/ChartParts';
 import Icon from '../../components/common/Icon';
+import OtpStatus from '../../components/seller/OtpStatus';
 import { useAuth } from '../../context/AuthContext';
 import useApi from '../../hooks/useApi';
 import { responsiveImage } from '../../utils/image';
@@ -340,6 +341,7 @@ export default function StoreDashboard() {
         <RevenueChart daily={data.daily} />
         <Pipeline fulfilment={data.fulfilment} returns={data.returns} />
         {data.leads && <Leads leads={data.leads} />}
+        {admin && <OtpStatus />}
         <StockHealth stock={data.stock} admin={admin} />
         <RecentOrders orders={data.recent} />
         <div className="sd-stack">

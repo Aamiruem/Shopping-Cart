@@ -120,6 +120,11 @@ export const api = {
   // Passwordless login: code to the account's email, or SMS / WhatsApp to its verified mobile
   otpLogin: (identifier, channel) => request('/auth/otp', { method: 'POST', body: { identifier, channel } }),
   otpLoginVerify: (identifier, code) => request('/auth/otp/verify', { method: 'POST', body: { identifier, code } }),
+  // Which code channels are connected (store API): { email, sms, whatsapp }
+  otpChannels: () => request('/auth/otp/channels'),
+  forgotPassword: (identifier, channel) => request('/auth/password/forgot', { method: 'POST', body: { identifier, channel } }),
+  resetPassword: (identifier, code, password) => request('/auth/password/reset', { method: 'POST', body: { identifier, code, password } }),
+  otpStatus: () => request('/auth/otp/status'),
   googleLogin: (credential) => request('/auth/google', { method: 'POST', body: { credential } }),
   me: () => request('/auth/me'),
   updateProfile: (body) => request('/auth/me', { method: 'PUT', body }),

@@ -30,7 +30,9 @@ function OtpBoxes({ value, onChange, inputRef }) {
 
 // 6-digit code entry shared by signup (email), phone (SMS / WhatsApp) and payout confirmation.
 // `info` = what the API returned when it sent the code: { sentTo, channel, devCode? }
-export default function CodeVerify({ title, info, onVerify, onResend, onBack, verifyLabel = 'Verify' }) {
+// `note` replaces the "We sent a code" line (login and reset can't say whether the account exists); `children` go above
+// the code boxes (the reset form's new-password field)
+export default function CodeVerify({ title, info, onVerify, onResend, onBack, verifyLabel = 'Verify', note, children }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -89,7 +91,11 @@ export default function CodeVerify({ title, info, onVerify, onResend, onBack, ve
     <form className="code-verify" onSubmit={submit} noValidate>
       <div className="code-icon"><Icon name={via === 'email' ? 'mail' : via === 'WhatsApp' ? 'message' : 'phone'} size={26} /></div>
       <h2>{title}</h2>
-      <p className="muted">We sent a 6-digit code by {via} to <strong>{sent?.sentTo}</strong>. It expires in 5 minutes.</p>
+      <p className="muted">
+        {note ? note(sent) : <>We sent a 6-digit code by {via} to <strong>{sent?.sentTo}</strong>.</>}
+        {' '}It expires in {Math.round((sent?.expiresInSeconds || 300) / 60)} minutes.
+      </p>
+      {children}
       {sent?.devCode && (
         <p className="otp-dev"><Icon name="zap" size={12} /> Dev mode ({via} not connected yet): your code is <code>{sent.devCode}</code></p>
       )}

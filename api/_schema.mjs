@@ -15,6 +15,24 @@ CREATE TABLE IF NOT EXISTS cart_items (
   added_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (user_id, product_id)
 );
+-- One-time codes (api/_otp.mjs): verification_codes itself is in backend/app/db/schema.sql. verified_at tells a code
+-- that was used apart from one replaced by a newer code. The log holds outcomes only: masked addresses, never codes.
+ALTER TABLE verification_codes ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS verification_codes_target_idx ON verification_codes (target, created_at DESC);
+CREATE TABLE IF NOT EXISTS otp_delivery_logs (
+  id              SERIAL       PRIMARY KEY,
+  verification_id INTEGER      REFERENCES verification_codes(id) ON DELETE SET NULL,
+  purpose         VARCHAR(20)  NOT NULL,
+  channel         VARCHAR(10)  NOT NULL,
+  provider        VARCHAR(20),
+  target_masked   VARCHAR(255) NOT NULL,
+  status          VARCHAR(20)  NOT NULL,                 -- accepted | failed | not_sent_dev
+  provider_ref    VARCHAR(120),
+  error           TEXT,
+  created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS otp_delivery_logs_recent_idx ON otp_delivery_logs (created_at DESC);
+
 -- Sizes and colours (api/_variants.mjs): one cart line per product + size + colour. '' = the product has no such option.
 -- Existing rows keep working as lines without options; the key widens once, and running this again changes nothing.
 ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS size  VARCHAR(20) NOT NULL DEFAULT '';

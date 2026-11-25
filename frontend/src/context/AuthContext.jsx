@@ -34,6 +34,8 @@ export function AuthProvider({ children }) {
     ready,
     login: async (email, password) => saveSession(await api.login({ email, password })),
     otpLogin: async (identifier, code) => saveSession(await api.otpLoginVerify(identifier, code)),
+    // Forgot password: a correct code sets the new password and signs in
+    resetPassword: async (identifier, code, password) => saveSession(await api.resetPassword(identifier, code, password)),
     // The full API signs up in two steps: register() emails a code, verifySignup() creates the account and signs in.
     // The api/ functions have no email service yet, so they create the account straight away.
     register: async (form) => {

@@ -20,6 +20,8 @@ from . import mailer, messaging
 
 MAX_ATTEMPTS = 5
 RESEND_AFTER_SECONDS = 30
+MAX_PER_HOUR = 5  # codes to one email or phone per hour, whatever the purpose: no flooding someone's inbox or phone
+CHANNEL_LABEL = {"email": "Email", "sms": "SMS", "whatsapp": "WhatsApp"}
 PURPOSE_TEXT = {
     "signup": "verify your email and finish creating your Arvixa Store account",
     "login": "log in to your Arvixa Store account",
@@ -42,8 +44,23 @@ def _configured(channel: str) -> bool:
     return mailer.is_configured() if channel == "email" else messaging.is_configured(channel)
 
 
+def sent_response(target: str, channel: str) -> dict:
+    """What the caller is told after a code is sent; also returned, without sending, for an unknown account so the
+    reply never reveals whether an email or number has an account."""
+    return {"sentTo": mask(target), "channel": channel, "expiresInSeconds": get_settings().otp_ttl_minutes * 60}
+
+
 async def send_code(purpose: str, target: str, channel: str, user_id: int | None = None, payload: dict | None = None) -> dict:
+    settings = get_settings()
+    if not _configured(channel) and settings.is_production:
+        # Never pretend: in production an unconnected channel is refused, not logged and reported as sent
+        raise ApiError(503, f"{CHANNEL_LABEL.get(channel, channel)} codes aren't available right now. Please choose another way.")
     pool = get_pool()
+    recent = await pool.fetchval(
+        "SELECT COUNT(*) FROM verification_codes WHERE target = $1 AND created_at > NOW() - INTERVAL '1 hour'", target
+    )
+    if recent >= MAX_PER_HOUR:
+        raise ApiError(429, "Too many codes sent to this address. Please try again in an hour.")
     age = await pool.fetchval(
         """SELECT EXTRACT(EPOCH FROM NOW() - created_at) FROM verification_codes
             WHERE purpose = $1 AND target = $2 ORDER BY created_at DESC LIMIT 1""",
@@ -53,7 +70,6 @@ async def send_code(purpose: str, target: str, channel: str, user_id: int | None
     if age is not None and float(age) < RESEND_AFTER_SECONDS:
         raise ApiError(429, f"Please wait {math.ceil(RESEND_AFTER_SECONDS - float(age))} seconds before requesting a new code")
 
-    settings = get_settings()
     code = f"{secrets.randbelow(1_000_000):06d}"
     async with pool.acquire() as conn, conn.transaction():
         await conn.execute(
@@ -88,7 +104,7 @@ async def send_code(purpose: str, target: str, channel: str, user_id: int | None
     else:
         await messaging.send(channel, target, text)
 
-    response = {"sentTo": mask(target), "channel": channel, "expiresInSeconds": settings.otp_ttl_minutes * 60}
+    response = sent_response(target, channel)
     if not _configured(channel) and not settings.is_production:
         response["devCode"] = code  # local development: the channel isn't connected, so show the code
     return response

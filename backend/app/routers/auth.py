@@ -14,7 +14,7 @@ from ..core.security import create_token, hash_password, verify_password
 from ..db.postgres import get_pool
 from ..deps import CurrentUser, get_current_user
 from ..services import validation as v
-from ..services.verification import check_code, send_code
+from ..services.verification import check_code, send_code, sent_response
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 auth_limiter = rate_limit(20, message="Too many login attempts. Please try again in 15 minutes.")
@@ -225,20 +225,13 @@ def _login_target(identifier: str) -> tuple[str, bool]:
     return digits, False
 
 
-async def _login_user(target: str, is_email: bool) -> dict:
+async def _login_user(target: str, is_email: bool) -> dict | None:
     # Mobile login only for numbers the owner has verified: a number typed at signup proves nothing
     if is_email:
         u = await get_pool().fetchrow("SELECT * FROM users WHERE email = $1", target)
     else:
         u = await get_pool().fetchrow("SELECT * FROM users WHERE phone = $1 AND phone_verified ORDER BY id LIMIT 1", target)
-    if not u:
-        raise ApiError(
-            404,
-            "No Arvixa account uses this email. Please create an account."
-            if is_email
-            else "No account has verified this mobile number yet. Log in with your email, then verify the number in My Profile.",
-        )
-    return dict(u)
+    return dict(u) if u else None
 
 
 @router.post("/otp", dependencies=[Depends(otp_limiter)])
@@ -246,8 +239,12 @@ async def otp_login(body: OtpLoginIn):
     """Passwordless login, step 1: sends a 6-digit code to the account's email, or by SMS / WhatsApp to its
     verified mobile number."""
     target, is_email = _login_target(body.identifier)
+    channel = "email" if is_email else body.channel
     u = await _login_user(target, is_email)
-    return await send_code("login", target, "email" if is_email else body.channel, user_id=u["id"])
+    if not u:
+        # Same answer as for a real account, and nothing is sent: the reply never tells who has an account
+        return sent_response(target, channel)
+    return await send_code("login", target, channel, user_id=u["id"])
 
 
 @router.post("/otp/verify", dependencies=[Depends(auth_limiter)])

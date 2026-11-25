@@ -190,3 +190,11 @@ body.hub-dark .data-table th, body.hub-dark .data-table td { color: var(--text);
   .sd-card { padding: 16px; }
   .sd-table-wrap { margin: 0 -16px; padding: 0 16px; }
 }
+
+/* Verification codes (components/seller/OtpStatus.jsx) */
+.otp-channels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.otp-channel-card { padding: 14px; border-radius: 14px; border: 1px solid var(--border-light); background: var(--bg); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.otp-channel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.otp-channel-card code { font-size: 11px; word-break: break-all; }
+.sd-pill .icon { margin-right: 3px; }
+@media (max-width: 860px) { .otp-channels { grid-template-columns: minmax(0, 1fr); } }

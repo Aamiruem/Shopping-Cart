@@ -123,6 +123,10 @@ function vercelRequest(req, url, raw) {
   return req;
 }
 
+// After the demo accounts exist: verification codes work locally without any provider, shown on screen ("dev mode").
+// api/_otp.mjs never honours this in a production build.
+process.env.OTP_DEV_CODES ||= '1';
+
 createServer((req, res) => {
   let raw = '';
   req.on('data', (chunk) => (raw += chunk));
