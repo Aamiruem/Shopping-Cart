@@ -66,6 +66,12 @@ uvicorn app.main:app --port 8100                     # docs: http://localhost:81
 pytest                                               # 60 tests, no database or API key needed
 ```
 
+`python main.py` from `ai-service/app` (or `python app/main.py`, or an IDE Run button) also works, with auto-reload on
+port 8100 (`PORT`, `HOST`, `RELOAD=0` to change). It switches to `ai-service/.venv` by itself if the Python you ran lacks
+the service's packages (for example with `backend/.venv` active). On Windows with Smart App Control, which can block
+psycopg's bundled DLL, it uses your installed PostgreSQL's signed `libpq.dll` instead (`PSYCOPG_IMPL=python`). Set
+`PSYCOPG_IMPL` yourself to opt out.
+
 `ANTHROPIC_API_KEY` is optional. Without it RAG returns the best passage, the analyst answers from built-in
 report templates, the listing writer uses a template and only the shopping assistant is unavailable.
 
