@@ -234,3 +234,50 @@ test('photo uploads: sellers only, real images only, up to 4 MB', async () => {
   assert.match(ok.body.url, /products\/\d+\/photo\.jpg$/);
   assert.deepEqual(stored.map((s) => s[2]), ['image/jpeg']);
 });
+
+test('dashboard overview: each seller sees only their own sales and stock; the admin sees the store and its leads', async () => {
+  const asha = await account('asha@example.com');
+  await asha.becomeSeller('Asha Crafts');
+  const ravi = await account('ravi@example.com');
+  await ravi.becomeSeller('Ravi Electronics');
+  const { body: kurta } = await asha.seller('POST', 'products', PRODUCT);
+  await asha.seller('POST', 'products', { ...PRODUCT, name: 'Handloom Silk Kurta', stock: 4 });
+  await asha.seller('POST', 'products', { ...PRODUCT, name: 'Handloom Linen Kurta', stock: 0 });
+  await ravi.seller('POST', 'products', { ...PRODUCT, name: 'Ravi Kurta', stock: 50 });
+  await sync();
+
+  const empty = (await asha.seller('GET', 'overview')).body;
+  assert.deepEqual([empty.kpis.revenue, empty.kpis.orders, empty.daily.length], [0, 0, 30]); // zeros, not made-up numbers
+
+  const buyer = await account('buyer@example.com');
+  const address = (await buyer.shop('POST', 'addresses', { name: 'Buyer', phone: '9876543210', line1: '1 MG Road', city: 'Pune', state: 'Maharashtra', pincode: '411001' })).body.id;
+  await buyer.shop('POST', 'cart', { productId: kurta._id, qty: 2 });
+  const order = (await buyer.shop('POST', 'orders', { addressId: address, paymentMethod: 'cod' })).body;
+  await asha.seller('PATCH', `orders/${order.id}`, { fulfilment: 'packed' });
+
+  const mine = (await asha.seller('GET', 'overview')).body;
+  assert.equal(mine.scope, 'seller');
+  assert.deepEqual([mine.kpis.revenue, mine.kpis.orders, mine.kpis.ordersToday, mine.kpis.customers, mine.kpis.averageOrder], [2598, 1, 1, 1, 2598]);
+  assert.equal(mine.daily.at(-1).revenue, 2598);
+  assert.deepEqual(mine.fulfilment.map((f) => f.orders), [0, 1, 0, 0]);
+  assert.deepEqual([mine.stock.total, mine.stock.inStock, mine.stock.low, mine.stock.out], [3, 1, 1, 1]);
+  assert.deepEqual(mine.stock.alerts.map((a) => a.stock), [0, 4]);
+  assert.deepEqual([mine.recent[0].id, mine.recent[0].amount, mine.top[0].units], [order.id, 2598, 2]);
+  assert.ok(mine.activity.some((e) => e.note === 'Packed'));
+  assert.equal(mine.leads, null, 'leads are for the admin');
+
+  const theirs = (await ravi.seller('GET', 'overview')).body;
+  assert.deepEqual([theirs.kpis.revenue, theirs.recent.length, theirs.activity.length, theirs.stock.total], [0, 0, 0, 1]);
+
+  const owner = await account('owner@example.com');
+  await db("UPDATE users SET role = 'admin' WHERE email = 'owner@example.com'");
+  await db("INSERT INTO leads (source, kind, email, intent, consent_at, status) VALUES ('quote', 'quote', 'a@b.co', 'high', NOW(), 'new'), ('contact', 'product_enquiry', 'c@d.co', 'low', NOW(), 'won')");
+  const store = (await owner.seller('GET', 'overview')).body;
+  assert.equal(store.scope, 'store');
+  assert.equal(store.kpis.revenue, 2598);
+  assert.ok(store.stock.total > 700, 'the whole catalog');
+  assert.deepEqual(store.leads.stages.map((s) => s.count), [1, 0, 0, 1, 0]);
+  assert.equal(store.leads.stages[0].hot, 1);
+
+  assert.equal((await buyer.seller('GET', 'overview')).status, 403);
+});

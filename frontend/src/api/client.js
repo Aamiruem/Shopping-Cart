@@ -187,6 +187,7 @@ export const api = {
   // Seller hub
   becomeSeller: (body) => request('/seller/register', { method: 'POST', body }),
   sellerProfile: () => request('/seller/profile'),
+  sellerOverview: () => request('/seller/overview'),
   sellerProducts: (params = {}) => request(`/seller/products?${query(params)}`),
   sellerCreateProduct: (body) => request('/seller/products', { method: 'POST', body }),
   sellerUpdateProduct: (id, body) => request(`/seller/products/${id}`, { method: 'PUT', body }),

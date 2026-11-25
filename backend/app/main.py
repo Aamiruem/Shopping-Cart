@@ -8,6 +8,31 @@ API docs:      http://localhost:5000/docs
 import sys
 from pathlib import Path
 
+
+def _use_backend_venv() -> None:
+    """`python main.py` with a Python that lacks the API's packages (say the system Python): run this file with
+    backend/.venv's Python instead of stopping at "No module named 'pymongo'"."""
+    if __name__ != "__main__":
+        return  # imported by uvicorn, or uvicorn's reload worker: already the right Python
+    venv = Path(__file__).resolve().parents[1] / ".venv"
+    python = venv / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    if not python.exists() or Path(sys.prefix).resolve() == venv.resolve():
+        return
+    import importlib.util
+
+    if all(importlib.util.find_spec(name) for name in ("fastapi", "uvicorn", "pymongo", "asyncpg")):
+        return  # this Python has everything the API needs
+    import subprocess
+
+    print(f"This Python ({sys.executable}) doesn't have the API's packages; starting with {python}", file=sys.stderr)
+    try:
+        sys.exit(subprocess.call([str(python), str(Path(__file__).resolve()), *sys.argv[1:]]))
+    except KeyboardInterrupt:  # Ctrl+C reaches the server too; just leave quietly
+        sys.exit(130)
+
+
+_use_backend_venv()
+
 if not __package__:
     # Run as a file (`python main.py`, an IDE "Run" button, or uvicorn's reload worker on Windows, which
     # re-runs this file as __mp_main__): make the `app` package importable so the relative imports below work.

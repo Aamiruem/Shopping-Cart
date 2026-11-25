@@ -180,6 +180,16 @@ export default async function handler(req, res) {
       return send(res, result.status, result.body);
     }
   }
+  if (area === 'ai' && req.method === 'POST') {
+    // Shopping assistant (api/_assistant.mjs): answers from the live catalog, store policies and the shopper's orders
+    const assistant = await import('./_assistant.mjs');
+    if (assistant.isAssistantRoute(req.method, rest)) {
+      const ip = req.headers['x-real-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+      const result = await assistant.handleAssistant({ rest, body: bodyOf(req), authorization: req.headers.authorization, ip });
+      Object.entries(result.headers).forEach(([key, value]) => res.setHeader(key, value));
+      return send(res, result.status, result.body);
+    }
+  }
   if (['recommendations', 'ai', 'events'].includes(area)) {
     const answer = await recommendations(req, area, rest, params);
     if (answer) return send(res, answer.status ?? 200, answer.body, answer.cacheable);

@@ -122,7 +122,7 @@ export default function App() {
 
       <Footer />
       <MobileTabBar />
-      {!PREVIEW && <ChatWidget />}
+      <ChatWidget />
       <ConsentBanner />
     </div>
     </AuthModalProvider>

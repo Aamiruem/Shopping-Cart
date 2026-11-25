@@ -8,6 +8,7 @@ import { setSellerProducts } from './_catalog.mjs';
 import { razorpayClient } from './_payments.mjs';
 import { listCatalog, resetCatalogProduct, updateCatalogProduct } from './_inventory.mjs';
 import { actOnReturn, listReturns } from './_returns.mjs';
+import { overview } from './_overview.mjs';
 
 const CATEGORIES = ['mobiles', 'electronics', 'fashion', 'accessories', 'beauty', 'home', 'kitchen', 'sports', 'grocery'];
 const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -442,6 +443,7 @@ export async function syncSellerProducts(db = query, now = Date.now()) {
 const ROUTES = {
   'POST register': register,
   'GET profile': getProfile,
+  'GET overview': ({ db, userId, role }) => overview({ db, userId, role }).then((body) => ({ body })),
   'PUT profile': updateProfile,
   'GET products': myProducts,
   'POST products': createProduct,
