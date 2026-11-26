@@ -140,7 +140,8 @@
 .reset-password-input .icon-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
 
 /* Welcome popup (components/account/WelcomeSheet.jsx): mobile number first, email one tap away */
-.welcome-sheet { display: grid; gap: 14px; }
+.welcome-sheet { display: grid; gap: 14px; width: min(100%, 440px); margin: 0 auto; padding: 28px 26px 22px; background: var(--surface); color: var(--text); border-radius: var(--radius-lg); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35); }
+.auth-modal:has(.welcome-sheet) { width: min(100%, 440px); }
 .welcome-sheet .auth-title { margin: 0; }
 .welcome-sheet > p { margin: 0; }
 .welcome-sheet .stack-sm { display: grid; gap: 12px; }
