@@ -132,7 +132,7 @@ export default async function handler(req, res) {
   const path = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
   if (req.method === 'HEAD' || req.method === 'OPTIONS') return send(res, 204, null);
   const [area, ...rest] = path.split('/').filter(Boolean);
-  if (!['health', 'location', 'payments'].includes(area)) {
+  if (!['health', 'location', 'payments', 'shipping'].includes(area)) {
     const [{ syncSellerProducts }, { syncCatalogState }] = await Promise.all([import('./_seller.mjs'), import('./_inventory.mjs')]);
     // Sellers' listed products join the catalog; the admin's edits, stock and review ratings apply (each at most every 30 s)
     await Promise.all([syncSellerProducts(), syncCatalogState()]);
@@ -149,6 +149,13 @@ export default async function handler(req, res) {
       const result = await seller.handleSeller({ method: req.method, rest, body, params, authorization: req.headers.authorization });
       return send(res, result.status, result.body);
     }
+  }
+  if (req.method === 'GET' && area === 'shipping' && rest[0] === 'check' && rest.length === 1) {
+    // Courier serviceability for a pincode (api/_shipping.mjs): { checked: false } when no courier is connected
+    const { serviceability } = await import('./_shipping.mjs');
+    const pincode = String(params.pincode || '');
+    if (!/^[1-9]\d{5}$/.test(pincode)) return send(res, 400, { error: 'Please enter a valid 6-digit pincode' });
+    return send(res, 200, await serviceability(pincode, { cod: params.cod === '1', weightKg: Math.min(50, Math.max(0.1, Number(params.weight) || 0.5)) }));
   }
   if (req.method === 'GET' && area === 'location' && rest[0] === 'pincode' && rest.length === 2) {
     const { PINCODE_RE, lookupPincode } = await import('./_location.mjs');

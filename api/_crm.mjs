@@ -12,7 +12,7 @@ import {
   cancelCampaign, createCampaign, deleteCampaign, getCampaign, listCampaigns, listMessages, listSubscribers, publicUnsubscribe, retryMessages, runAutomations,
   sendCampaign, sendDirect, staffUnsubscribe, updateCampaign,
 } from './_crm_marketing.mjs';
-import { cancelOrder, dashboard, getOrder, invoice, listOrders, refundAction, refundsList, report, REPORTS, setFulfilment } from './_crm_sales.mjs';
+import { bookShipment, cancelOrder, dashboard, getOrder, invoice, listOrders, refundAction, refundsList, report, REPORTS, setFulfilment } from './_crm_sales.mjs';
 import { createTicket, getTicket, listTickets, replyTicket, updateTicket } from './_crm_support.mjs';
 import {
   addStaff, auditLog, createRole, createTask, deleteRole, deleteTask, feed, listRoles, listStaff, listTasks, markFeedSeen, removeStaff, revokeSession,
@@ -43,7 +43,7 @@ function integrations() {
       messaging,
       otp: providerStatus(env),
       payments: { provider: 'razorpay', configured: has('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET'), webhook: has('RAZORPAY_WEBHOOK_SECRET') },
-      shipping: { provider: 'shiprocket', configured: has('SHIPROCKET_EMAIL', 'SHIPROCKET_PASSWORD'), webhook: has('SHIPROCKET_WEBHOOK_TOKEN') },
+      shipping: { provider: 'shiprocket', configured: has('SHIPROCKET_EMAIL', 'SHIPROCKET_PASSWORD', 'SHIPROCKET_PICKUP_POSTCODE'), webhook: has('SHIPROCKET_WEBHOOK_TOKEN') },
       cron: { configured: has('CRON_SECRET') },
       encryption: { configured: has('DATA_ENCRYPTION_KEY') },
       // What each provider needs, so the page can say exactly what to set (names only, never values)
@@ -53,9 +53,11 @@ function integrations() {
         whatsapp: ['WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_UPDATE_TEMPLATE (utility) and WHATSAPP_MARKETING_TEMPLATE (marketing), each with one body variable', 'WHATSAPP_APP_SECRET + WHATSAPP_VERIFY_TOKEN for the webhook (incoming messages and delivery reports)'],
         site: ['SITE_URL, e.g. https://arvixa-store.vercel.app (links in messages, unsubscribe)'],
         cron: ['CRON_SECRET (Vercel sends it to the daily job)'],
+        shipping: ['SHIPROCKET_EMAIL, SHIPROCKET_PASSWORD (an API user: Shiprocket → Settings → API)', 'SHIPROCKET_PICKUP_POSTCODE and SHIPROCKET_PICKUP_LOCATION (the pickup address name in Shiprocket)', 'SHIPROCKET_WEBHOOK_TOKEN, set on the tracking webhook pointing at /api/webhooks/courier'],
+        payments: ['RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET (live keys after KYC)', 'RAZORPAY_WEBHOOK_SECRET with events payment.captured, payment.failed, refund.processed'],
       },
       webhookUrls: siteUrl(env) ? {
-        resend: `${siteUrl(env)}/api/webhooks/resend`, whatsapp: `${siteUrl(env)}/api/webhooks/whatsapp`, twilio: `${siteUrl(env)}/api/webhooks/twilio`,
+        resend: `${siteUrl(env)}/api/webhooks/resend`, courier: `${siteUrl(env)}/api/webhooks/courier`, whatsapp: `${siteUrl(env)}/api/webhooks/whatsapp`, twilio: `${siteUrl(env)}/api/webhooks/twilio`,
       } : null,
     },
   };
@@ -108,6 +110,7 @@ const routes = [
   ['GET', 'orders/:id/invoice', 'sales.view', invoice],
   ['PATCH', 'orders/:id/fulfilment', 'orders.edit', setFulfilment],
   ['POST', 'orders/:id/cancel', 'orders.edit', cancelOrder],
+  ['POST', 'orders/:id/shipment', 'shipping.manage', bookShipment],
   ['GET', 'refunds', 'sales.view', refundsList],
   ['PATCH', 'refunds/:id', 'refunds.manage', refundAction],
 

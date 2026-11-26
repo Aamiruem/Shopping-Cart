@@ -236,6 +236,7 @@ export const NOTIFICATION_EVENTS = {
   welcome: 'Welcome email after signing up',
   order_confirmation: 'Order confirmation',
   payment_confirmation: 'Online payment received',
+  payment_failed: 'Online payment failed (with a safe way to retry)',
   shipping_update: 'Order shipped',
   delivery_confirmation: 'Order delivered',
   support_update: 'Reply on a support ticket',

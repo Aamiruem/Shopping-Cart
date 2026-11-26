@@ -13,6 +13,14 @@ function OrderDrawer({ id, onClose, onChange }) {
   const { data: o, error, reload } = useCrmData(`/orders/${id}`);
   const { run, busy } = useAction();
   const [ship, setShip] = useState({ courier: '', trackingNumber: '' });
+  const [box, setBox] = useState({ weightKg: '', lengthCm: '', breadthCm: '', heightCm: '' });
+  const book = async (e) => {
+    e.preventDefault();
+    if (await run(() => crm.post(`/orders/${id}/shipment`, box), (s) => `Booked with ${s.courier}: AWB ${s.awb}`)) {
+      reload();
+      onChange();
+    }
+  };
   const move = async (fulfilment) => {
     if (fulfilment === 'shipped' && !ship.trackingNumber.trim()) return;
     if (await run(() => crm.patch(`/orders/${id}/fulfilment`, { fulfilment, ...(fulfilment === 'shipped' ? ship : {}) }), `Marked ${fulfilment}`)) {
@@ -65,6 +73,18 @@ function OrderDrawer({ id, onClose, onChange }) {
                     {step < 1 && <button type="button" className="b" disabled={busy} onClick={() => move('packed')}>Mark packed</button>}
                     {step >= 2 && step < 3 && <button type="button" className="b primary" disabled={busy} onClick={() => move('delivered')}>Mark delivered</button>}
                   </div>
+                  {step < 2 && o.shippingConnected && can('shipping.manage') && (
+                    <form className="stack" onSubmit={book}>
+                      <strong className="small">Book with the courier (Shiprocket): the courier issues the tracking number</strong>
+                      <div className="row">
+                        <input type="number" step="0.01" min="0.01" required placeholder="Weight kg" value={box.weightKg} onChange={(e) => setBox({ ...box, weightKg: e.target.value })} style={{ width: 100 }} />
+                        <input type="number" min="1" required placeholder="L cm" value={box.lengthCm} onChange={(e) => setBox({ ...box, lengthCm: e.target.value })} style={{ width: 80 }} />
+                        <input type="number" min="1" required placeholder="B cm" value={box.breadthCm} onChange={(e) => setBox({ ...box, breadthCm: e.target.value })} style={{ width: 80 }} />
+                        <input type="number" min="1" required placeholder="H cm" value={box.heightCm} onChange={(e) => setBox({ ...box, heightCm: e.target.value })} style={{ width: 80 }} />
+                        <button type="submit" className="b primary" disabled={busy}>Book shipment</button>
+                      </div>
+                    </form>
+                  )}
                   {step < 2 && (
                     <form className="row" onSubmit={(e) => { e.preventDefault(); move('shipped'); }}>
                       <input placeholder="Courier" value={ship.courier} onChange={(e) => setShip({ ...ship, courier: e.target.value })} />
@@ -83,6 +103,13 @@ function OrderDrawer({ id, onClose, onChange }) {
               {o.payments.map((p) => <p key={p.id} className="small" style={{ margin: '0 0 6px' }}>{label(p.provider)} {p.provider_payment_id || ''} · {money(p.amount)} · <Badge value={p.status} /> · {p.method || ''} · {dateTime(p.updated_at)}{p.error && <span className="sub">{p.error}</span>}</p>)}
             </section>
           )}
+          {o.shipment && (
+            <section className="card"><h3>Shipment</h3>
+              <p className="small">{o.shipment.courier || 'Courier'} · AWB <strong>{o.shipment.awb || 'not assigned yet'}</strong> · <Badge value={o.shipment.status}>{label(o.shipment.status)}</Badge>{o.shipment.eta ? ` · ETA ${o.shipment.eta.slice(0, 10)}` : ''}{o.shipment.tracking_url && <> · <a href={o.shipment.tracking_url} target="_blank" rel="noreferrer">Courier tracking</a></>}</p>
+              {o.shipment.events?.length > 0 && <ul className="timeline">{o.shipment.events.map((e) => <li key={e.id}><div>{label(e.status)}{e.location ? ` · ${e.location}` : ''}<time>{dateTime(e.occurred_at)}</time></div></li>)}</ul>}
+            </section>
+          )}
+          {o.deliveryCheck && <p className="muted small">At checkout: {o.deliveryCheck.checked ? (o.deliveryCheck.serviceable ? `courier delivery confirmed to ${o.deliveryCheck.pincode}` : 'not serviceable') : 'no courier connected, delivery to be confirmed by the team'}.</p>}
           {o.return && <section className="card"><h3>Return</h3><p className="small">{label(o.return.status)} · {o.return.reason}{o.return.refund ? ` · refund ${label(o.return.refund)}` : ''}</p></section>}
           <section className="card"><h3>Timeline</h3><ul className="timeline">{o.events.map((e, i) => <li key={i}><div>{e.note || label(e.status)}<time>{dateTime(e.created_at)}</time></div></li>)}</ul></section>
           <h3>Internal notes</h3>

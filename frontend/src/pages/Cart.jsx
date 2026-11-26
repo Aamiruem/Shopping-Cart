@@ -7,6 +7,7 @@ import Icon from '../components/common/Icon';
 import Price from '../components/common/Price';
 import ItemOptions from '../components/product/ItemOptions';
 import { useCart } from '../context/CartContext';
+import { useAuthModal } from '../context/AuthModalContext';
 import { useToast } from '../context/ToastContext';
 import useShopActions from '../hooks/useShopActions';
 import { PREVIEW } from '../config';
@@ -66,8 +67,11 @@ function CartItem({ item }) {
 
 export default function Cart() {
   useSeo({ title: 'Cart', noindex: true });
-  const { cart, loading } = useCart();
+  const { cart, loading, guest } = useCart();
   const navigate = useNavigate();
+  const { openLogin } = useAuthModal();
+  // Guests sign in here (their cart moves to the account); checkout itself is for signed-in customers only
+  const placeOrder = () => (guest ? openLogin('welcome', 'Sign in to place your order. Your cart is saved.') : navigate('/checkout'));
 
   if (loading && !cart.items.length) return <Spinner />;
   if (!cart.items.length) {
@@ -88,11 +92,11 @@ export default function Cart() {
           </header>
           <ul>{cart.items.map((item) => <CartItem key={item.lineId ?? item.productId} item={item} />)}</ul>
           <div className="cart-footer">
-            <button type="button" className="btn btn-buy btn-lg" onClick={() => navigate('/checkout')}>Place order</button>
+            <button type="button" className="btn btn-buy btn-lg" onClick={placeOrder}>{guest ? 'Sign in to place order' : 'Place order'}</button>
           </div>
         </div>
       </section>
-      <PriceDetails cart={cart}><CouponBox /></PriceDetails>
+      <PriceDetails cart={cart}>{guest ? <p className="muted small" style={{ padding: '0 16px 12px' }}>Sign in to use a coupon.</p> : <CouponBox />}</PriceDetails>
     </div>
   );
 }

@@ -111,6 +111,8 @@ export default function OrderDetail() {
           {shipment && (
             <p className="tracking-line">
               <Icon name="truck" size={16} /> {shipment.courier || 'Courier'} · Tracking number <strong>{shipment.tracking_number}</strong>
+              {order.shipment?.tracking_url && <> · <a href={order.shipment.tracking_url} target="_blank" rel="noreferrer">Track with the courier</a></>}
+              {order.shipment?.eta && <> · Expected by {formatDate(order.shipment.eta)}</>}
             </p>
           )}
 

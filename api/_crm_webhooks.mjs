@@ -97,5 +97,11 @@ export async function handleProviderWebhook(provider, { method, url, headers, ra
     const updated = await applyStatus(db, 'twilio', form.MessageSid, TWILIO[form.MessageStatus], form.ErrorCode ? `Twilio error ${form.ErrorCode}` : null);
     return { status: 200, body: { ok: true, updated } };
   }
+  if (provider === 'courier') {
+    // Shiprocket tracking (its webhook URLs may not contain the word "shiprocket", hence /api/webhooks/courier)
+    const { handleTracking } = await import('./_shipping.mjs');
+    const { updateFulfilment } = await import('./_seller.mjs');
+    return handleTracking(raw, h, { db, env, deliver: (orderId) => updateFulfilment({ db, userId: null, role: 'admin', id: orderId, body: { fulfilment: 'delivered' } }).catch((err) => console.error('delivered not recorded', err.message)) });
+  }
   return { status: 404, body: { error: 'Unknown provider' } };
 }

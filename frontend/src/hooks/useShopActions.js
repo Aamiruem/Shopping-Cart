@@ -18,14 +18,19 @@ export default function useShopActions() {
   const toast = useToast();
   const navigate = useNavigate();
 
-  const requireLogin = () => {
+  const requireLogin = (why = 'Sign in to continue') => {
     if (!SHOPPING) {
       toast.show(OPENING_SOON_MESSAGE, 'info');
       return false;
     }
     if (user) return true;
-    toast.show('Please log in to continue', 'info');
-    openLogin('login');
+    openLogin('welcome', why);
+    return false;
+  };
+  // Guests can fill a cart (kept in this browser until they sign in); ordering always needs an account
+  const canShop = () => {
+    if (SHOPPING) return true;
+    toast.show(OPENING_SOON_MESSAGE, 'info');
     return false;
   };
 
@@ -44,14 +49,19 @@ export default function useShopActions() {
 
   return {
     addToCart: (product, qty = 1, options = {}) =>
-      requireLogin() && run(async () => {
+      canShop() && run(async () => {
         await cart.add(product._id, qty, options);
         trackAddToCart(product, qty);
       }, `${product.name} added to cart`, 'add'),
 
     // Straight to checkout with this product at the chosen quantity
     buyNow: async (product, qty = 1, options = {}) => {
-      if (!requireLogin()) return;
+      if (!user) {
+        if (!canShop()) return;
+        // Into the guest cart, then sign in: it moves to the account and checkout is one tap away
+        if (await run(() => cart.add(product._id, qty, options), null, 'add')) requireLogin('Sign in to place your order. Your cart is saved.');
+        return;
+      }
       // The same product in the same size and colour (a product without options matches on its id alone)
       const line = cart.cart.items.find((i) => i.productId === product._id
         && (!options.size || i.size === options.size) && (!options.color || i.color === options.color));
@@ -65,7 +75,7 @@ export default function useShopActions() {
     },
 
     toggleWishlist: (product) => {
-      if (!requireLogin()) return;
+      if (!requireLogin('Sign in to save items to your wishlist')) return;
       return wishlist.has(product._id)
         ? run(() => wishlist.remove(product._id), 'Removed from wishlist', 'click')
         : run(async () => {
@@ -76,7 +86,7 @@ export default function useShopActions() {
 
     // Cart page "Save for later": wishlist it, then drop it from the cart
     saveForLater: (item) =>
-      run(async () => {
+      requireLogin('Sign in to save items for later') && run(async () => {
         await wishlist.add(item.productId);
         await cart.remove(item.lineId ?? item.productId);
       }, `${item.name} moved to wishlist`, 'wishlist'),

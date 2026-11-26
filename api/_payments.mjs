@@ -74,6 +74,8 @@ async function startPayment({ db, userId, body, rz, store }) {
   await limit(store, `pay:${userId}`, START_LIMIT, 'Too many payment attempts. Please try again in a few minutes.');
   const address = await resolveAddress(db, userId, body.addressId);
   const { summary } = await checkoutSummary(db, userId);
+  const { assertDeliverable } = await import('./_shipping.mjs');
+  await assertDeliverable(address, { cod: false, units: summary.items.reduce((n, i) => n + i.qty, 0) }); // before taking any money
   const [account] = await db('SELECT name, email, phone FROM users WHERE id = $1', [userId]);
   const order = await rz.createOrder(summary.total, `user${userId}`, { userId: String(userId) });
   await db('INSERT INTO payments (user_id, provider_order_id, amount, address) VALUES ($1, $2, $3, $4)', [userId, order.id, summary.total, address]);
@@ -296,10 +298,12 @@ export async function handleWebhook(raw, signature, { db = query, rz = razorpayC
   const entity = event.payload?.payment?.entity || {};
   try {
     if (kind === 'payment.failed' && entity.order_id) {
-      await db(
-        "UPDATE payments SET status = 'failed', error = $1, updated_at = NOW() WHERE provider_order_id = $2 AND status = 'created'",
+      const failed = await db(
+        "UPDATE payments SET status = 'failed', error = $1, updated_at = NOW() WHERE provider_order_id = $2 AND status = 'created' RETURNING id, user_id",
         [String(entity.error_description || 'payment failed').slice(0, 500), entity.order_id],
       );
+      // Only the first report of this failure tells the shopper (Razorpay can send the event more than once)
+      for (const p of failed) await notifyLater(db, 'payment_failed', { userId: p.user_id, paymentId: p.id });
     } else if (kind === 'payment.captured' && entity.order_id) {
       // Usually verify got there first. If the shopper closed the tab after paying, this places the order.
       const [payment] = await db('SELECT * FROM payments WHERE provider_order_id = $1', [entity.order_id]);

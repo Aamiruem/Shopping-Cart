@@ -219,7 +219,7 @@ async function orderFacts(db, orderId) {
 }
 
 /** Subject, text and HTML for each update. Only facts from the database; no promises the store can't keep. */
-export function compose(event, { user, order, ticket, reply, company, env = process.env }) {
+export function compose(event, { user, order, ticket, reply, payment, company, env = process.env }) {
   const first = (user.name || '').split(' ')[0] || 'there';
   const base = siteUrl(env);
   const orderLink = order && base ? `${base}/orders/${order.id}` : null;
@@ -252,6 +252,11 @@ export function compose(event, { user, order, ticket, reply, company, env = proc
       text: `Hi ${first},\n\nYour order ${no} has been delivered. If anything isn’t right, you can request a return from your order page within 7 days.${orderLink ? `\n\n${orderLink}` : ''}`,
       short: `Order ${no} delivered. Questions? Reply on your order page.`,
     },
+    payment_failed: payment && {
+      subject: 'Your payment didn’t go through',
+      text: `Hi ${first},\n\nYour payment of ${rupees(payment.amount)} didn’t go through, so no order was placed. If any money left your account, it is returned automatically by your bank or payment app, usually within 5–7 working days.\n\nYour cart is saved: you can try again${base ? ` at ${base}/cart` : ''}, or choose cash on delivery.`,
+      short: `Payment of ${rupees(payment.amount)} failed; no order was placed. Your cart is saved to try again.`,
+    },
     support_update: ticket && {
       subject: `Update on your ticket #${ticket.id}: ${ticket.subject}`,
       text: `Hi ${first},\n\nOur support team replied to your ticket #${ticket.id}:\n\n“${String(reply || '').slice(0, 1500)}”${base ? `\n\nReply here: ${base}/help` : ''}`,
@@ -266,7 +271,7 @@ export function compose(event, { user, order, ticket, reply, company, env = proc
  * Deduplicated: the same update for the same order / ticket message goes out once per channel, however often it's
  * triggered. Never throws: a provider failure is logged on the message and the store carries on.
  */
-export async function notify(db, event, { userId, orderId = null, ticketId = null, messageId = null, reply = null } = {}, { env = process.env, fetchImpl = fetch } = {}) {
+export async function notify(db, event, { userId, orderId = null, ticketId = null, messageId = null, reply = null, paymentId = null } = {}, { env = process.env, fetchImpl = fetch } = {}) {
   try {
     if (!db) return [];
     const configured = channelStatus(env);
@@ -277,9 +282,10 @@ export async function notify(db, event, { userId, orderId = null, ticketId = nul
     if (!user || user.disabled_at) return [];
     const order = orderId ? await orderFacts(db, orderId) : null;
     const [ticket] = ticketId ? await db('SELECT id, subject FROM support_tickets WHERE id = $1', [ticketId]) : [];
-    const content = compose(event, { user, order, ticket, reply, company: settings.company, env });
+    const [payment] = paymentId ? await db('SELECT id, amount, error FROM payments WHERE id = $1 AND user_id = $2', [paymentId, userId]) : [];
+    const content = compose(event, { user, order, ticket, reply, payment, company: settings.company, env });
     if (!content) return [];
-    const ref = orderId ? `order:${orderId}` : ticketId ? `ticket:${ticketId}:${messageId}` : `user:${userId}`;
+    const ref = paymentId ? `payment:${paymentId}` : orderId ? `order:${orderId}` : ticketId ? `ticket:${ticketId}:${messageId}` : `user:${userId}`;
     const sent = [];
     for (const channel of wanted) {
       // Texts go only to a number the customer verified: a mistyped number must not get someone else's order details

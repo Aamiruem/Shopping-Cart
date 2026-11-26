@@ -208,11 +208,12 @@ async function orderRow(db, id) {
 
 export async function getOrder({ db, staff, id }) {
   const o = await orderRow(db, id);
-  const [items, events, pays, ret, notes] = await Promise.all([
+  const [items, events, pays, ret, shipments, notes] = await Promise.all([
     db('SELECT id, product_id, name, price::float, qty, image, category, seller_id, fulfilment, courier, tracking_number, fulfilled_at, options FROM order_items WHERE order_id = $1 ORDER BY id', [o.id]),
     db('SELECT status, note, created_at FROM order_events WHERE order_id = $1 ORDER BY created_at, id', [o.id]),
     db('SELECT id, provider, provider_payment_id, method, amount::float, status, error, created_at, updated_at FROM payments WHERE order_id = $1 ORDER BY id', [o.id]),
     db("SELECT order_id, status, reason, reason_code, refund, refund_to, amount::float, note, created_at, resolved_at, refunded_at FROM order_returns WHERE order_id = $1", [o.id]),
+    db('SELECT s.*, (SELECT json_agg(e ORDER BY e.occurred_at) FROM shipment_events e WHERE e.shipment_id = s.id) AS events FROM shipments s WHERE s.order_id = $1', [o.id]),
     db(`SELECT n.id, n.kind, n.body, n.happened_at, u.name AS author FROM crm_notes n LEFT JOIN users u ON u.id = n.author_id
          WHERE n.entity = 'order' AND n.entity_id = $1 AND n.deleted_at IS NULL ORDER BY n.happened_at DESC`, [String(o.id)]),
   ]);
@@ -222,7 +223,8 @@ export async function getOrder({ db, staff, id }) {
   return {
     body: {
       ...o, email: contact ? o.email : mask(o.email), phone: contact ? o.phone : mask(o.phone), address: contact ? o.address : `${o.address.split(',')[0]}, ••••`,
-      items, events, payments: pays, return: ret[0] ?? null, notes, fulfilment,
+      items, events, payments: pays, return: ret[0] ?? null, shipment: shipments[0] ?? null, notes, fulfilment,
+      deliveryCheck: o.delivery_check ?? null, shippingConnected: (await import('./_shipping.mjs')).shippingConfigured(),
       payment: paymentState({ ...o, payment_status: pays.at(-1)?.status, fulfilment }),
       subtotal: items.reduce((s, i) => s + i.price * i.qty, 0),
       canCancel: o.status === 'placed' && !items.some((i) => ['shipped', 'delivered'].includes(i.fulfilment)) && can(staff, 'orders.edit'),
@@ -267,6 +269,19 @@ export async function cancelOrder({ db, staff, id, body, rz = razorpayClient() }
   }
   await audit(db, staff, 'order.cancel', 'order', order.id, { reason, refund: refund ?? 'none (cash on delivery)' });
   return { body: { id: order.id, status: 'cancelled', refund } };
+}
+
+/** Books the order with the courier (real AWB), then marks it shipped, which tells the customer */
+export async function bookShipment({ db, staff, id, body }) {
+  need(staff, 'shipping.manage');
+  const { createShipment } = await import('./_shipping.mjs');
+  const o = await orderRow(db, id);
+  if (o.status !== 'placed') fail(`This order was ${o.status}`, 409);
+  const items = await db('SELECT product_id, name, price, qty FROM order_items WHERE order_id = $1 ORDER BY id', [o.id]);
+  const shipment = await createShipment(db, o, items, body);
+  await updateFulfilment({ db, userId: staff.id, role: 'admin', id: o.id, body: { fulfilment: 'shipped', courier: shipment.courier, trackingNumber: shipment.awb } });
+  await audit(db, staff, 'order.shipment', 'order', o.id, { courier: shipment.courier, awb: shipment.awb });
+  return { status: 201, body: shipment };
 }
 
 export async function invoice({ db, id }) {

@@ -94,6 +94,24 @@ function loadRazorpay() {
   });
 }
 
+// What a connected courier says about delivering to this pincode. Without one, nothing is promised: the team
+// confirms delivery before dispatch, and an order that can't be delivered is cancelled and refunded in full.
+function DeliveryCheck({ pincode }) {
+  const [check, setCheck] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setCheck(null);
+    api.shippingCheck(pincode).then((c) => live && setCheck(c)).catch(() => live && setCheck({ checked: false }));
+    return () => {
+      live = false;
+    };
+  }, [pincode]);
+  if (!check) return <p className="muted small">Checking delivery to {pincode}…</p>;
+  if (!check.checked) return <p className="muted small">Delivery to {pincode} is confirmed by our team before dispatch. If we can’t deliver, the order is cancelled and fully refunded.</p>;
+  if (!check.serviceable) return <p className="alert alert-error small">{check.reason}</p>;
+  return <p className="text-success small">Courier delivery available to {pincode}{check.days ? `: usually ${check.days.min === check.days.max ? check.days.min : `${check.days.min}–${check.days.max}`} days after dispatch` : ''}.</p>;
+}
+
 // onOpen: the step's title opens it (once there's an address), so shoppers can jump to Payment options directly
 function Step({ number, title, done, summary, active, onChange, onOpen, children }) {
   const canOpen = Boolean(onOpen) && !active;
@@ -276,6 +294,7 @@ export default function Checkout() {
                 <p><strong>{a.name}</strong> <span className="chip">{a.type}</span> <strong>{a.phone}</strong></p>
                 <p className="muted">{a.line1}, {a.city}, {a.state} — <strong>{a.pincode}</strong></p>
                 <a className="map-link" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${a.line1}, ${a.city}, ${a.state} ${a.pincode}`)}`} target="_blank" rel="noreferrer"><Icon name="mapPin" size={14} /> Check on Google Maps</a>
+                {a.id === addressId && <DeliveryCheck pincode={a.pincode} />}
                 {a.id === addressId && <button type="button" className="btn btn-buy" onClick={() => setStep(3)}>Deliver here</button>}
               </div>
             </label>

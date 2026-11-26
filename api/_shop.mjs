@@ -272,7 +272,10 @@ async function placeOrder({ db, userId, body, store, ip }) {
   await limit(store, `order:${userId}`, ORDER_LIMIT, 'You’ve placed a lot of orders just now. Please try again in 15 minutes.');
   await limit(store, `order-ip:${ip}`, ORDER_LIMIT * 3, 'Too many orders from this connection. Please try again in 15 minutes.');
   const { summary } = await checkoutSummary(db, userId);
-  const order = await createOrder(db, { userId, address, method: 'cod', summary });
+  // A connected courier must be able to deliver (cash on delivery too); without one, nothing is claimed
+  const { assertDeliverable } = await import('./_shipping.mjs');
+  const deliveryCheck = await assertDeliverable(address, { cod: true, units: summary.items.reduce((n, i) => n + i.qty, 0) });
+  const order = await createOrder(db, { userId, address, method: 'cod', summary, deliveryCheck });
   if (!order) throw new ApiError(400, 'Your cart is empty');
   return { status: 201, body: { ...order, items: summary.items } };
 }
@@ -282,7 +285,7 @@ async function placeOrder({ db, userId, body, store, ip }) {
  * first and the order exists only if that removed something: a double-clicked "Place order" finds the cart already
  * gone and creates nothing (returns null).
  */
-export async function createOrder(db, { userId, address, method, summary }) {
+export async function createOrder(db, { userId, address, method, summary, deliveryCheck = null }) {
   const details = summary.items.map((i) => ({
     product_id: i.productId, size: i.size ?? '', color: i.color ?? '', name: i.name, price: i.price, image: i.image, category: i.category, seller_id: i.sellerId,
   }));
@@ -293,8 +296,8 @@ export async function createOrder(db, { userId, address, method, summary }) {
       `WITH taken AS (
        DELETE FROM cart_items WHERE user_id = $1 RETURNING product_id, qty, size, color
      ), placed AS (
-       INSERT INTO orders (user_id, total, address, payment_method, delivery_fee, coupon_code, coupon_discount)
-       SELECT $1::int, $2::numeric, $3::text, $6::text, $4::numeric, $7::text, $8::numeric WHERE EXISTS (SELECT 1 FROM taken)
+       INSERT INTO orders (user_id, total, address, payment_method, delivery_fee, coupon_code, coupon_discount, delivery_check)
+       SELECT $1::int, $2::numeric, $3::text, $6::text, $4::numeric, $7::text, $8::numeric, $9::jsonb WHERE EXISTS (SELECT 1 FROM taken)
        RETURNING *
      ), redeemed AS (
        -- One use per customer: a second use breaks the (code, user) key and the whole order is undone
@@ -312,7 +315,7 @@ export async function createOrder(db, { userId, address, method, summary }) {
        INSERT INTO order_events (order_id, status, note) SELECT id, 'placed', 'Order placed' FROM placed
      )${TAKE_STOCK_SQL}
      SELECT * FROM placed`,
-      [userId, summary.total, address, summary.deliveryFee, JSON.stringify(details), method, coupon, summary.couponDiscount],
+      [userId, summary.total, address, summary.deliveryFee, JSON.stringify(details), method, coupon, summary.couponDiscount, deliveryCheck ? JSON.stringify(deliveryCheck) : null],
     );
   } catch (err) {
     if (err.code === '23505' && String(err.constraint || err.message).includes('coupon_redemptions')) {
@@ -344,7 +347,8 @@ async function getOrder({ db, userId, id }) {
   const [order] = ID_RE.test(id) ? await db(`${ORDERS_SQL} AND o.id = $2 GROUP BY o.id`, [userId, Number(id)]) : [];
   if (!order) throw new ApiError(404, 'Order not found');
   const events = await db('SELECT status, note, created_at FROM order_events WHERE order_id = $1 ORDER BY created_at, id', [order.id]);
-  return { body: { ...orderJson(order), events, return: await orderReturn(db, order.id) } };
+  const [shipment] = await db('SELECT courier, awb, status, eta, tracking_url, last_event_at FROM shipments WHERE order_id = $1 AND awb IS NOT NULL', [order.id]).catch(() => []);
+  return { body: { ...orderJson(order), events, shipment: shipment ?? null, return: await orderReturn(db, order.id) } };
 }
 
 async function cancelOrder({ db, userId, id, rz }) {
@@ -429,6 +433,8 @@ export function handleShop({ method, segments, body, authorization, ip }, { db =
     const [account] = await db('SELECT disabled_at, sessions_revoked_at FROM users WHERE id = $1', [userId]);
     if (!account) throw new ApiError(401, 'Please log in again');
     assertSessionValid(account, claims);
-    return findRoute(method, segments)({ db, userId, id: segments[1], body: body ?? {}, store: postgresStore(db), ip, rz });
+    const route = findRoute(method, segments);
+    if (!route) throw new ApiError(404, 'Not found');
+    return route({ db, userId, id: segments[1], body: body ?? {}, store: postgresStore(db), ip, rz });
   });
 }

@@ -148,6 +148,7 @@ export const api = {
 
   // Delivery location
   pincode: (pin) => request(`/location/pincode/${pin}`),
+  shippingCheck: (pincode, cod = false) => request(`/shipping/check?pincode=${pincode}${cod ? '&cod=1' : ''}`),
   reverseGeocode: (lat, lon) => request(`/location/reverse?lat=${lat}&lon=${lon}`),
 
   // Cart

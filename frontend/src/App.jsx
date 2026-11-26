@@ -123,7 +123,8 @@ export default function App() {
             <Route path="/shipping" element={<Shipping />} />
 
             {/* Logged-in users only */}
-            <Route path="/cart" element={shopRoute(<Cart />)} />
+            {/* The cart works for guests too (kept in the browser until they sign in); checkout needs an account */}
+            <Route path="/cart" element={SHOPPING ? <Cart /> : <OpeningSoon />} />
             <Route path="/checkout" element={shopRoute(<Checkout />)} />
             <Route path="/orders" element={shopRoute(<Orders />)} />
             <Route path="/orders/:id" element={shopRoute(<OrderDetail />)} />

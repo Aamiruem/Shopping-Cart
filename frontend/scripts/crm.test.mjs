@@ -346,7 +346,7 @@ test('order updates go out once per order on configured channels only', async ()
   const second = await notify(db, 'shipping_update', { userId: asha.id, orderId: order }, { env, fetchImpl });
   assert.equal(first.length, 1);
   assert.equal(second.length, 0, 'deduplicated');
-  assert.match(calls[0].subject, new RegExp(`Order #${order} has shipped`));
+  assert.match(calls[0].subject, /^Order ARV-ORD-\d{4}-\d{6} has shipped$/); // the customer-facing order number
   // SMS is off by default and needs a verified number
   assert.equal(channelStatus({}).sms.configured, false);
   assert.deepEqual(await notify(db, 'order_confirmation', { userId: asha.id, orderId: order }, { env: {}, fetchImpl }), []);
