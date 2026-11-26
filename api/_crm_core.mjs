@@ -33,6 +33,9 @@ export const PERMISSIONS = {
   'reports.view': 'See reports and analytics',
   'reports.export': 'Download reports',
   'insights.view': 'See AI insights',
+  'catalog.view': 'See every product with its verification status',
+  'catalog.verify': 'Verify, approve, reject, publish and withdraw products',
+  'shipping.manage': 'Book shipments with the courier',
   'staff.manage': 'Add team members, roles and permissions',
   'settings.manage': 'Change CRM settings',
   'audit.view': 'See the audit log',
@@ -56,7 +59,7 @@ export const BUILT_IN_ROLES = {
   support_manager: {
     name: 'Support Manager',
     description: 'Runs the support desk, returns and refunds.',
-    permissions: [...VIEW, 'customers.contact', 'customers.edit', 'support.view', 'support.edit', 'refunds.manage', 'sales.view', 'orders.edit', 'tasks.manage', 'reports.view', 'reports.export'],
+    permissions: [...VIEW, 'customers.contact', 'customers.edit', 'support.view', 'support.edit', 'refunds.manage', 'sales.view', 'orders.edit', 'shipping.manage', 'tasks.manage', 'reports.view', 'reports.export'],
   },
   support_executive: {
     name: 'Support Executive',

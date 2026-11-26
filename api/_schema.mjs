@@ -320,4 +320,72 @@ CREATE UNIQUE INDEX IF NOT EXISTS leads_cart_open_idx ON leads (user_id)
   WHERE source = 'abandoned_cart' AND status IN ('new', 'contacted', 'qualified', 'proposal', 'negotiation');
 CREATE INDEX IF NOT EXISTS leads_assigned_idx ON leads (assigned_to, status);
 CREATE INDEX IF NOT EXISTS leads_phone_idx    ON leads (phone) WHERE phone IS NOT NULL;
+
+-- ================= Public launch: verified products, customer and order numbers, shipments =================
+-- Product verification (CRM → Catalog): the evidence an admin checked before a product may be sold. A product's
+-- status itself lives with the product (catalog_overrides.data.status / seller_products.data.status).
+CREATE TABLE IF NOT EXISTS product_verifications (
+  product_id   VARCHAR(64)  PRIMARY KEY,
+  checks       JSONB        NOT NULL DEFAULT '{}',   -- { name: true, images: true, supplier: true, ... }
+  supplier     VARCHAR(160),                         -- manufacturer or supplier
+  evidence     TEXT,                                 -- invoice / authorisation / GST bill the admin saw
+  condition    VARCHAR(20),                          -- new | refurbished | used
+  warranty     VARCHAR(200),
+  returnable   BOOLEAN,
+  ships        BOOLEAN,
+  notes        TEXT,
+  decision     VARCHAR(12),                          -- approved | rejected
+  decision_reason TEXT,
+  verified_by  INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  verified_at  TIMESTAMPTZ,
+  updated_by   INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- Customer and order numbers people can quote: ARV-CUS-2026-000001, ARV-ORD-2026-000001. From database sequences,
+-- so two sign-ups or checkouts at the same moment can never get the same number; the internal ids stay internal.
+CREATE SEQUENCE IF NOT EXISTS arv_customer_seq;
+CREATE SEQUENCE IF NOT EXISTS arv_order_seq;
+ALTER TABLE users  ADD COLUMN IF NOT EXISTS customer_code VARCHAR(24);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_number  VARCHAR(24);
+UPDATE users SET customer_code = 'ARV-CUS-' || to_char(created_at, 'YYYY') || '-' || lpad(nextval('arv_customer_seq')::text, 6, '0')
+ WHERE customer_code IS NULL AND id IN (SELECT id FROM users WHERE customer_code IS NULL ORDER BY id);
+UPDATE orders SET order_number = 'ARV-ORD-' || to_char(created_at, 'YYYY') || '-' || lpad(nextval('arv_order_seq')::text, 6, '0')
+ WHERE order_number IS NULL AND id IN (SELECT id FROM orders WHERE order_number IS NULL ORDER BY id);
+ALTER TABLE users  ALTER COLUMN customer_code SET DEFAULT 'ARV-CUS-' || to_char(NOW(), 'YYYY') || '-' || lpad(nextval('arv_customer_seq')::text, 6, '0');
+ALTER TABLE orders ALTER COLUMN order_number  SET DEFAULT 'ARV-ORD-' || to_char(NOW(), 'YYYY') || '-' || lpad(nextval('arv_order_seq')::text, 6, '0');
+CREATE UNIQUE INDEX IF NOT EXISTS users_customer_code_idx ON users (customer_code);
+CREATE UNIQUE INDEX IF NOT EXISTS orders_order_number_idx ON orders (order_number);
+
+-- Shipments booked with the courier (api/_shipping.mjs): real AWB numbers and the courier's own tracking events only
+CREATE TABLE IF NOT EXISTS shipments (
+  id                SERIAL       PRIMARY KEY,
+  order_id          INTEGER      NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  provider          VARCHAR(20)  NOT NULL,              -- shiprocket
+  provider_order_id VARCHAR(40),
+  shipment_ref      VARCHAR(40),
+  awb               VARCHAR(40),
+  courier           VARCHAR(80),
+  status            VARCHAR(30)  NOT NULL DEFAULT 'created',
+  eta               DATE,
+  label_url         TEXT,
+  tracking_url      TEXT,
+  last_event_at     TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS shipments_order_idx ON shipments (order_id);
+CREATE UNIQUE INDEX IF NOT EXISTS shipments_awb_idx ON shipments (awb) WHERE awb IS NOT NULL;
+CREATE TABLE IF NOT EXISTS shipment_events (
+  id          SERIAL       PRIMARY KEY,
+  shipment_id INTEGER      NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+  status      VARCHAR(40)  NOT NULL,
+  location    VARCHAR(120),
+  occurred_at TIMESTAMPTZ  NOT NULL,
+  raw_key     VARCHAR(120) NOT NULL,                  -- the courier's event identity: a repeated webhook adds nothing
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (shipment_id, raw_key)
+);
+-- Delivery estimate and courier check made at checkout, kept with the order
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_check JSONB;
 `;

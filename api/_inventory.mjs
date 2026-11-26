@@ -29,10 +29,16 @@ export async function syncCatalogState(db = query, now = Date.now(), force = fal
       db('SELECT product_id, delta FROM stock_adjustments WHERE delta <> 0', []),
       db('SELECT product_id, ROUND(AVG(rating)::numeric, 1)::float AS average, COUNT(*)::int AS count FROM product_reviews GROUP BY product_id', []),
     ]);
+    // Whether products need an admin's verification before they're sold (CRM → Catalog). Read on its own so a database
+    // without the CRM tables yet keeps working; unreadable keeps the last known value.
+    const verification = await db("SELECT value FROM crm_settings WHERE key = 'catalog'", [])
+      .then(([row]) => row?.value?.requireVerification === true)
+      .catch(() => undefined);
     setCatalogState({
       overrides: new Map(edits.map((r) => [r.product_id, r.data])),
       deltas: new Map(stock.map((r) => [r.product_id, r.delta])),
       reviews: new Map(reviews.map((r) => [r.product_id, { average: r.average, count: r.count }])),
+      ...(verification === undefined ? {} : { verification }),
     });
   } catch (err) {
     console.error('catalog state unavailable', err.message);

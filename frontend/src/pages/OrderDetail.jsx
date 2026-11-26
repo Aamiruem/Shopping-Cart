@@ -89,14 +89,14 @@ export default function OrderDetail() {
       )}
 
       <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link to="/">Home</Link> <Icon name="chevronRight" size={12} /> <Link to="/orders">My Orders</Link> <Icon name="chevronRight" size={12} /> <span>#{order.id}</span>
+        <Link to="/">Home</Link> <Icon name="chevronRight" size={12} /> <Link to="/orders">My Orders</Link> <Icon name="chevronRight" size={12} /> <span>{order.order_number || `#${order.id}`}</span>
       </nav>
 
       <div className="order-detail-grid">
         <section className="panel order-detail">
           <header className="order-detail-head">
             <div>
-              <h2>Order ID #{order.id}</h2>
+              <h2>Order {order.order_number || `#${order.id}`}</h2>
               <p className="muted small">Placed on {formatDate(order.created_at, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
             </div>
             <StatusBadge status={order.status} />

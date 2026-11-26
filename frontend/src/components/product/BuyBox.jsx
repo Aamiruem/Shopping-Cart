@@ -79,7 +79,7 @@ export default function BuyBox({ product, options = {}, ready = () => true, inCa
   const [qty, setQty] = useState(1);
   const { addToCart, buyNow } = useShopActions();
   const online = useOnlinePayments();
-  const outOfStock = !product.stock;
+  const outOfStock = !product.stock || product.purchasable === false;
   const most = Math.min(10, product.stock || 0);
 
   return (
@@ -87,7 +87,9 @@ export default function BuyBox({ product, options = {}, ready = () => true, inCa
       <p className="buy-box-price">{formatPrice(product.price)}</p>
       <p className="muted small">{product.price >= 499 ? 'Free delivery on this item' : 'Free delivery on orders of ₹499 or more'}</p>
       <DeliverTo />
-      <p className={`buy-box-stock ${outOfStock ? 'text-error' : 'text-success'}`}>{outOfStock ? 'Currently out of stock' : 'In stock'}</p>
+      <p className={`buy-box-stock ${outOfStock ? 'text-error' : 'text-success'}`}>
+        {!outOfStock ? 'In stock' : product.availability === 'coming_soon' ? 'Coming soon: not available to order yet' : product.availability === 'discontinued' ? 'Discontinued: no longer sold' : product.availability === 'unavailable' ? 'Currently unavailable' : 'Currently out of stock'}
+      </p>
       {!outOfStock && (
         <label className="buy-box-qty">
           Quantity

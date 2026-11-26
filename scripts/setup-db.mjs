@@ -13,6 +13,9 @@ const pool = new Pool({ connectionString: url });
 try {
   await pool.query(schema);
   await pool.query(STORE_SCHEMA);
+  // Public launch: products must be verified by an admin before they're shown or sold (CRM → Catalog). Set once; an
+  // existing choice is kept.
+  await pool.query(`INSERT INTO crm_settings (key, value) VALUES ('catalog', '{"requireVerification": true}'::jsonb) ON CONFLICT (key) DO NOTHING`);
   const { rows } = await pool.query("SELECT count(*)::int AS tables FROM information_schema.tables WHERE table_schema = 'public'");
   console.log(`Database ready: ${rows[0].tables} tables`);
 } finally {

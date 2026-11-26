@@ -146,7 +146,7 @@ function ProfileTab() {
         </label>
         <label className="field">
           Customer ID
-          <input value={user.id} disabled />
+          <input value={user.customerId || user.id} disabled />
         </label>
       </div>
       {error && <p className="alert alert-error" role="alert">{error}</p>}

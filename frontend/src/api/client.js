@@ -122,6 +122,10 @@ export const api = {
   otpLoginVerify: (identifier, code) => request('/auth/otp/verify', { method: 'POST', body: { identifier, code } }),
   // Which code channels are connected (store API): { email, sms, whatsapp }
   otpChannels: () => request('/auth/otp/channels'),
+  // Mobile-first sign-in: a code to the number, then log in, or finish a new account with name and email
+  mobileStart: (phone, channel) => request('/auth/mobile/start', { method: 'POST', body: { phone, channel } }),
+  mobileLogin: (phone, code) => request('/auth/mobile/login', { method: 'POST', body: { phone, code } }),
+  mobileComplete: (body) => request('/auth/mobile/complete', { method: 'POST', body }),
   forgotPassword: (identifier, channel) => request('/auth/password/forgot', { method: 'POST', body: { identifier, channel } }),
   resetPassword: (identifier, code, password) => request('/auth/password/reset', { method: 'POST', body: { identifier, code, password } }),
   otpStatus: () => request('/auth/otp/status'),

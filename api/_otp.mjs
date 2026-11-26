@@ -26,6 +26,7 @@ const PURPOSE_TEXT = {
   login: 'log in to your Arvixa Store account',
   reset: 'reset your Arvixa Store password',
   phone: 'verify your mobile number on Arvixa',
+  mobile: 'sign in to Arvixa Store',
 };
 
 const num = (value, fallback, min, max) => {

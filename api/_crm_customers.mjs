@@ -22,7 +22,7 @@ export const SEGMENTS = {
 };
 
 export const CUSTOMER_STATS = `
-  SELECT u.id, u.name, u.email, u.phone, u.phone_verified, u.email_verified, u.role, u.created_at, u.last_login, u.disabled_at,
+  SELECT u.id, u.customer_code, u.name, u.email, u.phone, u.phone_verified, u.email_verified, u.role, u.created_at, u.last_login, u.disabled_at,
          COALESCE(p.tags, '[]'::jsonb) AS tags, p.assigned_to, a.name AS assignee_name,
          to_char(p.birthday, 'YYYY-MM-DD') AS birthday, to_char(p.anniversary, 'YYYY-MM-DD') AS anniversary,
          COALESCE(p.email_opt_in, FALSE) AS email_opt_in, COALESCE(p.sms_opt_in, FALSE) AS sms_opt_in,
@@ -64,8 +64,8 @@ function filters(params, staff) {
   const q = text(params.q, 100);
   if (q) {
     const digits = q.replace(/\D/g, '');
-    w.add(`(s.name ILIKE ? OR s.email ILIKE ? ${digits.length >= 4 ? 'OR s.phone LIKE ?' : ''} ${ID_RE.test(q) ? 'OR s.id = ?' : ''})`,
-      like(q), like(q), ...(digits.length >= 4 ? [`%${digits}%`] : []), ...(ID_RE.test(q) ? [Number(q)] : []));
+    w.add(`(s.name ILIKE ? OR s.email ILIKE ? OR s.customer_code ILIKE ? ${digits.length >= 4 ? 'OR s.phone LIKE ?' : ''} ${ID_RE.test(q) ? 'OR s.id = ?' : ''})`,
+      like(q), like(q), like(q), ...(digits.length >= 4 ? [`%${digits}%`] : []), ...(ID_RE.test(q) ? [Number(q)] : []));
   }
   if (params.status === 'active') w.raw('s.disabled_at IS NULL');
   if (params.status === 'inactive') w.raw('s.disabled_at IS NOT NULL');
@@ -103,7 +103,7 @@ export async function exportCustomers({ db, staff, params }) {
   const { body } = await listCustomers({ db, staff, params: { ...params, page: 1, pageSize: 5000 } }, { max: 5000 });
   await audit(db, staff, 'customers.export', 'customer', null, { rows: body.items.length, filters: params, masked: !can(staff, 'customers.contact') });
   return { body: { rows: body.items.map((c) => ({
-    id: c.id, name: c.name, email: c.email, phone: c.phone, status: c.status, segment: c.segmentLabel, orders: c.orders, spent: c.spent,
+    customerId: c.customer_code, name: c.name, email: c.email, phone: c.phone, status: c.status, segment: c.segmentLabel, orders: c.orders, spent: c.spent,
     averageOrder: c.averageOrder, lastOrder: c.last_order, joined: c.created_at, tags: (c.tags || []).join('; '), assignedTo: c.assignee_name || '',
     emailOptIn: c.email_opt_in, smsOptIn: c.sms_opt_in, whatsappOptIn: c.whatsapp_opt_in,
   })), total: body.total } };

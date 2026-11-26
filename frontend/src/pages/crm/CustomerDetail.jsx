@@ -38,7 +38,7 @@ export default function CustomerDetail() {
   return (
     <>
       <p className="small"><Link to="/crm/customers">← Customers</Link></p>
-      <PageHead title={c.name} subtitle={`Customer #${c.id} · joined ${date(c.created_at)}${c.last_login ? ` · last login ${ago(c.last_login)}` : ''}`}>
+      <PageHead title={c.name} subtitle={`${c.customer_code || `Customer #${c.id}`} · joined ${date(c.created_at)}${c.last_login ? ` · last login ${ago(c.last_login)}` : ''}`}>
         <Badge value={c.status} /> <Badge tone="info">{c.segmentLabel}</Badge>
         {can('customers.contact') && <button type="button" className="b" onClick={() => setMessage(true)}><Icon name="send" size={15} /> Message</button>}
         <button type="button" className="b" onClick={() => setTask(true)}><Icon name="clock" size={15} /> Follow-up</button>

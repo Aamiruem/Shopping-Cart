@@ -57,6 +57,7 @@ const CrmCustomer = lazy(() => import('./pages/crm/CustomerDetail'));
 const CrmLeads = lazy(() => import('./pages/crm/Leads'));
 const CrmSales = lazy(() => import('./pages/crm/Sales'));
 const CrmInvoice = lazy(() => import('./pages/crm/Invoice'));
+const CrmCatalog = lazy(() => import('./pages/crm/Catalog'));
 const CrmMarketing = lazy(() => import('./pages/crm/Marketing'));
 const CrmSupport = lazy(() => import('./pages/crm/Support'));
 const CrmTasks = lazy(() => import('./pages/crm/Tasks'));
@@ -152,6 +153,7 @@ export default function App() {
               <Route path="leads" element={<CrmLeads />} />
               <Route path="sales" element={<CrmSales />} />
               <Route path="invoice/:id" element={<CrmInvoice />} />
+              <Route path="catalog" element={<CrmCatalog />} />
               <Route path="marketing" element={<CrmMarketing />} />
               <Route path="support" element={<CrmSupport />} />
               <Route path="tasks" element={<CrmTasks />} />

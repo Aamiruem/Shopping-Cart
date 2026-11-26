@@ -120,7 +120,7 @@ export async function dashboard({ db, staff, params }) {
     [from, to],
   );
   const recentOrders = await db(
-    `SELECT o.id, o.created_at, o.status, o.total::float, o.payment_method, u.name AS customer, u.id AS customer_id,
+    `SELECT o.id, o.order_number, o.created_at, o.status, o.total::float, o.payment_method, u.name AS customer, u.id AS customer_id,
             MIN(array_position(ARRAY['pending','packed','shipped','delivered'], oi.fulfilment::text)) AS step, count(oi.id)::int AS lines
        FROM orders o JOIN users u ON u.id = o.user_id JOIN order_items oi ON oi.order_id = o.id
       GROUP BY o.id, u.id ORDER BY o.created_at DESC LIMIT 8`,
@@ -163,7 +163,7 @@ export async function dashboard({ db, staff, params }) {
 
 // ---------- Orders ----------
 const ORDER_LIST = `
-  SELECT o.id, o.created_at, o.status, o.total::float, o.payment_method, o.delivery_fee::float, o.coupon_code, o.coupon_discount::float,
+  SELECT o.id, o.order_number, o.created_at, o.status, o.total::float, o.payment_method, o.delivery_fee::float, o.coupon_code, o.coupon_discount::float,
          o.user_id, u.name AS customer, u.email,
          count(oi.id)::int AS lines, SUM(oi.qty)::int AS units,
          MIN(array_position(ARRAY['pending','packed','shipped','delivered'], oi.fulfilment::text)) AS step,
@@ -185,7 +185,7 @@ export async function listOrders({ db, staff, params }, { max = 100 } = {}) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(params.to ?? '')) w.add('o.created_at < ?::date + 1', params.to);
   if (ID_RE.test(params.customer ?? '')) w.add('o.user_id = ?', Number(params.customer));
   const q = text(params.q, 80).replace(/^#/, '');
-  if (q) w.add(`(u.name ILIKE ? OR u.email ILIKE ? ${ID_RE.test(q) ? 'OR o.id = ?' : ''})`, like(q), like(q), ...(ID_RE.test(q) ? [Number(q)] : []));
+  if (q) w.add(`(u.name ILIKE ? OR u.email ILIKE ? OR o.order_number ILIKE ? ${ID_RE.test(q) ? 'OR o.id = ?' : ''})`, like(q), like(q), like(q), ...(ID_RE.test(q) ? [Number(q)] : []));
   const having = STEPS.includes(params.fulfilment) ? `HAVING MIN(array_position(ARRAY['pending','packed','shipped','delivered'], oi.fulfilment::text)) = ${STEPS.indexOf(params.fulfilment) + 1}` : '';
   const p = paging(params, max);
   const [{ total }] = await db(`SELECT count(*)::int AS total FROM (${ORDER_LIST} ${w.sql()} GROUP BY o.id, u.id ${having}) x`, w.args);
@@ -201,7 +201,7 @@ export async function listOrders({ db, staff, params }, { max = 100 } = {}) {
 
 async function orderRow(db, id) {
   if (!ID_RE.test(String(id))) fail('Order not found', 404);
-  const [o] = await db(`SELECT o.*, o.total::float AS total, u.name AS customer, u.email, u.phone FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1`, [Number(id)]);
+  const [o] = await db(`SELECT o.*, o.total::float AS total, u.name AS customer, u.email, u.phone, u.customer_code FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1`, [Number(id)]);
   if (!o) fail('Order not found', 404);
   return o;
 }
@@ -279,7 +279,7 @@ export async function invoice({ db, id }) {
   return {
     body: {
       number: `${settings.company.invoicePrefix || 'ARV'}/${year}/${String(o.id).padStart(6, '0')}`,
-      orderId: o.id, date: o.created_at, status: o.status, paymentMethod: o.payment_method,
+      orderId: o.id, orderNumber: o.order_number, customerId: o.customer_code, date: o.created_at, status: o.status, paymentMethod: o.payment_method,
       seller: settings.company,
       buyer: { name: o.customer, email: o.email, phone: o.phone, address: o.address },
       items: items.map((i) => ({ ...i, amount: i.price * i.qty })),

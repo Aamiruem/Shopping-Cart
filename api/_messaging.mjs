@@ -212,7 +212,7 @@ export function unsubscribeUrl(channel, address, env = process.env) {
 const rupees = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 async function orderFacts(db, orderId) {
-  const [o] = await db('SELECT id, user_id, total, payment_method, status, created_at FROM orders WHERE id = $1', [orderId]);
+  const [o] = await db('SELECT id, order_number, user_id, total, payment_method, status, created_at FROM orders WHERE id = $1', [orderId]);
   if (!o) return null;
   const items = await db('SELECT name, qty, price, courier, tracking_number FROM order_items WHERE order_id = $1 ORDER BY id', [orderId]);
   return { ...o, items };
@@ -223,6 +223,7 @@ export function compose(event, { user, order, ticket, reply, company, env = proc
   const first = (user.name || '').split(' ')[0] || 'there';
   const base = siteUrl(env);
   const orderLink = order && base ? `${base}/orders/${order.id}` : null;
+  const no = order ? order.order_number || `#${order.id}` : '';
   const lines = order ? order.items.map((i) => `• ${i.name} × ${i.qty}`).join('\n') : '';
   const tracking = order?.items.find((i) => i.tracking_number);
   const map = {
@@ -232,24 +233,24 @@ export function compose(event, { user, order, ticket, reply, company, env = proc
       short: `Welcome to ${company.name || 'Arvixa Store'}, ${first}! Your account is ready.`,
     },
     order_confirmation: order && {
-      subject: `Order #${order.id} confirmed`,
-      text: `Hi ${first},\n\nWe’ve received your order #${order.id} for ${rupees(order.total)} (${order.payment_method === 'cod' ? 'cash on delivery' : 'paid online'}).\n\n${lines}${orderLink ? `\n\nTrack it here: ${orderLink}` : ''}`,
-      short: `Order #${order.id} confirmed: ${rupees(order.total)}. We'll update you when it ships.`,
+      subject: `Order ${no} confirmed`,
+      text: `Hi ${first},\n\nWe’ve received your order ${no} for ${rupees(order.total)} (${order.payment_method === 'cod' ? 'cash on delivery' : 'paid online'}).\n\n${lines}${orderLink ? `\n\nTrack it here: ${orderLink}` : ''}`,
+      short: `Order ${no} confirmed: ${rupees(order.total)}. We'll update you when it ships.`,
     },
     payment_confirmation: order && {
-      subject: `Payment received for order #${order.id}`,
-      text: `Hi ${first},\n\nWe’ve received your payment of ${rupees(order.total)} for order #${order.id}.${orderLink ? `\n\nOrder details: ${orderLink}` : ''}`,
-      short: `Payment of ${rupees(order.total)} received for order #${order.id}.`,
+      subject: `Payment received for order ${no}`,
+      text: `Hi ${first},\n\nWe’ve received your payment of ${rupees(order.total)} for order ${no}.${orderLink ? `\n\nOrder details: ${orderLink}` : ''}`,
+      short: `Payment of ${rupees(order.total)} received for order ${no}.`,
     },
     shipping_update: order && {
-      subject: `Order #${order.id} has shipped`,
-      text: `Hi ${first},\n\nYour order #${order.id} is on its way${tracking ? ` with ${tracking.courier || 'our courier'}, tracking number ${tracking.tracking_number}` : ''}.${orderLink ? `\n\nTrack it here: ${orderLink}` : ''}`,
-      short: `Order #${order.id} has shipped${tracking ? ` (${tracking.courier || 'courier'} ${tracking.tracking_number})` : ''}.`,
+      subject: `Order ${no} has shipped`,
+      text: `Hi ${first},\n\nYour order ${no} is on its way${tracking ? ` with ${tracking.courier || 'our courier'}, tracking number ${tracking.tracking_number}` : ''}.${orderLink ? `\n\nTrack it here: ${orderLink}` : ''}`,
+      short: `Order ${no} has shipped${tracking ? ` (${tracking.courier || 'courier'} ${tracking.tracking_number})` : ''}.`,
     },
     delivery_confirmation: order && {
-      subject: `Order #${order.id} delivered`,
-      text: `Hi ${first},\n\nYour order #${order.id} has been delivered. If anything isn’t right, you can request a return from your order page within 7 days.${orderLink ? `\n\n${orderLink}` : ''}`,
-      short: `Order #${order.id} delivered. Questions? Reply on your order page.`,
+      subject: `Order ${no} delivered`,
+      text: `Hi ${first},\n\nYour order ${no} has been delivered. If anything isn’t right, you can request a return from your order page within 7 days.${orderLink ? `\n\n${orderLink}` : ''}`,
+      short: `Order ${no} delivered. Questions? Reply on your order page.`,
     },
     support_update: ticket && {
       subject: `Update on your ticket #${ticket.id}: ${ticket.subject}`,

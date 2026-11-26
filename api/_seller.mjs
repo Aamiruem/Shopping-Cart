@@ -318,7 +318,7 @@ async function bulkProducts({ db, userId, role, body }) {
 
 async function duplicateProduct({ db, userId, role, id }) {
   const row = await ownedProduct(db, id, userId, role);
-  const copy = { ...row.data, name: `${row.data.name} (copy)`.slice(0, 200), active: false, rating: 0, ratingCount: 0, featured: false };
+  const copy = { ...row.data, name: `${row.data.name} (copy)`.slice(0, 200), active: false, rating: 0, ratingCount: 0, featured: false, status: undefined }; // a copy is verified again
   return { status: 201, body: await saveProduct(db, randomBytes(12).toString('hex'), role === 'admin' ? row.seller_id : userId, copy) };
 }
 

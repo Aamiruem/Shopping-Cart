@@ -29,7 +29,7 @@ function OrderDrawer({ id, onClose, onChange }) {
   };
   const step = o ? STEPS.indexOf(o.fulfilment) : 0;
   return (
-    <Drawer title={`Order #${id}`} onClose={onClose} actions={o && o.status !== 'cancelled' && <Link className="b sm" to={`/crm/invoice/${id}`} target="_blank">Invoice</Link>}>
+    <Drawer title={o?.order_number ? `Order ${o.order_number}` : `Order #${id}`} onClose={onClose} actions={o && o.status !== 'cancelled' && <Link className="b sm" to={`/crm/invoice/${id}`} target="_blank">Invoice</Link>}>
       <ErrorBox error={error} onRetry={reload} />
       {!o ? <Loading /> : (
         <div className="stack">
@@ -164,7 +164,7 @@ function Forecast() {
   );
 }
 
-const EXPORT = [{ key: 'id', label: 'Order' }, { key: 'created_at', label: 'Date' }, { key: 'customer', label: 'Customer' }, { key: 'email', label: 'Email' }, { key: 'status', label: 'Status' }, { key: 'fulfilment', label: 'Fulfilment' }, { key: 'payment', label: 'Payment' }, { key: 'payment_method', label: 'Method' }, { key: 'units', label: 'Units' }, { key: 'total', label: 'Total (₹)' }, { key: 'coupon_code', label: 'Coupon' }];
+const EXPORT = [{ key: 'order_number', label: 'Order' }, { key: 'created_at', label: 'Date' }, { key: 'customer', label: 'Customer' }, { key: 'email', label: 'Email' }, { key: 'status', label: 'Status' }, { key: 'fulfilment', label: 'Fulfilment' }, { key: 'payment', label: 'Payment' }, { key: 'payment_method', label: 'Method' }, { key: 'units', label: 'Units' }, { key: 'total', label: 'Total (₹)' }, { key: 'coupon_code', label: 'Coupon' }];
 
 export default function Sales() {
   const { can } = useCrm();
@@ -196,7 +196,7 @@ export default function Sales() {
           {loading && !data ? <Loading /> : (
             <Table rows={data?.items} onRow={(o) => setSearch({ tab, order: o.id })} sort={params.sort} onSort={(sort) => setParams({ ...params, sort })} empty="No orders match"
               columns={[
-                { key: 'id', label: 'Order', render: (o) => <>#{o.id}<span className="sub">{dateTime(o.created_at)}</span></> },
+                { key: 'id', label: 'Order', render: (o) => <>{o.order_number || `#${o.id}`}<span className="sub">{dateTime(o.created_at)}</span></> },
                 { key: 'customer', label: 'Customer', render: (o) => <>{o.customer}<span className="sub">{o.email}</span></> },
                 { key: 'first_item', label: 'Items', hideSm: true, render: (o) => <>{o.first_item}{o.lines > 1 && <span className="sub">+{o.lines - 1} more</span>}</> },
                 { key: 'status', label: 'Status', render: (o) => <>{o.status === 'placed' ? <Badge value={o.fulfilment} /> : <Badge value={o.status} />}{o.return_status && <span className="sub">Return {o.return_status}</span>}</> },

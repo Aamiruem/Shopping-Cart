@@ -107,6 +107,13 @@ function ForYou() {
   );
 }
 
+// Verified products announced but not on sale yet: shown only when there are some, and never purchasable
+function ComingSoon() {
+  const { products, loading } = useProducts({ availability: 'coming_soon', limit: 20 });
+  if (loading || !products.length) return null;
+  return <ProductRail title="Coming soon" subtitle="Verified products arriving shortly. They can’t be ordered yet." products={products} viewAll="/products?availability=coming_soon" />;
+}
+
 export default function Home() {
   useSeo({ description: homeDescription(PREVIEW), path: '/', jsonLd: homeLd() });
   const deals = useProducts({ featured: 'true', sort: 'popularity', limit: 100 });
@@ -129,6 +136,10 @@ export default function Home() {
       <ShopByNeed />
       <SeasonCollections />
       <ErrorMessage message={deals.error && `Couldn't load products: ${deals.error}`} />
+      {!deals.loading && !deals.error && !deals.products.length && (
+        <p className="panel" style={{ padding: 16 }}>Our catalogue is being checked product by product. Items appear here as soon as each one is verified and ready to ship.</p>
+      )}
+      <ComingSoon />
 
       <ProductRail
         title={PREVIEW ? 'Popular Picks' : 'Deals of the Day'}

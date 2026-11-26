@@ -11,6 +11,7 @@ const NAV = [
   { to: '/crm/customers', icon: 'users', label: 'Customers', perm: 'customers.view' },
   { to: '/crm/leads', icon: 'zap', label: 'Leads', perm: 'leads.view' },
   { to: '/crm/sales', icon: 'shoppingBag', label: 'Sales & orders', perm: 'sales.view' },
+  { to: '/crm/catalog', icon: 'tag', label: 'Catalog verification', perm: 'catalog.view' },
   { to: '/crm/marketing', icon: 'send', label: 'Marketing', perm: 'marketing.view' },
   { to: '/crm/support', icon: 'headphones', label: 'Support', perm: 'support.view' },
   { to: '/crm/tasks', icon: 'check', label: 'Tasks', perm: null },
@@ -46,7 +47,7 @@ function useTheme() {
  * Live notifications: polls the feed while the tab is visible (Vercel functions can't hold Socket.IO connections).
  * Events carry stable ids, so each one is announced once however often it's fetched.
  */
-function useFeed(toast) {
+function useFeed(toast, enabled) {
   const [feed, setFeed] = useState({ events: [], unread: 0 });
   const seen = useRef(null);
   const load = useCallback(async () => {
@@ -64,6 +65,7 @@ function useFeed(toast) {
     }
   }, [toast]);
   useEffect(() => {
+    if (!enabled) return undefined;
     load();
     const t = setInterval(load, POLL_MS);
     document.addEventListener('visibilitychange', load);
@@ -71,7 +73,7 @@ function useFeed(toast) {
       clearInterval(t);
       document.removeEventListener('visibilitychange', load);
     };
-  }, [load]);
+  }, [load, enabled]);
   const markSeen = async () => {
     setFeed((f) => ({ ...f, unread: 0, events: f.events.map((e) => ({ ...e, unread: false })) }));
     await crm.post('/feed/seen').catch(() => {});
@@ -123,7 +125,7 @@ export default function CrmLayout() {
     crm.get('/me').then(setMe).catch((err) => setError(err.message));
   }, [allowed]);
   useEffect(() => setMenu(false), [pathname]);
-  const { feed, markSeen } = useFeed(toast);
+  const { feed, markSeen } = useFeed(toast, Boolean(me));
 
   const value = useMemo(() => ({
     me, toast, confirm,

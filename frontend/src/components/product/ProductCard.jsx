@@ -12,12 +12,17 @@ import Rating, { shownRating } from '../common/Rating';
 import { discountPercent } from '../../utils/format';
 import { swatchOf } from './VariantPicker';
 
+export const availabilityLabel = (p) =>
+  ({ coming_soon: 'Coming soon', discontinued: 'Discontinued', unavailable: 'Currently unavailable' })[p.availability] || 'Out of stock';
+
 // variant "grid" = listing pages, "compact" = horizontal home-page rails
 export default function ProductCard({ product, variant = 'grid' }) {
   const { has: inCart } = useCart();
   const { has: inWishlist } = useWishlist();
   const { addToCart, toggleWishlist } = useShopActions();
-  const outOfStock = product.stock === 0;
+  // The server says whether a product can be bought (verified, on sale, in stock); never guessed here
+  const outOfStock = product.purchasable === false || product.stock === 0;
+  const blocked = availabilityLabel(product);
   const wished = inWishlist(product._id);
   const off = discountPercent(product.price, product.mrp);
   // Clothing reads best as a full-bleed portrait photo (Flipkart / Myntra style); gadgets stay square
@@ -43,7 +48,7 @@ export default function ProductCard({ product, variant = 'grid' }) {
         <div className="product-img">
           <img {...responsiveImage(product.image)} alt={product.name} loading="lazy" decoding="async" />
           {hoverImage && <img className="product-img-alt" {...responsiveImage(hoverImage)} alt="" loading="lazy" decoding="async" aria-hidden="true" />}
-          {outOfStock && <span className="stock-flag">Sold out</span>}
+          {outOfStock && <span className="stock-flag">{blocked === 'Out of stock' ? 'Sold out' : blocked}</span>}
           {!PREVIEW && off >= 10 && <span className="off-badge" aria-hidden="true">↓{off}%</span>}
           {product.images360?.length >= 4 && <span className="badge-360"><Icon name="rotate" size={11} /> 360°</span>}
         </div>
@@ -71,7 +76,7 @@ export default function ProductCard({ product, variant = 'grid' }) {
           <Link to={productPath(product)} className="btn btn-cart btn-block btn-sm"><Icon name="shirt" size={14} /> Select size</Link>
         ) : (
           <button type="button" className="btn btn-cart btn-block btn-sm" disabled={outOfStock || !SHOPPING} onClick={() => addToCart(product, 1, { size: product.sizes?.[0], color: product.colors?.[0] })}>
-            <Icon name="cart" size={14} /> {!SHOPPING ? 'Coming soon' : outOfStock ? 'Out of stock' : 'Add to cart'}
+            <Icon name="cart" size={14} /> {!SHOPPING ? 'Coming soon' : outOfStock ? blocked : 'Add to cart'}
           </button>
         )
       )}

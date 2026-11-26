@@ -21,6 +21,35 @@ export function stableId(name, occurrence = 0) {
 
 export const discountPercent = (price, mrp) => (!mrp || mrp <= price ? 0 : Math.round(((mrp - price) / mrp) * 100));
 
+// ---------- Publication and availability ----------
+// Every product has a status. Only verified products are ever public or purchasable:
+//   draft                 never shown                    pending_verification  waiting for an admin, never shown
+//   available             shown, can be bought (shown as out of stock when none are left)
+//   out_of_stock          shown, can't be bought         coming_soon           shown in Coming Soon, can't be bought
+//   discontinued          not listed; its page says so   unavailable           not listed; its page says so
+// A product without a status is pending verification once the store requires verification (CRM → Catalog; switched
+// on for the live database by scripts/setup-db.mjs), so no unchecked product can be sold by default.
+export const PRODUCT_STATUSES = ['draft', 'pending_verification', 'available', 'out_of_stock', 'coming_soon', 'discontinued', 'unavailable'];
+export const PUBLIC_STATUSES = ['available', 'out_of_stock', 'coming_soon'];
+const LISTED = ['available', 'out_of_stock'];
+const VISIBLE = [...PUBLIC_STATUSES, 'discontinued', 'unavailable'];
+let requireVerification = false;
+
+export function statusOf(p) {
+  if (p.active === false) return 'draft'; // hidden by the admin or the seller
+  if (PRODUCT_STATUSES.includes(p.status)) return p.status;
+  return requireVerification ? 'pending_verification' : 'available';
+}
+
+/** What shoppers see: the status, with "available" turning into out of stock when none are left */
+function withAvailability(p) {
+  const status = statusOf(p);
+  const availability = status === 'available' && !(p.stock > 0) ? 'out_of_stock' : status;
+  return { ...p, status, availability, purchasable: availability === 'available' };
+}
+
+export const verificationRequired = () => requireVerification;
+
 let cache;
 // Listed products from sellers (api/_seller.mjs keeps these fresh), shown after the store's own catalog
 let sellerProducts = [];
@@ -37,10 +66,11 @@ export function setSellerProducts(products) {
   merged = null;
 }
 
-export function setCatalogState({ overrides: o = overrides, deltas = stockDeltas, reviews = reviewStats } = {}) {
+export function setCatalogState({ overrides: o = overrides, deltas = stockDeltas, reviews = reviewStats, verification = requireVerification } = {}) {
   overrides = o;
   stockDeltas = deltas;
   reviewStats = reviews;
+  requireVerification = Boolean(verification);
   merged = null;
 }
 
@@ -59,19 +89,30 @@ function withState(p) {
   };
 }
 
-/** Every product shoppers can see: the store's listed catalog, then sellers' listed products. */
-export function loadProducts() {
-  if (merged) return merged;
+let visible = null;
+function visibleProducts() {
+  if (visible) return visible;
   const withReviews = (p) => {
     const reviews = reviewStats.get(p._id);
     return reviews ? { ...p, reviewRating: reviews.average, reviewCount: reviews.count } : p;
   };
-  merged = [...loadBaseProducts().map(withState).filter((p) => p.active), ...sellerProducts.map(withReviews)];
+  visible = [...loadBaseProducts().map(withState), ...sellerProducts.map(withReviews)].map(withAvailability).filter((p) => VISIBLE.includes(p.status));
+  return visible;
+}
+
+/** Every product shoppers can browse: verified and listed (available or out of stock), the store's then sellers'. */
+export function loadProducts() {
+  if (merged) return merged;
+  visible = null;
+  merged = visibleProducts().filter((p) => LISTED.includes(p.status));
   return merged;
 }
 
+/** Verified products announced but not on sale yet (their own section; never purchasable) */
+export const comingSoon = () => (loadProducts(), visibleProducts().filter((p) => p.status === 'coming_soon'));
+
 /** The store's own catalog for the admin, hidden products included. */
-export const storeCatalog = () => loadBaseProducts().map((p) => ({ ...withState(p), edited: overrides.has(p._id) ? Object.keys(overrides.get(p._id)) : [] }));
+export const storeCatalog = () => loadBaseProducts().map((p) => ({ ...withAvailability(withState(p)), edited: overrides.has(p._id) ? Object.keys(overrides.get(p._id)) : [] }));
 
 /** The store's own product as it came from the file, before any edit. */
 export const baseProduct = (id) => loadBaseProducts().find((p) => p._id === id) || null;
@@ -132,6 +173,7 @@ const anyOf = (values, list) => !list || list.split(',').some((v) => (values || 
 
 export function listProducts(params = {}) {
   const { q, subCategory, size, color, ageGroup, brand, featured, sort = 'relevance' } = params;
+  if (params.availability === 'coming_soon') return comingSoon().filter(baseFilter(params)).slice(0, Math.max(1, Math.min(Number(params.limit) || 200, 200)));
   const low = number(params.minPrice);
   const high = number(params.maxPrice);
   const minRating = number(params.minRating);
@@ -163,7 +205,8 @@ export function listProducts(params = {}) {
   return (unfiltered ? fashionFirst(sorted) : sorted).slice(skip, skip + limit);
 }
 
-export const getProduct = (id) => loadProducts().find((p) => p._id === id) || null;
+/** A product page: listed, coming soon, or discontinued / unavailable (old links still explain). Never draft or unverified. */
+export const getProduct = (id) => (loadProducts(), visibleProducts().find((p) => p._id === id) || null);
 
 function groupCovers(products, key, order) {
   const groups = new Map();

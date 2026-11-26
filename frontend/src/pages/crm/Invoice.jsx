@@ -21,12 +21,12 @@ export default function Invoice() {
         <div style={{ textAlign: 'right' }}>
           <h2 style={{ margin: 0 }}>{s.gstin ? 'Tax invoice' : 'Invoice'}</h2>
           <p style={{ margin: '4px 0' }}>No. {inv.number}</p>
-          <p style={{ margin: '4px 0' }}>Order #{inv.orderId} · {new Date(inv.date).toLocaleDateString('en-IN')}</p>
+          <p style={{ margin: '4px 0' }}>Order {inv.orderNumber || `#${inv.orderId}`} · {new Date(inv.date).toLocaleDateString('en-IN')}</p>
           <p style={{ margin: '4px 0' }}>{inv.paymentMethod === 'cod' ? 'Cash on delivery' : 'Paid online'}</p>
         </div>
       </div>
       <hr />
-      <p><strong>Bill to</strong><br />{inv.buyer.name}<br />{inv.buyer.address}<br />{[inv.buyer.email, inv.buyer.phone].filter(Boolean).join(' · ')}</p>
+      <p><strong>Bill to</strong>{inv.customerId && <> · {inv.customerId}</>}<br />{inv.buyer.name}<br />{inv.buyer.address}<br />{[inv.buyer.email, inv.buyer.phone].filter(Boolean).join(' · ')}</p>
       <table className="t" style={{ color: '#111' }}>
         <thead><tr><th>#</th><th>Item</th><th className="num">Qty</th><th className="num">Unit price</th><th className="num">Amount</th></tr></thead>
         <tbody>

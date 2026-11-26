@@ -153,7 +153,9 @@ function product(id) {
 
 async function addToCart({ db, userId, body }) {
   const item = product(body.productId);
-  if ((item.stock ?? 0) < 1) throw new ApiError(409, `${item.name} is out of stock`);
+  if (item.availability === 'coming_soon') throw new ApiError(409, `${item.name} is coming soon and can’t be ordered yet`);
+  if (item.purchasable === false && item.availability !== 'out_of_stock') throw new ApiError(409, `${item.name} isn’t available to order`);
+  if ((item.stock ?? 0) < 1 || item.availability === 'out_of_stock') throw new ApiError(409, `${item.name} is out of stock`);
   const [{ lines }] = await db('SELECT count(*)::int AS lines FROM cart_items WHERE user_id = $1', [userId]);
   if (lines >= MAX_CART_LINES) throw new ApiError(400, 'Your cart is full');
   const { size, color } = chooseOptions(item, body);
@@ -257,7 +259,9 @@ export async function checkoutSummary(db, userId) {
   const wanted = new Map();
   for (const { product: p, qty } of lines) wanted.set(p._id, { p, qty: (wanted.get(p._id)?.qty ?? 0) + qty });
   for (const { p, qty } of wanted.values()) {
-    if ((p.stock ?? 0) < qty) throw new ApiError(409, `Only ${p.stock ?? 0} left of ${p.name}`);
+    // Checked again at the moment of ordering: a product unpublished or sold out since it went in the cart can't be bought
+    if (p.purchasable === false && p.availability !== 'out_of_stock') throw new ApiError(409, `${p.name} isn’t available to order any more. Please remove it from your cart.`);
+    if ((p.stock ?? 0) < qty || p.availability === 'out_of_stock') throw new ApiError(409, `Only ${p.availability === 'out_of_stock' ? 0 : p.stock ?? 0} left of ${p.name}`);
   }
   return { lines, summary };
 }

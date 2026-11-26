@@ -138,3 +138,17 @@
 .reset-password-input { position: relative; display: flex; }
 .reset-password-input input { flex: 1; padding-right: 44px; }
 .reset-password-input .icon-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
+
+/* Welcome popup (components/account/WelcomeSheet.jsx): mobile number first, email one tap away */
+.welcome-sheet { display: grid; gap: 14px; }
+.welcome-sheet .auth-title { margin: 0; }
+.welcome-sheet > p { margin: 0; }
+.welcome-sheet .stack-sm { display: grid; gap: 12px; }
+.welcome-sheet .row { display: flex; gap: 16px; flex-wrap: wrap; }
+.welcome-sheet .check { display: inline-flex; gap: 6px; align-items: center; font-size: var(--fs-md); }
+.phone-input { display: flex; align-items: stretch; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); }
+.phone-input .prefix { display: grid; place-items: center; padding: 0 12px; background: var(--brand-faint); color: var(--text-muted); font-weight: 600; }
+.phone-input input { border: 0; flex: 1; min-width: 0; padding: 11px 12px; outline: none; }
+.phone-input:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-light); }
+.welcome-alt { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-light); }
+.welcome-alt .btn-link { justify-self: center; background: none; border: 0; color: var(--brand); font-weight: 600; cursor: pointer; padding: 6px; }

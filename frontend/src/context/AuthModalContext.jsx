@@ -7,18 +7,22 @@ import { useAuth } from './AuthContext';
 
 const loadLoginForm = () => import('../pages/Login');
 const LoginForm = lazy(() => loadLoginForm().then((m) => ({ default: m.LoginForm })));
+const WelcomeSheet = lazy(() => import('../components/account/WelcomeSheet'));
 const AuthModalContext = createContext({ openLogin: () => {} });
 
 // Login and sign-up in a dialog over the current page, so shoppers stay where they were.
 // The /login and /register pages still exist for direct links and for pages that need a login.
 export function AuthModalProvider({ children }) {
-  const [mode, setMode] = useState(null); // null | 'login' | 'register'
+  const [mode, setMode] = useState(null); // null | 'welcome' | 'login' | 'register'
+  const [reason, setReason] = useState('');
   const dialog = useRef(null);
   const opener = useRef(null);
 
-  const openLogin = useCallback((next = 'login') => {
+  // openLogin('welcome', 'Sign in to place your order') shows the mobile-first sheet with a reason line
+  const openLogin = useCallback((next = 'login', why = '') => {
     if (!SHOPPING) return;
     opener.current = document.activeElement;
+    setReason(why);
     setMode(next);
   }, []);
   const close = useCallback(() => setMode(null), []);
@@ -46,12 +50,14 @@ export function AuthModalProvider({ children }) {
       {children}
       {mode && (
         <div className="auth-modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-          <div ref={dialog} className="auth-modal" role="dialog" aria-modal="true" aria-label={mode === 'register' ? 'Create account' : 'Login'}>
+          <div ref={dialog} className="auth-modal" role="dialog" aria-modal="true" aria-label={mode === 'register' ? 'Create account' : mode === 'welcome' ? 'Welcome to Arvixa' : 'Login'}>
             <button type="button" className="auth-modal-close" onClick={close} aria-label="Close">
               <Icon name="x" size={22} />
             </button>
             <Suspense fallback={<Spinner />}>
-              <LoginForm key={mode} mode={mode} embedded onDone={close} onSwitch={setMode} />
+              {mode === 'welcome'
+                ? <WelcomeSheet onDone={close} onEmail={setMode} reason={reason} />
+                : <LoginForm key={mode} mode={mode} embedded onDone={close} onSwitch={setMode} />}
             </Suspense>
           </div>
         </div>
@@ -65,7 +71,7 @@ export const useAuthModal = () => useContext(AuthModalContext);
 const WELCOMED_KEY = 'arvixa:welcomed';
 const WELCOME_DELAY_MS = 4000;
 // Pages where a popup would get in the way: the shopper is already logging in, paying or reading a policy
-const NO_PROMPT = /^\/(login|register|checkout|cart|orders|account|seller|terms|privacy|refunds|shipping)/;
+const NO_PROMPT = /^\/(login|register|checkout|cart|orders|account|seller|crm|unsubscribe|terms|privacy|refunds|shipping)/;
 // Search engines penalise pop-ups that cover content, so crawlers and audit tools never see it
 const isBot = () => /bot|crawl|spider|slurp|lighthouse|headlesschrome/i.test(navigator.userAgent);
 
@@ -86,7 +92,7 @@ function useFirstVisitPrompt(openLogin, alreadyOpen) {
       try {
         localStorage.setItem(WELCOMED_KEY, '1');
       } catch { /* ignore */ }
-      openLogin('login');
+      openLogin('welcome');
     }, WELCOME_DELAY_MS);
     return () => clearTimeout(timer);
   }, [ready, user, pathname, alreadyOpen, openLogin]);

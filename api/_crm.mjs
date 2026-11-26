@@ -5,6 +5,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { query, safely, limit, postgresStore } from './_auth.mjs';
 import { addNote, createCustomer, deleteNote, exportCustomers, getCustomer, importCustomers, listCustomers, updateCustomer } from './_crm_customers.mjs';
+import { catalogSettings, getCatalogProduct, listCatalog, saveVerification, setProductStatus } from './_crm_catalog.mjs';
 import { insights } from './_crm_insights.mjs';
 import { createLead, getLead, LEAD_SOURCES, listLeads, syncAutoLeads } from './_crm_leads.mjs';
 import {
@@ -109,6 +110,13 @@ const routes = [
   ['POST', 'orders/:id/cancel', 'orders.edit', cancelOrder],
   ['GET', 'refunds', 'sales.view', refundsList],
   ['PATCH', 'refunds/:id', 'refunds.manage', refundAction],
+
+  ['GET', 'catalog', 'catalog.view', listCatalog],
+  ['GET', 'catalog/settings', 'catalog.view', (ctx) => catalogSettings({ ...ctx, method: 'GET' })],
+  ['PUT', 'catalog/settings', 'settings.manage', (ctx) => catalogSettings({ ...ctx, method: 'PUT' })],
+  ['GET', 'catalog/:id', 'catalog.view', getCatalogProduct],
+  ['POST', 'catalog/:id/verification', 'catalog.verify', saveVerification],
+  ['POST', 'catalog/:id/status', 'catalog.verify', setProductStatus],
 
   ['GET', 'tickets', 'support.view', listTickets],
   ['POST', 'tickets', 'support.edit', createTicket],

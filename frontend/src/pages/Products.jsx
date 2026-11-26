@@ -13,7 +13,7 @@ import usePageTint from '../hooks/usePageTint';
 import useSeo, { breadcrumbLd, itemListLd } from '../hooks/useSeo';
 
 const PAGE_SIZE = 48;
-const FILTER_KEYS = ['q', 'use', 'category', 'audience', 'subCategory', 'brand', 'minPrice', 'maxPrice', 'minRating', 'sort'];
+const FILTER_KEYS = ['q', 'use', 'category', 'audience', 'subCategory', 'brand', 'minPrice', 'maxPrice', 'minRating', 'sort', 'availability'];
 const EMPTY_FACETS = { brands: [], minPrice: 0, maxPrice: 0 };
 
 // Search results + category listing. All filter state lives in the URL so it is shareable.

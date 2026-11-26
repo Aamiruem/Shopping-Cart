@@ -34,6 +34,12 @@ export function AuthProvider({ children }) {
     ready,
     login: async (email, password) => saveSession(await api.login({ email, password })),
     otpLogin: async (identifier, code) => saveSession(await api.otpLoginVerify(identifier, code)),
+    // Mobile sign-in: signs in, or returns { needsProfile, signupToken } for a number with no account yet
+    mobileLogin: async (phone, code) => {
+      const result = await api.mobileLogin(phone, code);
+      return result.token ? { user: saveSession(result) } : result;
+    },
+    mobileComplete: async (body) => saveSession(await api.mobileComplete(body)),
     // Forgot password: a correct code sets the new password and signs in
     resetPassword: async (identifier, code, password) => saveSession(await api.resetPassword(identifier, code, password)),
     // The full API signs up in two steps: register() emails a code, verifySignup() creates the account and signs in.

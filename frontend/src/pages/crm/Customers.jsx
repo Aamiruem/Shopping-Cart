@@ -6,7 +6,7 @@ import { AssignSelect, Badge, count, date, ErrorBox, ExportMenu, Field, Loading,
 import { parseCsv } from '../../utils/exporters';
 
 const EXPORT_COLUMNS = [
-  { key: 'id', label: 'ID' }, { key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone' }, { key: 'status', label: 'Status' },
+  { key: 'customerId', label: 'Customer ID' }, { key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone' }, { key: 'status', label: 'Status' },
   { key: 'segment', label: 'Segment' }, { key: 'orders', label: 'Orders' }, { key: 'spent', label: 'Total spent (₹)' }, { key: 'averageOrder', label: 'Average order (₹)' },
   { key: 'lastOrder', label: 'Last order' }, { key: 'joined', label: 'Joined' }, { key: 'tags', label: 'Tags' }, { key: 'assignedTo', label: 'Owner' },
   { key: 'emailOptIn', label: 'Email consent' }, { key: 'smsOptIn', label: 'SMS consent' }, { key: 'whatsappOptIn', label: 'WhatsApp consent' },
@@ -142,7 +142,7 @@ export default function Customers() {
             onRow={(c) => navigate(`/crm/customers/${c.id}`)}
             empty="No customers match"
             columns={[
-              { key: 'name', label: 'Customer', sort: 'name', render: (c) => <>{c.name}<span className="sub">{c.email}{c.phone ? ` · ${c.phone}` : ''}</span></> },
+              { key: 'name', label: 'Customer', sort: 'name', render: (c) => <>{c.name}<span className="sub">{c.customer_code} · {c.email}{c.phone ? ` · ${c.phone}` : ''}</span></> },
               { key: 'segment', label: 'Segment', render: (c) => <><Badge tone={c.segment === 'loyal' || c.segment === 'returning' ? 'good' : c.segment === 'at_risk' || c.segment === 'lost' ? 'bad' : c.segment === 'new' ? 'info' : 'none'}>{c.segmentLabel}</Badge>{c.status === 'inactive' && <> <Badge value="inactive" /></>}</> },
               { key: 'orders', label: 'Orders', num: true, sort: 'orders', render: (c) => count(c.orders) },
               { key: 'spent', label: 'Spent', num: true, sort: 'spent', render: (c) => <>{money(c.spent)}<span className="sub">avg {money(c.averageOrder)}</span></> },

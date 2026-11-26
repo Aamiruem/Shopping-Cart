@@ -108,6 +108,7 @@ async function publicUser(u, store) {
     email: u.email,
     phone: u.phone,
     role: u.role,
+    customerId: u.customer_code ?? null, // ARV-CUS-2026-000001: the number to quote; the internal id stays internal
     emailVerified: u.email_verified,
     phoneVerified: u.phone_verified ?? false,
     hasPassword: Boolean(u.password_hash),
@@ -290,6 +291,63 @@ async function phoneVerify(body, ctx) {
   return { body: await publicUser(updated, ctx.store) };
 }
 
+// ---------- Mobile-first sign-in (the welcome popup) ----------
+// 1. phone/start: a code goes to the number (SMS, or WhatsApp when set up), whether or not an account uses it: the
+//    reply never reveals that. 2. phone/login: a correct code signs in the account that verified this number, or
+//    returns a short-lived signup token proving the number was verified. 3. phone/complete: with that token, name and
+//    email create the account, its number already verified. One code proves one number once.
+const SIGNUP_TOKEN_SECONDS = 15 * 60;
+
+async function mobileStart(body, ctx) {
+  const phone = loginTarget(body.phone);
+  if (phone.isEmail) throw new ApiError(400, 'Please enter your 10-digit mobile number');
+  const channel = body.channel === 'whatsapp' ? 'whatsapp' : 'sms';
+  if (!availableChannels(ctx.env)[channel]) throw new ApiError(503, `${CHANNEL_LABEL[channel]} codes aren’t available right now. Please log in with your email instead.`);
+  await limit(ctx.store, `otp:${ctx.ip}`, OTP_IP_LIMIT, 'Too many code requests. Please try again in 15 minutes.');
+  return { body: await sendCode(ctx.store.db, { purpose: 'mobile', target: phone.target, channel }, ctx.otp) };
+}
+
+async function mobileLogin(body, ctx) {
+  const phone = loginTarget(body.phone);
+  if (phone.isEmail) throw new ApiError(400, 'Please enter your 10-digit mobile number');
+  await limit(ctx.store, `verify:${ctx.ip}`, VERIFY_IP_LIMIT, 'Too many attempts. Please try again in 15 minutes.');
+  await checkCode(ctx.store.db, { purpose: 'mobile', target: phone.target, code: body.code }, ctx.otp);
+  const [user] = await ctx.store.db('SELECT * FROM users WHERE phone = $1 AND phone_verified ORDER BY id LIMIT 1', [phone.target]);
+  if (user) {
+    assertSessionValid({ disabled_at: user.disabled_at });
+    await ctx.store.touchLogin(user.id);
+    return { body: await session(user, ctx.store) };
+  }
+  const signupToken = jwt.sign({ phone: phone.target, purpose: 'phone-signup' }, jwtSecret(), { algorithm: 'HS256', expiresIn: SIGNUP_TOKEN_SECONDS });
+  return { body: { needsProfile: true, phone: phone.target, signupToken } };
+}
+
+async function mobileComplete(body, ctx) {
+  let claims;
+  try {
+    claims = jwt.verify(text(body.signupToken), jwtSecret(), { algorithms: ['HS256'] });
+  } catch {
+    throw new ApiError(400, 'Your verification expired. Please request a new code.');
+  }
+  if (claims.purpose !== 'phone-signup' || !PHONE_RE.test(claims.phone ?? '')) throw new ApiError(400, 'Please request a new code.');
+  const name = text(body.name).trim();
+  const email = normalizeEmail(body.email);
+  await limit(ctx.store, `register:${ctx.ip}`, IP_LIMIT);
+  const error = nameError(name) || emailError(email) || (await ctx.domainError(email));
+  if (error) throw new ApiError(400, error);
+  const [taken] = await ctx.store.db('SELECT 1 FROM users WHERE phone = $1 AND phone_verified', [claims.phone]);
+  if (taken) throw new ApiError(409, 'This mobile number already has an account. Request a new code to log in.');
+  await emailFree(ctx, email);
+  const [user] = await ctx.store.db(
+    `INSERT INTO users (name, email, phone, phone_verified, password_hash, last_login) VALUES ($1, $2, $3, TRUE, NULL, NOW())
+     ON CONFLICT (email) DO NOTHING RETURNING *`,
+    [name, email, claims.phone],
+  );
+  if (!user) throw new ApiError(409, 'An account with this email already exists. Please log in with your email.');
+  await welcome(ctx.store.db, user);
+  return { status: 201, body: await session(user, ctx.store) };
+}
+
 async function otpStatus(_, ctx) {
   const user = await signedInUser(ctx);
   if (user.role !== 'admin') throw new ApiError(403, 'Only the store admin can see this');
@@ -357,6 +415,9 @@ const ROUTES = {
   'POST password/reset': resetPassword,
   'POST phone/otp': phoneOtp,
   'POST phone/verify': phoneVerify,
+  'POST mobile/start': mobileStart,
+  'POST mobile/login': mobileLogin,
+  'POST mobile/complete': mobileComplete,
   'GET otp/status': otpStatus,
 };
 

@@ -4,7 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { categories, CATEGORY_GROUPS, listProducts, loadProducts, popular, similar } from '../../api/_catalog.mjs';
+import { categories, CATEGORY_GROUPS, listProducts, loadProducts, popular, setCatalogState, similar } from '../../api/_catalog.mjs';
 import { CATEGORIES, categoryLabel, CATEGORY_GROUPS as GROUP_INFO, HERO_SLIDES } from '../src/constants/catalog.js';
 import {
   ABOUT_DESCRIPTION, CATEGORY_INTROS, HOME_TITLE, homeDescription, listingDescription, listingTitle, LOGO_PATH, PRIVACY_DESCRIPTION,
@@ -121,6 +121,24 @@ function listingPage(file, { heading, path, intro, products, crumbs = [] }) {
 
 // ---------- Pages ----------
 
+// Static pages list only verified products. With the database available (Vercel builds), they follow the live
+// verification state and the admin's catalog edits; without it, or if it can't be read, every product counts as
+// unverified, so a build can never publish an unchecked product.
+async function catalogState() {
+  let required = true;
+  if (process.env.DATABASE_URL) {
+    try {
+      const [{ syncCatalogState }, { query }] = await Promise.all([import('../../api/_inventory.mjs'), import('../../api/_auth.mjs')]);
+      await syncCatalogState(query, Date.now(), true);
+      const [row] = await query("SELECT value FROM crm_settings WHERE key = 'catalog'");
+      required = row ? row.value?.requireVerification !== false : true;
+    } catch (err) {
+      console.warn('prerender: catalog state unavailable, listing no unverified products:', err.message);
+    }
+  }
+  setCatalogState({ verification: required });
+}
+await catalogState();
 const products = loadProducts();
 const shareDescription = homeDescription(PREVIEW);
 
