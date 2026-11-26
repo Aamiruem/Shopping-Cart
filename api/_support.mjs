@@ -5,7 +5,10 @@
 //   GET   /support/tickets[?status=]     their own tickets; the admin sees everyone's, most urgent first
 //   GET   /support/tickets/:id           one ticket with its conversation
 //   POST  /support/tickets/:id/messages  a reply (a shopper's reply reopens a resolved ticket)
-//   PATCH /support/tickets/:id           admin: open | in_progress | resolved
+//   PATCH /support/tickets/:id           admin: open | in_progress | waiting | resolved | closed
+//
+// The CRM support desk (api/_crm_support.mjs) works on the same tickets: assignment, internal notes (never shown to
+// the shopper here), response times.
 //
 // The full API triages tickets with a trained model; here keyword rules pick the team, the urgency and a first answer.
 import { ApiError, currentUserId, limit, postgresStore, query, safely } from './_auth.mjs';
@@ -18,7 +21,8 @@ export const CATEGORY_LABELS = {
   account: 'Account & login',
   order_change: 'Order changes & cancellation',
 };
-const STATUSES = ['open', 'in_progress', 'resolved'];
+export const STATUSES = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
+const DONE = ['resolved', 'closed'];
 const ID_RE = /^\d{1,9}$/;
 
 // Words that point at each team. The highest score wins; ties go to the order listed here.
@@ -131,12 +135,12 @@ async function listTickets({ db, user, params }) {
     where.push(`t.status = $${args.length}`);
   }
   const order = admin
-    ? "CASE t.status WHEN 'resolved' THEN 1 ELSE 0 END, CASE t.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, t.updated_at DESC"
+    ? "CASE WHEN t.status IN ('resolved', 'closed') THEN 1 ELSE 0 END, CASE t.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, t.updated_at DESC"
     : 't.updated_at DESC';
   const rows = await db(
     `SELECT t.*, u.name AS customer_name,
-            (SELECT count(*)::int FROM ticket_messages m WHERE m.ticket_id = t.id) AS replies,
-            (SELECT m.staff FROM ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_from_staff
+            (SELECT count(*)::int FROM ticket_messages m WHERE m.ticket_id = t.id AND NOT m.internal) AS replies,
+            (SELECT m.staff FROM ticket_messages m WHERE m.ticket_id = t.id AND NOT m.internal ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_from_staff
        FROM support_tickets t LEFT JOIN users u ON u.id = t.user_id
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY ${order} LIMIT 200`,
@@ -150,8 +154,8 @@ async function getTicket({ db, user, id }) {
   const messages = await db(
     `SELECT m.id, m.staff, m.body, m.created_at, CASE WHEN m.staff THEN 'Arvixa support' ELSE u.name END AS author
        FROM ticket_messages m LEFT JOIN users u ON u.id = m.user_id
-      WHERE m.ticket_id = $1 ORDER BY m.created_at, m.id`,
-    [ticket.id],
+      WHERE m.ticket_id = $1 AND ($2::boolean OR NOT m.internal) ORDER BY m.created_at, m.id`,
+    [ticket.id, user.role === 'admin'],
   );
   return { body: { ...ticketJson(ticket), messages } };
 }
@@ -162,18 +166,46 @@ async function reply({ db, user, id, body, store }) {
   if (message.length < 2 || message.length > 4000) fail('Please write a reply');
   const staff = user.role === 'admin' && ticket.user_id !== user.id;
   await limit(store, `ticket-reply:${user.id}`, staff ? 200 : 30, 'Too many replies just now. Please try again in 15 minutes.');
-  // Staff replying moves an open ticket to "in progress"; the shopper replying reopens a resolved one
-  const next = staff ? (ticket.status === 'open' ? 'in_progress' : ticket.status) : ticket.status === 'resolved' ? 'open' : ticket.status;
-  await db(
-    `WITH said AS (
-       INSERT INTO ticket_messages (ticket_id, user_id, staff, body) VALUES ($1, $2, $3, $4) RETURNING id
-     )
-     UPDATE support_tickets SET status = $5::varchar, updated_at = NOW(),
-            resolved_at = CASE WHEN $5::varchar = 'resolved' THEN resolved_at ELSE NULL END
-      WHERE id = $1 AND EXISTS (SELECT 1 FROM said)`,
-    [ticket.id, user.id, staff, message, next],
-  );
+  const said = await postReply(db, { ticket, userId: user.id, staff, message });
+  if (staff) await notifyReply(db, ticket, said, message);
   return getTicket({ db, user, id });
+}
+
+/**
+ * Adds a reply and moves the ticket on. Staff replying moves an open ticket to "in progress" (or to `status`) and
+ * records the first response time; the shopper replying reopens a waiting, resolved or closed ticket. Internal notes
+ * change nothing the shopper sees. Returns the new message id.
+ */
+export async function postReply(db, { ticket, userId, staff, message, internal = false, status = null }) {
+  let next = ticket.status;
+  if (internal) next = status || ticket.status;
+  else if (staff) next = status || (ticket.status === 'open' ? 'in_progress' : ticket.status);
+  else if (['waiting', ...DONE].includes(ticket.status)) next = 'open';
+  const [row] = await db(
+    `WITH said AS (
+       INSERT INTO ticket_messages (ticket_id, user_id, staff, body, internal) VALUES ($1, $2, $3, $4, $6) RETURNING id
+     ), moved AS (
+       UPDATE support_tickets SET status = $5::varchar, updated_at = NOW(),
+              first_response_at = CASE WHEN $3 AND NOT $6 THEN COALESCE(first_response_at, NOW()) ELSE first_response_at END,
+              resolved_at = CASE WHEN $5::varchar IN ('resolved', 'closed') THEN COALESCE(resolved_at, NOW()) ELSE NULL END,
+              closed_at = CASE WHEN $5::varchar = 'closed' THEN COALESCE(closed_at, NOW()) ELSE NULL END
+        WHERE id = $1 AND EXISTS (SELECT 1 FROM said)
+     )
+     SELECT id FROM said`,
+    [ticket.id, userId, staff, message, next, internal],
+  );
+  return row.id;
+}
+
+/** "Support replied" email / text to the shopper (CRM → Settings → Notifications) */
+export async function notifyReply(db, ticket, messageId, message) {
+  if (!ticket.user_id) return;
+  try {
+    const { notify } = await import('./_messaging.mjs');
+    await notify(db, 'support_update', { userId: ticket.user_id, ticketId: ticket.id, messageId, reply: message });
+  } catch (err) {
+    console.error('support_update notification skipped', err.message);
+  }
 }
 
 async function setStatus({ db, user, id, body }) {
@@ -182,7 +214,8 @@ async function setStatus({ db, user, id, body }) {
   const [ticket] = ID_RE.test(String(id))
     ? await db(
         `UPDATE support_tickets SET status = $1::varchar, updated_at = NOW(),
-                resolved_at = CASE WHEN $1::varchar = 'resolved' THEN NOW() ELSE NULL END
+                resolved_at = CASE WHEN $1::varchar IN ('resolved', 'closed') THEN COALESCE(resolved_at, NOW()) ELSE NULL END,
+                closed_at = CASE WHEN $1::varchar = 'closed' THEN COALESCE(closed_at, NOW()) ELSE NULL END
           WHERE id = $2 RETURNING *`,
         [body.status, Number(id)],
       )

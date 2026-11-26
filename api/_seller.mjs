@@ -10,6 +10,7 @@ import { listCatalog, resetCatalogProduct, updateCatalogProduct } from './_inven
 import { actOnReturn, listReturns } from './_returns.mjs';
 import { overview } from './_overview.mjs';
 import { validateVariants } from './_variants.mjs';
+import { notifyLater } from './_shop.mjs';
 
 const CATEGORIES = ['mobiles', 'electronics', 'fashion', 'accessories', 'beauty', 'home', 'kitchen', 'sports', 'grocery'];
 const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -353,7 +354,7 @@ async function myOrders({ db, userId, role, params }) {
   return { body: rows.map(({ step, ...r }) => ({ ...r, fulfilment: FULFILMENT[(step || 1) - 1] })) };
 }
 
-async function updateFulfilment({ db, userId, role, id, body }) {
+export async function updateFulfilment({ db, userId, role, id, body }) {
   if (!/^\d{1,9}$/.test(String(id))) fail('Order not found', 404);
   if (!FULFILMENT.includes(body.fulfilment)) fail('Unknown fulfilment step');
   const courier = text(body.courier).slice(0, 60) || null;
@@ -384,6 +385,15 @@ async function updateFulfilment({ db, userId, role, id, body }) {
     [Number(id), body.fulfilment, courier, tracking, role === 'admin' ? null : userId, note],
   );
   if (!rows[0].lines) fail('This order has none of your products', 404);
+  if (['shipped', 'delivered'].includes(body.fulfilment)) {
+    // Shipped: on the first shipment. Delivered: once every line of the order has arrived. Each is sent once per order.
+    const [o] = await db(
+      "SELECT user_id, bool_and(fulfilment = 'delivered') AS all_delivered FROM orders o JOIN order_items oi ON oi.order_id = o.id WHERE o.id = $1 GROUP BY o.user_id",
+      [Number(id)],
+    );
+    const event = body.fulfilment === 'shipped' ? 'shipping_update' : o?.all_delivered ? 'delivery_confirmation' : null;
+    if (o && event) await notifyLater(db, event, { userId: o.user_id, orderId: Number(id) });
+  }
   return { body: { orderId: Number(id), fulfilment: body.fulfilment, lines: rows[0].lines } };
 }
 

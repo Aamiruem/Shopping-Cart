@@ -127,4 +127,197 @@ CREATE INDEX IF NOT EXISTS leads_status_idx ON leads (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS leads_email_idx ON leads (lower(email)) WHERE email IS NOT NULL;
 -- One newsletter subscription per address
 CREATE UNIQUE INDEX IF NOT EXISTS leads_newsletter_idx ON leads (lower(email)) WHERE source = 'newsletter';
+
+-- ================= CRM (api/_crm*.mjs) =================
+-- Everything below is additive: existing tables only gain nullable / defaulted columns and indexes.
+
+-- Accounts: an admin can deactivate one (login refused, open sessions end) or end all of a person's sessions.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_at         TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sessions_revoked_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS users_created_idx ON users (created_at DESC);
+CREATE INDEX IF NOT EXISTS users_phone_idx   ON users (phone) WHERE phone IS NOT NULL;
+CREATE INDEX IF NOT EXISTS order_items_order_idx ON order_items (order_id);
+CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (status, created_at DESC);
+
+-- Team members with CRM access. The store admin (users.role = 'admin') is always Super Admin and needs no row here.
+-- Built-in roles live in code (api/_crm_core.mjs); crm_roles holds the custom roles an admin creates.
+CREATE TABLE IF NOT EXISTS crm_roles (
+  key         VARCHAR(40)  PRIMARY KEY,
+  name        VARCHAR(60)  NOT NULL,
+  description TEXT,
+  permissions JSONB        NOT NULL DEFAULT '[]',
+  created_by  INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS crm_staff (
+  user_id      INTEGER     PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  role_key     VARCHAR(40) NOT NULL,
+  title        VARCHAR(80),
+  active       BOOLEAN     NOT NULL DEFAULT TRUE,
+  feed_seen_at TIMESTAMPTZ,
+  added_by     INTEGER     REFERENCES users(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- One row per login token used on the CRM: login history, last activity, and revocation of a single session
+CREATE TABLE IF NOT EXISTS crm_sessions (
+  id         SERIAL       PRIMARY KEY,
+  user_id    INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash CHAR(64)     NOT NULL UNIQUE,              -- sha256 of the token: the token itself is never stored
+  ip         VARCHAR(64),
+  user_agent VARCHAR(200),
+  issued_at  TIMESTAMPTZ,
+  first_seen TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  last_seen  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  revoked_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS crm_sessions_user_idx ON crm_sessions (user_id, last_seen DESC);
+-- Who did what: logins, customer edits, assignments, order changes, refunds, permission and settings changes, exports
+CREATE TABLE IF NOT EXISTS crm_audit_log (
+  id         BIGSERIAL    PRIMARY KEY,
+  actor_id   INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  actor_name VARCHAR(100),
+  action     VARCHAR(60)  NOT NULL,
+  entity     VARCHAR(30),
+  entity_id  VARCHAR(64),
+  details    JSONB        NOT NULL DEFAULT '{}',
+  ip         VARCHAR(64),
+  created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS crm_audit_recent_idx ON crm_audit_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS crm_audit_actor_idx  ON crm_audit_log (actor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS crm_audit_entity_idx ON crm_audit_log (entity, entity_id);
+
+-- CRM details of a customer (an account in users): tags, owner, dates for greetings, and per-channel marketing consent
+CREATE TABLE IF NOT EXISTS crm_customer_profiles (
+  user_id            INTEGER     PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  tags               JSONB       NOT NULL DEFAULT '[]',
+  assigned_to        INTEGER     REFERENCES users(id) ON DELETE SET NULL,
+  birthday           DATE,
+  anniversary        DATE,
+  email_opt_in       BOOLEAN     NOT NULL DEFAULT FALSE,
+  sms_opt_in         BOOLEAN     NOT NULL DEFAULT FALSE,
+  whatsapp_opt_in    BOOLEAN     NOT NULL DEFAULT FALSE,
+  consent_updated_at TIMESTAMPTZ,
+  source             VARCHAR(20) NOT NULL DEFAULT 'website', -- website | crm | import
+  created_by         INTEGER     REFERENCES users(id) ON DELETE SET NULL,
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS crm_profiles_assigned_idx ON crm_customer_profiles (assigned_to);
+
+-- Notes and logged interactions (call, meeting, email, SMS, WhatsApp) on a customer, lead, order or ticket. Soft-deleted.
+CREATE TABLE IF NOT EXISTS crm_notes (
+  id          SERIAL      PRIMARY KEY,
+  entity      VARCHAR(20) NOT NULL,                    -- customer | lead | order | ticket
+  entity_id   VARCHAR(64) NOT NULL,
+  kind        VARCHAR(12) NOT NULL DEFAULT 'note',     -- note | call | meeting | email | sms | whatsapp
+  body        TEXT        NOT NULL,
+  outcome     VARCHAR(120),
+  happened_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  author_id   INTEGER     REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS crm_notes_entity_idx ON crm_notes (entity, entity_id, happened_at DESC);
+
+-- Tasks and follow-ups. "Overdue" is not stored: it is an open task whose due time has passed.
+CREATE TABLE IF NOT EXISTS crm_tasks (
+  id           SERIAL       PRIMARY KEY,
+  title        VARCHAR(160) NOT NULL,
+  description  TEXT,
+  kind         VARCHAR(20)  NOT NULL DEFAULT 'general',   -- general | lead_follow_up | customer_follow_up | support_follow_up
+  priority     VARCHAR(8)   NOT NULL DEFAULT 'medium',    -- low | medium | high
+  status       VARCHAR(12)  NOT NULL DEFAULT 'pending',   -- pending | in_progress | completed | cancelled
+  due_at       TIMESTAMPTZ,
+  assigned_to  INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  created_by   INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  lead_id      INTEGER      REFERENCES leads(id) ON DELETE CASCADE,
+  customer_id  INTEGER      REFERENCES users(id) ON DELETE CASCADE,
+  ticket_id    INTEGER      REFERENCES support_tickets(id) ON DELETE CASCADE,
+  completed_at TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  deleted_at   TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS crm_tasks_assignee_idx ON crm_tasks (assigned_to, status, due_at);
+CREATE INDEX IF NOT EXISTS crm_tasks_due_idx      ON crm_tasks (due_at) WHERE deleted_at IS NULL;
+
+-- Marketing campaigns, and every message the CRM sends or receives (campaigns, order updates, automations, WhatsApp
+-- replies). status only moves forward on what the provider reports: accepted is not delivered.
+CREATE TABLE IF NOT EXISTS crm_campaigns (
+  id            SERIAL       PRIMARY KEY,
+  name          VARCHAR(120) NOT NULL,
+  kind          VARCHAR(20)  NOT NULL DEFAULT 'promotional', -- promotional | newsletter | retention | follow_up
+  channel       VARCHAR(10)  NOT NULL,                       -- email | sms | whatsapp
+  audience      JSONB        NOT NULL DEFAULT '{}',
+  subject       VARCHAR(200),
+  body          TEXT         NOT NULL,
+  template_name VARCHAR(80),
+  coupon_code   VARCHAR(30),
+  status        VARCHAR(12)  NOT NULL DEFAULT 'draft',        -- draft | sending | sent | cancelled
+  created_by    INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  sent_at       TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  deleted_at    TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS crm_messages (
+  id           BIGSERIAL    PRIMARY KEY,
+  channel      VARCHAR(10)  NOT NULL,
+  direction    VARCHAR(3)   NOT NULL DEFAULT 'out',          -- out | in
+  kind         VARCHAR(14)  NOT NULL,                        -- campaign | transactional | automation | manual | inbound
+  event        VARCHAR(40),
+  dedupe_key   VARCHAR(160) UNIQUE,                          -- the same order update or campaign email is never sent twice
+  user_id      INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  lead_id      INTEGER      REFERENCES leads(id) ON DELETE SET NULL,
+  campaign_id  INTEGER      REFERENCES crm_campaigns(id) ON DELETE SET NULL,
+  ticket_id    INTEGER      REFERENCES support_tickets(id) ON DELETE SET NULL,
+  to_address   VARCHAR(255) NOT NULL,
+  subject      VARCHAR(200),
+  body         TEXT,
+  status       VARCHAR(12)  NOT NULL DEFAULT 'queued',       -- queued | accepted | delivered | opened | clicked | bounced | failed | received
+  provider     VARCHAR(20),
+  provider_ref VARCHAR(120),
+  error        TEXT,
+  attempts     INTEGER      NOT NULL DEFAULT 0,
+  sent_by      INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  status_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS crm_messages_campaign_idx ON crm_messages (campaign_id, status);
+CREATE INDEX IF NOT EXISTS crm_messages_user_idx     ON crm_messages (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS crm_messages_status_idx   ON crm_messages (status, created_at);
+CREATE INDEX IF NOT EXISTS crm_messages_address_idx  ON crm_messages (lower(to_address));
+CREATE UNIQUE INDEX IF NOT EXISTS crm_messages_ref_idx ON crm_messages (provider, provider_ref) WHERE provider_ref IS NOT NULL;
+-- Addresses that unsubscribed or bounced: never sent marketing again on that channel
+CREATE TABLE IF NOT EXISTS crm_suppressions (
+  channel    VARCHAR(10)  NOT NULL,
+  address    VARCHAR(255) NOT NULL,
+  reason     VARCHAR(30)  NOT NULL,                          -- unsubscribed | bounced | complained | admin
+  created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (channel, address)
+);
+CREATE TABLE IF NOT EXISTS crm_settings (
+  key        VARCHAR(40) PRIMARY KEY,
+  value      JSONB       NOT NULL,
+  updated_by INTEGER     REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Support desk: an owner, response times, internal notes the customer never sees, and two more statuses
+-- (waiting = waiting for the customer, closed = resolved and finished).
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS assigned_to       INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS first_response_at TIMESTAMPTZ;
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS closed_at         TIMESTAMPTZ;
+ALTER TABLE ticket_messages ADD COLUMN IF NOT EXISTS internal          BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS support_tickets_status_idx ON support_tickets (status, updated_at DESC);
+
+-- Leads captured automatically: one sign-up lead per account, and one open abandoned-cart lead per shopper
+CREATE UNIQUE INDEX IF NOT EXISTS leads_registration_idx ON leads (user_id) WHERE source = 'registration';
+CREATE UNIQUE INDEX IF NOT EXISTS leads_cart_open_idx ON leads (user_id)
+  WHERE source = 'abandoned_cart' AND status IN ('new', 'contacted', 'qualified', 'proposal', 'negotiation');
+CREATE INDEX IF NOT EXISTS leads_assigned_idx ON leads (assigned_to, status);
+CREATE INDEX IF NOT EXISTS leads_phone_idx    ON leads (phone) WHERE phone IS NOT NULL;
 `;

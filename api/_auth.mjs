@@ -76,13 +76,27 @@ function jwtSecret() {
 
 export const createToken = (u) => jwt.sign({ id: u.id, email: u.email, role: u.role }, jwtSecret(), { algorithm: 'HS256', expiresIn: TOKEN_SECONDS });
 
-export function currentUserId(header) {
+/** The verified token's claims ({ id, email, role, iat, exp }); throws 401 for a missing, forged or expired token. */
+export function tokenClaims(header) {
   if (!text(header).startsWith('Bearer ')) throw new ApiError(401, 'Login required');
   try {
-    return jwt.verify(header.slice(7), jwtSecret(), { algorithms: ['HS256'] }).id;
+    return jwt.verify(header.slice(7), jwtSecret(), { algorithms: ['HS256'] });
   } catch (err) {
     if (err instanceof ApiError) throw err;
     throw new ApiError(401, 'Invalid or expired token');
+  }
+}
+
+export const currentUserId = (header) => tokenClaims(header).id;
+
+/**
+ * Throws 401 when an admin deactivated the account or ended its sessions after this token was issued (CRM: Customers
+ * and Team). Checked on /auth/me (every page load), on ordering, and on every CRM request.
+ */
+export function assertSessionValid(user, claims) {
+  if (user.disabled_at) throw new ApiError(401, 'This account has been deactivated. Please contact customer care.');
+  if (user.sessions_revoked_at && claims?.iat && claims.iat * 1000 < new Date(user.sessions_revoked_at).getTime() - 999) {
+    throw new ApiError(401, 'Your session has ended. Please log in again.');
   }
 }
 
@@ -99,8 +113,22 @@ async function publicUser(u, store) {
     hasPassword: Boolean(u.password_hash),
     googleLinked: Boolean(u.google_id),
     storeName: ['seller', 'admin'].includes(u.role) ? await store.storeName(u.id) : null,
+    // CRM access (role and permissions) decides whether "CRM Dashboard" shows in the More menu. The server checks
+    // permissions again on every CRM request; this is only for the menu.
+    crm: await crmAccess(store.db, u),
     createdAt: u.created_at,
   };
+}
+
+async function crmAccess(db, u) {
+  try {
+    const { accessFor } = await import('./_crm_core.mjs');
+    const access = await accessFor(db, u);
+    return access && { role: access.role, roleName: access.roleName, permissions: [...access.permissions] };
+  } catch (err) {
+    console.error('crm access check failed', err.message); // e.g. CRM tables not created yet: no CRM, login still works
+    return u.role === 'admin' ? { role: 'super_admin', roleName: 'Super Admin', permissions: [] } : null;
+  }
 }
 
 export const session = async (u, store) => ({ token: createToken(u), user: await publicUser(u, store) });
@@ -128,7 +156,18 @@ async function register(body, ctx) {
   }
   const user = await ctx.store.create({ name, email, phone, passwordHash: hash });
   if (!user) throw new ApiError(409, 'An account with this email already exists. Please log in.');
+  await welcome(ctx.store.db, user);
   return { status: 201, body: await session(user, ctx.store) };
+}
+
+// The welcome email (CRM → Settings → Notifications). Never blocks or fails a signup.
+async function welcome(db, user) {
+  try {
+    const { notify } = await import('./_messaging.mjs');
+    await notify(db, 'welcome', { userId: user.id });
+  } catch (err) {
+    console.error('welcome notification skipped', err.message);
+  }
 }
 
 async function emailFree(ctx, email) {
@@ -160,6 +199,7 @@ async function verifySignup(body, ctx) {
   await emailFree(ctx, email);
   const user = await ctx.store.create({ name: data.name, email, phone: data.phone ?? null, passwordHash: data.password_hash, emailVerified: true });
   if (!user) throw new ApiError(409, 'An account with this email already exists. Please log in.');
+  await welcome(ctx.store.db, user);
   return { status: 201, body: await session(user, ctx.store) };
 }
 
@@ -205,6 +245,8 @@ async function verifyAccountCode(purpose, body, ctx) {
   const who = loginTarget(body.identifier);
   await limit(ctx.store, `verify:${ctx.ip}`, VERIFY_IP_LIMIT, 'Too many attempts. Please try again in 15 minutes.');
   const row = await checkCode(ctx.store.db, { purpose, target: who.target, code: body.code }, ctx.otp);
+  const [account] = await ctx.store.db('SELECT disabled_at FROM users WHERE id = $1', [row.user_id]);
+  if (account) assertSessionValid(account);
   const [user] = await ctx.store.db(
     `UPDATE users SET last_login = NOW()${who.isEmail ? ', email_verified = TRUE' : ''} WHERE id = $1 RETURNING *`, // the code proves the email
     [row.user_id],
@@ -263,13 +305,16 @@ async function login(body, ctx) {
   const user = await ctx.store.findByEmail(email);
   if (user && !user.password_hash) throw new ApiError(400, 'This account uses Google sign-in. Please use “Continue with Google”.');
   if (!user || !(await bcrypt.compare(password, user.password_hash))) throw new ApiError(401, 'Invalid email or password');
+  assertSessionValid({ disabled_at: user.disabled_at }); // only after the password: never reveals the state to a guesser
   await ctx.store.touchLogin(user.id);
   return { body: await session(user, ctx.store) };
 }
 
 async function signedInUser(ctx) {
-  const user = await ctx.store.findById(currentUserId(ctx.authorization));
+  const claims = tokenClaims(ctx.authorization);
+  const user = await ctx.store.findById(claims.id);
   if (!user) throw new ApiError(404, 'User not found');
+  assertSessionValid(user, claims);
   return user;
 }
 

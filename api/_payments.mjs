@@ -9,7 +9,7 @@
 // If an order can't be placed after money was taken, the payment is refunded straight away.
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { ApiError, currentUserId, limit, postgresStore, query, safely } from './_auth.mjs';
-import { checkoutSummary, createOrder, resolveAddress } from './_shop.mjs';
+import { checkoutSummary, createOrder, notifyLater, resolveAddress } from './_shop.mjs';
 
 const API = 'https://api.razorpay.com/v1';
 // Razorpay payment.method -> orders.payment_method. Anything unknown is kept as 'online' rather than guessed.
@@ -146,6 +146,7 @@ async function settle(db, rz, payment, providerPaymentId, details) {
     "UPDATE payments SET status = 'paid', order_id = $1, provider_payment_id = $2, method = $3, updated_at = NOW() WHERE id = $4",
     [order.id, providerPaymentId, method, payment.id],
   );
+  await notifyLater(db, 'payment_confirmation', { userId: payment.user_id, orderId: order.id });
   return order;
 }
 

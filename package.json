@@ -12,7 +12,8 @@
     "@neondatabase/serverless": "1.0.2",
     "@vercel/blob": "^2.8.2",
     "bcryptjs": "3.0.3",
-    "jsonwebtoken": "9.0.3"
+    "jsonwebtoken": "9.0.3",
+    "nodemailer": "10.5.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.11"

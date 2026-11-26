@@ -7,7 +7,7 @@
 // Prices always come from the catalog on this server, never from the request. Stock is checked at checkout, taken
 // off when the order is placed and put back when it is cancelled or returned (api/_inventory.mjs).
 import { getProduct } from './_catalog.mjs';
-import { ApiError, currentUserId, limit, postgresStore, query, safely } from './_auth.mjs';
+import { ApiError, assertSessionValid, limit, postgresStore, query, safely, tokenClaims } from './_auth.mjs';
 import { razorpayClient, refundPaidOrder } from './_payments.mjs';
 import { restockOrder, syncCatalogState, TAKE_STOCK_SQL } from './_inventory.mjs';
 import { orderReturn, requestReturn, withdrawReturn } from './_returns.mjs';
@@ -318,7 +318,18 @@ export async function createOrder(db, { userId, address, method, summary }) {
   }
   const [order] = rows;
   if (order) await syncCatalogState(db, Date.now(), true); // this instance shows the new stock straight away
+  if (order) await notifyLater(db, 'order_confirmation', { userId, orderId: order.id });
   return order ? orderJson(order) : null;
+}
+
+/** Order and account updates (api/_messaging.mjs): never hold up or fail the order itself */
+export async function notifyLater(db, event, details) {
+  try {
+    const { notify } = await import('./_messaging.mjs');
+    await notify(db, event, details);
+  } catch (err) {
+    console.error(`${event} notification skipped`, err.message);
+  }
 }
 
 async function listOrders({ db, userId }) {
@@ -408,7 +419,12 @@ export const isShopRoute = (method, segments) => Boolean(findRoute(method, segme
 
 export function handleShop({ method, segments, body, authorization, ip }, { db = query, rz = razorpayClient() } = {}) {
   return safely(async () => {
-    const userId = currentUserId(authorization);
+    const claims = tokenClaims(authorization);
+    const userId = claims.id;
+    // A deactivated account, or one whose sessions an admin ended, can't shop with an old token (CRM → Customers)
+    const [account] = await db('SELECT disabled_at, sessions_revoked_at FROM users WHERE id = $1', [userId]);
+    if (!account) throw new ApiError(401, 'Please log in again');
+    assertSessionValid(account, claims);
     return findRoute(method, segments)({ db, userId, id: segments[1], body: body ?? {}, store: postgresStore(db), ip, rz });
   });
 }
