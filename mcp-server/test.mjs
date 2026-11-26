@@ -11,9 +11,11 @@ const PORT = 5099;
 const STORE_URL = `http://127.0.0.1:${PORT}`;
 const root = fileURLToPath(new URL('..', import.meta.url));
 let store;
+const clients = []; // closed in after(), so a failed assertion can't leave a server.mjs running and hang the run
 
 async function connect(env = {}) {
   const client = new Client({ name: 'test', version: '1.0.0' });
+  clients.push(client);
   await client.connect(new StdioClientTransport({
     command: process.execPath,
     args: [fileURLToPath(new URL('./server.mjs', import.meta.url))],
@@ -32,7 +34,10 @@ before(async () => {
   });
 });
 
-after(() => store?.kill());
+after(async () => {
+  await Promise.allSettled(clients.map((c) => c.close()));
+  store?.kill();
+});
 
 test('lists its tools, each with a description and input schema', async () => {
   const client = await connect();

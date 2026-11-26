@@ -28,6 +28,8 @@ Settings are environment variables:
 
 - `STORE_URL`: the store (default `https://arvixa-store.vercel.app`; `http://127.0.0.1:5000` for `npm run local`)
 - `STORE_EMAIL` and `STORE_PASSWORD`, or `STORE_TOKEN`: the account to act as. Leave them out for catalog tools only.
+  The store admin is signed in through the admin portal automatically. If that account has authenticator (MFA) sign-in
+  on, a password alone can't sign in: use `STORE_TOKEN` with an admin-portal session token (valid 12 hours) instead.
 
 Use a dedicated account, and give the assistant the admin account only if you want it to change things.
 

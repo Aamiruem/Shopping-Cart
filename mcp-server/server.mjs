@@ -30,13 +30,21 @@ export function storeClient({ env = process.env, fetchImpl = fetch } = {}) {
     if (!env.STORE_EMAIL || !env.STORE_PASSWORD) {
       throw new Error('This tool needs a store account. Set STORE_EMAIL and STORE_PASSWORD (or STORE_TOKEN) for the MCP server.');
     }
-    const res = await fetchImpl(`${base}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: env.STORE_EMAIL, password: env.STORE_PASSWORD }),
-    });
-    const data = await res.json().catch(() => ({}));
+    const post = async (path) => {
+      const res = await fetchImpl(`${base}/api${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: env.STORE_EMAIL, password: env.STORE_PASSWORD }),
+      });
+      return { res, data: await res.json().catch(() => ({})) };
+    };
+    let { res, data } = await post('/auth/login');
+    // The store admin may sign in only through the admin portal; its session also works in the Seller Hub and support
+    if (res.status === 403 && /admin portal/i.test(data.error ?? '')) ({ res, data } = await post('/auth/admin/login'));
     if (!res.ok) throw new Error(`Store login failed: ${data.error || res.status}`);
+    if (data.mfaRequired) {
+      throw new Error('This admin account has authenticator sign-in on. Sign in to the admin portal and set STORE_TOKEN to that session token instead of STORE_EMAIL and STORE_PASSWORD.');
+    }
     token = data.token;
     return token;
   }
