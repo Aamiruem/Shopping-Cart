@@ -6,7 +6,7 @@ import { loadProducts } from './_catalog.mjs';
 
 export const LOW_STOCK = 10; // the same line the product list's "Low stock" filter uses
 const DAYS = 30;
-const LEAD_STAGES = ['new', 'contacted', 'qualified', 'won', 'lost'];
+const LEAD_STAGES = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'];
 const FULFILMENT = ['pending', 'packed', 'shipped', 'delivered'];
 
 const change = (now, before) => (before > 0 ? Math.round(((now - before) / before) * 1000) / 10 : now > 0 ? null : 0);

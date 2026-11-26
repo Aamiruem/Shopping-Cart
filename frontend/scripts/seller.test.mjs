@@ -276,7 +276,7 @@ test('dashboard overview: each seller sees only their own sales and stock; the a
   assert.equal(store.scope, 'store');
   assert.equal(store.kpis.revenue, 2598);
   assert.ok(store.stock.total > 700, 'the whole catalog');
-  assert.deepEqual(store.leads.stages.map((s) => s.count), [1, 0, 0, 1, 0]);
+  assert.deepEqual(store.leads.stages.map((s) => s.count), [1, 0, 0, 0, 0, 1, 0]);
   assert.equal(store.leads.stages[0].hot, 1);
 
   assert.equal((await buyer.seller('GET', 'overview')).status, 403);

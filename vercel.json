@@ -62,6 +62,10 @@
       "destination": "/api/seller-upload"
     },
     {
+      "source": "/api/webhooks/:provider",
+      "destination": "/api/crm-webhooks?provider=:provider"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/catalog?path=:path*"
     },
@@ -112,11 +116,11 @@
       "destination": "/_seo/shell/index.html"
     },
     {
-      "source": "/(cart|checkout|wishlist|account|login|register|orders|payments|seller|admin)",
+      "source": "/(cart|checkout|wishlist|account|login|register|orders|payments|seller|admin|crm|unsubscribe)",
       "destination": "/_seo/shell/index.html"
     },
     {
-      "source": "/(orders|seller|admin|product)/:rest*",
+      "source": "/(orders|seller|admin|product|crm)/:rest*",
       "destination": "/_seo/shell/index.html"
     }
   ],
@@ -161,13 +165,19 @@
       ]
     },
     {
-      "source": "/(cart|checkout|wishlist|account|login|register|orders|payments|seller|admin|_seo)(.*)",
+      "source": "/(cart|checkout|wishlist|account|login|register|orders|payments|seller|admin|crm|unsubscribe|_seo)(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",
           "value": "noindex, nofollow"
         }
       ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/crm/cron",
+      "schedule": "30 3 * * *"
     }
   ]
 }

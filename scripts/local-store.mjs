@@ -8,7 +8,8 @@
 //   asha@example.com    customer: delivered orders to review or return, one on its way, a return, a complaint
 //   ravi@example.com    customer with a few orders, so "bought together" and trending have data
 //   seller@example.com  seller with their own listed product and an order to ship
-//   owner@example.com   admin: returns, refunds, complaints, leads and the store catalog in the Seller Hub
+//   owner@example.com   admin: returns, refunds, complaints, leads and the store catalog in the Seller Hub; the CRM
+//   sales@example.com   CRM team member (Sales Executive): sees the CRM with fewer sections; a shopper otherwise
 // Online payments stay off (no Razorpay keys) and photo uploads need Vercel Blob, so those two answer with their
 // usual "not set up yet" messages.
 import { readFileSync } from 'node:fs';
@@ -71,6 +72,8 @@ const asha = await account('Asha Rao', 'asha@example.com');
 const ravi = await account('Ravi Kumar', 'ravi@example.com');
 const seller = await account('Meera Textiles', 'seller@example.com', 'seller');
 const owner = await account('Store Owner', 'owner@example.com', 'admin');
+const sales = await account('Sam Sales', 'sales@example.com');
+await db("INSERT INTO crm_staff (user_id, role_key, title) VALUES ($1, 'sales_executive', 'Sales executive')", [sales.id]);
 for (const who of [asha, ravi]) {
   await who.shop('POST', 'addresses', { name: who === asha ? 'Asha Rao' : 'Ravi Kumar', phone: '9876543210', line1: '12 MG Road', city: 'Bengaluru', state: 'Karnataka', pincode: '560001' });
 }
@@ -151,6 +154,6 @@ createServer((req, res) => {
 }).listen(PORT, '127.0.0.1', () => {
   console.log(`Local store API on http://127.0.0.1:${PORT} (in memory: restart for fresh demo data)`);
   console.log('Now run:  cd frontend && VITE_STORE_MODE=store npm run dev   then open http://localhost:5173');
-  console.log(`Demo logins (password secret123): asha@example.com, ravi@example.com, seller@example.com, owner@example.com`);
+  console.log(`Demo logins (password secret123): asha@example.com, ravi@example.com, seller@example.com, owner@example.com, sales@example.com`);
   console.log(`Try: order #${reviewable} (review it), order #${returnable} (return it), the Seller Hub as owner@example.com`);
 });

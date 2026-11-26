@@ -7,7 +7,7 @@ import { formatDate } from '../../utils/format';
 import { ErrorMessage, Spinner } from '../common/Feedback';
 import Icon from '../common/Icon';
 
-export const TICKET_STATUS = { open: 'Open', in_progress: 'In progress', resolved: 'Resolved' };
+export const TICKET_STATUS = { open: 'Open', in_progress: 'In progress', waiting: 'Waiting for your reply', resolved: 'Resolved', closed: 'Closed' };
 const when = (d) => formatDate(d, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 // One complaint and its conversation. `staff` (the admin) can also change its status.
@@ -74,7 +74,7 @@ export default function TicketThread({ id, staff = false, onChange }) {
       </ol>
       <form className="thread-reply" onSubmit={send}>
         <label className="field">
-          {staff ? 'Reply to the customer' : ticket.status === 'resolved' ? 'Still need help? Reply to reopen this ticket' : 'Add a reply'}
+          {staff ? 'Reply to the customer' : ['resolved', 'closed'].includes(ticket.status) ? 'Still need help? Reply to reopen this ticket' : 'Add a reply'}
           <textarea rows={2} maxLength={4000} value={message} onChange={(e) => setMessage(e.target.value)} />
         </label>
         <div className="form-actions">

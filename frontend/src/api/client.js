@@ -261,3 +261,10 @@ export const api = {
   ask: (question) => request('/ai/ask', { method: 'POST', body: { question } }),
   agent: (messages) => request('/ai/agent', { method: 'POST', body: { messages } }),
 };
+
+// CRM (api/_crm.mjs). crm.get('/customers', { q }) etc.; the server checks the role and permission of every call.
+const crmCall = (method) => (path, bodyOrParams) =>
+  method === 'GET'
+    ? request(`/crm${path}${bodyOrParams ? `?${query(Object.fromEntries(Object.entries(bodyOrParams).filter(([, v]) => v !== '' && v !== null && v !== undefined)))}` : ''}`)
+    : request(`/crm${path}`, { method, body: bodyOrParams ?? {} });
+export const crm = { get: crmCall('GET'), post: crmCall('POST'), patch: crmCall('PATCH'), put: crmCall('PUT'), del: crmCall('DELETE') };

@@ -180,6 +180,15 @@ export default async function handler(req, res) {
       return send(res, result.status, result.body);
     }
   }
+  if (area === 'crm') {
+    // The CRM (api/_crm.mjs): store team only, every route permission-checked on the server
+    const crm = await import('./_crm.mjs');
+    const ip = req.headers['x-real-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+    if (!crm.isCrmRoute(req.method, rest)) return send(res, 404, { error: 'Not found' });
+    const result = await crm.handleCrm({ method: req.method, rest, body: bodyOf(req), params, authorization: req.headers.authorization, ip, userAgent: req.headers['user-agent'] });
+    Object.entries(result.headers).forEach(([key, value]) => res.setHeader(key, value));
+    return send(res, result.status, result.body);
+  }
   if (area === 'ai' && req.method === 'POST') {
     // Shopping assistant (api/_assistant.mjs): answers from the live catalog, store policies and the shopper's orders
     const assistant = await import('./_assistant.mjs');

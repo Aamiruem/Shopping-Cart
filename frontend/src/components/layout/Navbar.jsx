@@ -168,6 +168,9 @@ function MoreMenu() {
           <MenuLink to="/grocery" icon="home" label="Grocery Store" />
           {/* Seller Hub: sellers and admins only, and only in this menu */}
           {isSellerRole(user) && <MenuLink to="/seller/dashboard" icon="barChart" label="Seller Hub" />}
+          {/* CRM Dashboard: only for the store admin and CRM team members (user.crm comes from the server). The API
+              checks every CRM request again, so this link is a convenience, not the protection. */}
+          {user?.crm && <MenuLink to="/crm" icon="users" label="CRM Dashboard" />}
           <MenuLink to="/help" icon="headphones" label="Customer Care" />
           <MenuLink to="/orders" icon="package" label="Track your orders" />
           <button type="button" className="menu-link" onClick={() => { setOpen(false); window.dispatchEvent(new Event(OPEN_CHAT_EVENT)); }}>

@@ -10,16 +10,25 @@
 // kind, intent and the summary come from keyword rules (classifyLead), not a trained model. Product matches are searched
 // in the live catalog, and their price and stock are read again every time the admin opens the list.
 import { ApiError, currentUserId, limit, normalizeEmail, postgresStore, query, safely } from './_auth.mjs';
+import { assertAssignable, assignable, crmUser, getSettings, need } from './_crm_core.mjs';
 import { getProduct, loadProducts, similar } from './_catalog.mjs';
 
-export const SOURCES = ['contact', 'product', 'quote', 'business', 'newsletter'];
-export const STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost', 'unsubscribed'];
+// Forms people fill in themselves. The CRM adds leads from other sources (api/_crm_leads.mjs): sign-ups, abandoned
+// carts, WhatsApp messages and leads the team enters by hand.
+export const SOURCES = ['contact', 'product', 'quote', 'business', 'newsletter', 'checkout', 'consultation'];
+export const AUTO_SOURCES = ['registration', 'abandoned_cart', 'whatsapp', 'crm'];
+// The pipeline: New → Contacted → Qualified → Proposal sent → Negotiation → Converted (won) | Lost
+export const STATUSES = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost', 'unsubscribed'];
+export const OPEN_STATUSES = ['new', 'contacted', 'qualified', 'proposal', 'negotiation'];
 export const KIND_LABELS = {
   product_enquiry: 'Product enquiry',
   quote: 'Bulk / quote request',
   support: 'Support request',
   business: 'Business opportunity',
   newsletter: 'Newsletter',
+  consultation: 'Product consultation',
+  abandoned_cart: 'Abandoned cart',
+  registration: 'New sign-up',
 };
 const CLOSED = ['won', 'lost', 'unsubscribed'];
 const ID_RE = /^\d{1,9}$/;
@@ -118,9 +127,10 @@ export function classifyLead({ source, message = '', budget = null, quantity = n
   else if (hits(lower, SUPPORT) && !hits(lower, QUOTE)) kind = 'support';
   else if (source === 'business' || hits(lower, BUSINESS)) kind = 'business';
   else if (source === 'quote' || hits(lower, QUOTE) || (units ?? 0) >= 10) kind = 'quote';
+  else if (source === 'consultation') kind = 'consultation';
   else kind = 'product_enquiry';
 
-  const matches = ['product_enquiry', 'quote'].includes(kind) ? matchProducts(message, { budget: amount, productId }) : [];
+  const matches = ['product_enquiry', 'quote', 'consultation'].includes(kind) ? matchProducts(message, { budget: amount, productId }) : [];
   let intent = 'low';
   if (!['support', 'newsletter'].includes(kind)) {
     const score =
@@ -166,26 +176,29 @@ function followUp(lead, product, matches) {
 }
 
 // follow_up_on as text: a DATE must not shift a day with the server's time zone
-const COLUMNS = `l.id, l.source, l.kind, l.name, l.email, l.phone, l.user_id, l.product_id, l.message, l.budget, l.quantity, l.intent,
+export const COLUMNS = `l.id, l.source, l.kind, l.name, l.email, l.phone, l.user_id, l.product_id, l.message, l.budget, l.quantity, l.intent,
   l.summary, l.matches, l.status, l.assigned_to, to_char(l.follow_up_on, 'YYYY-MM-DD') AS follow_up_on, l.notes,
   l.marketing_consent, l.consent_at, l.created_at, l.updated_at, a.name AS assignee_name,
   (SELECT o.id FROM orders o JOIN users u ON u.id = o.user_id
     WHERE (o.user_id = l.user_id OR (l.email IS NOT NULL AND lower(u.email) = lower(l.email)))
       AND o.created_at >= l.created_at AND o.status <> 'cancelled'
     ORDER BY o.created_at LIMIT 1) AS converted_order_id`;
-const FROM = 'FROM leads l LEFT JOIN users a ON a.id = l.assigned_to';
+export const FROM = 'FROM leads l LEFT JOIN users a ON a.id = l.assigned_to';
 
-function leadJson(row) {
+export function leadJson(row) {
   const product = row.product_id ? brief(getProduct(row.product_id)) : null;
   const matches = (row.matches || []).map((id) => brief(getProduct(id))).filter(Boolean); // unlisted since: dropped
   return { ...row, kindLabel: KIND_LABELS[row.kind] ?? row.kind, product, matches, suggestedReply: followUp(row, product, matches) };
 }
 
-async function admin(db, authorization) {
-  const [u] = await db('SELECT id, name, role FROM users WHERE id = $1', [currentUserId(authorization)]);
-  if (!u) fail('Please log in again', 401);
-  if (u.role !== 'admin') fail('Only the store team can see enquiries', 403);
-  return u;
+// The store admin, or a CRM team member whose role allows working leads (CRM → Team)
+async function admin(db, authorization, ctx = {}) {
+  try {
+    return await crmUser(db, authorization, ctx);
+  } catch (err) {
+    if (err.status === 403) fail('Only the store team can see enquiries', 403);
+    throw err;
+  }
 }
 
 async function signedIn(db, authorization) {
@@ -255,6 +268,29 @@ async function createLead({ db, body, authorization, ip }) {
   if (contact.email) await limit(store, `lead-email:${contact.email}`, 4, 'You’ve sent several messages just now. Please try again in 15 minutes.');
 
   const c = classifyLead({ source, message, budget, quantity, productId, phone: contact.phone });
+  // The same person asking again while their enquiry is still open: one lead, with the new message added to it
+  const windowHours = await getSettings(db).then((s) => s.leads.duplicateWindowHours).catch(() => 72);
+  const [open] = await db(
+    `SELECT id, intent FROM leads
+      WHERE source <> 'newsletter' AND status IN ('new', 'contacted', 'qualified', 'proposal', 'negotiation')
+        AND ((($1::text) IS NOT NULL AND lower(email) = lower($1)) OR (($2::text) IS NOT NULL AND phone = $2))
+        AND COALESCE(product_id, '') = COALESCE($3::text, '')
+        AND created_at > NOW() - make_interval(hours => $4)
+      ORDER BY created_at DESC LIMIT 1`,
+    [contact.email, contact.phone, productId, windowHours],
+  );
+  if (open) {
+    const rank = { low: 0, medium: 1, high: 2 };
+    await db(
+      `UPDATE leads SET notes = notes || $2::jsonb, updated_at = NOW(),
+              intent = CASE WHEN $3::int > (CASE intent WHEN 'high' THEN 2 WHEN 'medium' THEN 1 ELSE 0 END) THEN $4 ELSE intent END,
+              budget = COALESCE($5, budget), quantity = COALESCE($6, quantity),
+              marketing_consent = marketing_consent OR $7
+        WHERE id = $1`,
+      [open.id, JSON.stringify([{ at: new Date().toISOString(), by: contact.name || 'Customer', text: `New message (${source}): ${message}` }]), rank[c.intent], c.intent, c.budget, c.quantity, body.marketingConsent === true],
+    );
+    return { status: 201, body: { received: true, kind: c.kind === 'support' ? 'support' : 'enquiry' } };
+  }
   await db(
     `INSERT INTO leads (source, kind, name, email, phone, user_id, product_id, message, budget, quantity, intent, summary, matches, marketing_consent, consent_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, NOW())`,
@@ -302,7 +338,7 @@ async function summary({ db }) {
        FROM x`,
   );
   const bySource = await db("SELECT source, count(*)::int AS count FROM leads WHERE source <> 'newsletter' GROUP BY source ORDER BY count DESC");
-  const team = await db("SELECT id, name FROM users WHERE role = 'admin' ORDER BY name, id"); // who a lead can be assigned to
+  const team = (await assignable(db, 'leads.view')).map(({ id, name }) => ({ id, name })); // who a lead can be assigned to
   return { body: { ...totals, conversionRate: totals.enquiries ? Math.round((totals.converted / totals.enquiries) * 1000) / 10 : null, bySource, team } };
 }
 
@@ -332,8 +368,8 @@ async function updateLead({ db, user, id, body }) {
   if (body.assignedTo !== undefined) {
     let assignee = null;
     if (body.assignedTo !== null && body.assignedTo !== '') {
-      [assignee] = ID_RE.test(String(body.assignedTo)) ? await db("SELECT id, name FROM users WHERE id = $1 AND role = 'admin'", [Number(body.assignedTo)]) : [];
-      if (!assignee) fail('Enquiries can only be assigned to the store team');
+      need(user, 'leads.assign');
+      assignee = await assertAssignable(db, body.assignedTo, 'leads.view', 'Enquiries can only be assigned to the store team:').catch(() => fail('Enquiries can only be assigned to the store team'));
     }
     if ((assignee?.id ?? null) !== lead.assigned_to) {
       set('assigned_to', assignee?.id ?? null);
@@ -387,7 +423,13 @@ export function handleLeads({ method, rest, body, params = {}, authorization, ip
   return safely(async () => {
     const { key, id } = findRoute(method, rest);
     if (key === 'POST ') return createLead({ db, body: body ?? {}, authorization, ip });
-    const user = await admin(db, authorization);
-    return ROUTES[key]({ db, user, id, body: body ?? {}, params });
+    const user = await admin(db, authorization, { ip });
+    need(user, key === 'DELETE :id' ? 'leads.delete' : key === 'PATCH :id' ? 'leads.edit' : 'leads.view');
+    const result = await ROUTES[key]({ db, user, id, body: body ?? {}, params });
+    if (key !== 'GET ' && key !== 'GET summary') {
+      const { audit } = await import('./_crm_core.mjs');
+      await audit(db, user, key === 'DELETE :id' ? 'lead.delete' : 'lead.update', 'lead', id, key === 'PATCH :id' ? body ?? {} : {});
+    }
+    return result;
   });
 }

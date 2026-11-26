@@ -49,6 +49,23 @@ const SellerSupport = lazy(() => import('./pages/seller/SellerSupport'));
 const SellerCatalog = lazy(() => import('./pages/seller/SellerCatalog'));
 const SellerLeads = lazy(() => import('./pages/seller/SellerLeads'));
 
+// CRM (store team only): its own bundle, never downloaded by shoppers
+const CrmLayout = lazy(() => import('./pages/crm/CrmLayout'));
+const CrmDashboard = lazy(() => import('./pages/crm/Dashboard'));
+const CrmCustomers = lazy(() => import('./pages/crm/Customers'));
+const CrmCustomer = lazy(() => import('./pages/crm/CustomerDetail'));
+const CrmLeads = lazy(() => import('./pages/crm/Leads'));
+const CrmSales = lazy(() => import('./pages/crm/Sales'));
+const CrmInvoice = lazy(() => import('./pages/crm/Invoice'));
+const CrmMarketing = lazy(() => import('./pages/crm/Marketing'));
+const CrmSupport = lazy(() => import('./pages/crm/Support'));
+const CrmTasks = lazy(() => import('./pages/crm/Tasks'));
+const CrmReports = lazy(() => import('./pages/crm/Reports'));
+const CrmInsights = lazy(() => import('./pages/crm/Insights'));
+const CrmTeam = lazy(() => import('./pages/crm/Team'));
+const CrmSettings = lazy(() => import('./pages/crm/Settings'));
+const Unsubscribe = lazy(() => import('./pages/Unsubscribe'));
+
 // Pages that show the category strip under the navbar
 const WITH_CATEGORY_BAR = ['/', '/products', '/grocery'];
 
@@ -126,6 +143,25 @@ export default function App() {
               <Route path="catalog" element={<SellerCatalog />} />
               <Route path="leads" element={<SellerLeads />} />
           </Route>
+
+            {/* CRM: hidden from everyone but the store team, and every API call is permission-checked on the server */}
+            <Route path="/crm" element={sellerRoute(<CrmLayout />)}>
+              <Route index element={<CrmDashboard />} />
+              <Route path="customers" element={<CrmCustomers />} />
+              <Route path="customers/:id" element={<CrmCustomer />} />
+              <Route path="leads" element={<CrmLeads />} />
+              <Route path="sales" element={<CrmSales />} />
+              <Route path="invoice/:id" element={<CrmInvoice />} />
+              <Route path="marketing" element={<CrmMarketing />} />
+              <Route path="support" element={<CrmSupport />} />
+              <Route path="tasks" element={<CrmTasks />} />
+              <Route path="reports" element={<CrmReports />} />
+              <Route path="insights" element={<CrmInsights />} />
+              <Route path="team" element={<CrmTeam />} />
+              <Route path="settings" element={<CrmSettings />} />
+              <Route path="*" element={<Navigate to="/crm" replace />} />
+            </Route>
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

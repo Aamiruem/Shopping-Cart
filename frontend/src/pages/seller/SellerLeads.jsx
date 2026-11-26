@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import useApi from '../../hooks/useApi';
 import { formatDate, formatPrice } from '../../utils/format';
 
-export const LEAD_STATUS = { new: 'New', contacted: 'Contacted', qualified: 'Qualified', won: 'Won', lost: 'Lost', unsubscribed: 'Unsubscribed' };
+export const LEAD_STATUS = { new: 'New', contacted: 'Contacted', qualified: 'Qualified', proposal: 'Proposal sent', negotiation: 'Negotiation', won: 'Won', lost: 'Lost', unsubscribed: 'Unsubscribed' };
 const INTENT_TONE = { high: 'error', medium: 'warn', low: 'ok' };
 const INTENT_LABEL = { high: 'Hot', medium: 'Warm', low: 'Cold' };
 const FILTERS = [['open', 'Open'], ['', 'All'], ['won', 'Won'], ['lost', 'Lost']];
