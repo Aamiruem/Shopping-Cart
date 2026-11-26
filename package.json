@@ -2,6 +2,9 @@
   "name": "arvixa-store-api",
   "private": true,
   "description": "Dependencies of the Vercel /api function. The storefront has its own package.json in frontend/.",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "db:setup": "node --env-file=.env.local scripts/setup-db.mjs",
     "coupon": "node --env-file=.env.local scripts/coupon.mjs",

@@ -5,9 +5,10 @@
 // One-time codes (api/_otp.mjs): with an email provider configured, signup works like the backend's: the account is
 // created, verified, only after the emailed code is confirmed. Without one, signup creates the account straight away
 // with email_verified = FALSE. Passwordless login, password reset and phone verification need a configured channel.
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { resolveMx } from 'node:dns/promises';
-import { neon } from '@neondatabase/serverless';
+import { neon, Pool } from '@neondatabase/serverless';
+import { STORE_SCHEMA } from './_schema.mjs';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { availableChannels, checkCode, otpReport, sendCode, sentResponse } from './_otp.mjs';
@@ -519,8 +520,10 @@ export async function safely(route) {
     return { status, body, headers: {} };
   } catch (err) {
     if (err instanceof ApiError) return { status: err.status, body: { error: err.message }, headers: err.headers };
-    console.error('store API error', err);
-    return { status: 500, body: { error: 'Something went wrong. Please try again.' }, headers: {} };
+    // The reference ties what the user sees to this line in the Vercel logs, without showing them any details
+    const ref = randomBytes(4).toString('hex');
+    console.error(`store API error [ref ${ref}]`, err);
+    return { status: 500, body: { error: `Something went wrong. Please try again. (ref ${ref})`, ref }, headers: {} };
   }
 }
 
@@ -538,7 +541,66 @@ export const useLocalDatabase = (db) => {
   localDb = db;
 };
 
-export const query = (statement, params = []) => (localDb ? localDb(statement, params) : (client ??= neon(process.env.DATABASE_URL)).query(statement, params));
+// The live database updates itself: a deploy whose STORE_SCHEMA differs from the version recorded in store_meta applies
+// it before its first query, so code never runs against a database missing its columns (deploying without
+// `npm run db:setup` used to break sign-in, cart and seller applications). STORE_SCHEMA is safe to re-run: it only
+// adds what is missing. Each server instance checks once (one small query); the update itself runs once, under a lock.
+export const STORE_SCHEMA_VERSION = createHash('sha256').update(STORE_SCHEMA).digest('hex').slice(0, 16);
+let schemaReady = null;
+
+// `check` runs one statement over HTTP; `open` starts a real session (the lock and the multi-statement script need one)
+function neonSchemaDb(url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL) {
+  return {
+    check: (statement) => neon(url).query(statement),
+    open: async () => {
+      const pool = new Pool({ connectionString: url });
+      const session = await pool.connect();
+      return {
+        query: async (statement, params) => (await session.query(statement, params)).rows,
+        close: async () => {
+          session.release();
+          await pool.end().catch(() => {});
+        },
+      };
+    },
+  };
+}
+
+const RECORDED = "SELECT value FROM store_meta WHERE key = 'store_schema'";
+const recordedVersion = (run) => Promise.resolve().then(() => run(RECORDED)).then((rows) => rows[0]?.value ?? null, () => null);
+
+/** Brings the database up to this deploy's STORE_SCHEMA. Returns 'current' or 'updated'. */
+export async function ensureStoreSchema({ check, open } = neonSchemaDb()) {
+  if ((await recordedVersion(check)) === STORE_SCHEMA_VERSION) return 'current';
+  const db = await open();
+  try {
+    await db.query('SELECT pg_advisory_lock(7310231)'); // another instance may be updating right now: wait for it
+    await db.query('CREATE TABLE IF NOT EXISTS store_meta (key VARCHAR(40) PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())');
+    if ((await recordedVersion(db.query)) === STORE_SCHEMA_VERSION) return 'current';
+    await db.query(STORE_SCHEMA);
+    await db.query(
+      `INSERT INTO store_meta (key, value) VALUES ('store_schema', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [STORE_SCHEMA_VERSION],
+    );
+    console.log(`store schema updated to ${STORE_SCHEMA_VERSION}`);
+    return 'updated';
+  } finally {
+    await db.query('SELECT pg_advisory_unlock(7310231)').catch(() => {});
+    await db.close();
+  }
+}
+
+async function liveQuery(statement, params) {
+  // A failed update is retried by the next request rather than remembered
+  await (schemaReady ??= ensureStoreSchema().catch((err) => {
+    schemaReady = null;
+    throw err;
+  }));
+  return (client ??= neon(process.env.DATABASE_URL)).query(statement, params);
+}
+
+export const query = (statement, params = []) => (localDb ? localDb(statement, params) : liveQuery(statement, params));
 
 export function postgresStore(db = query) {
   const one = async (statement, params) => (await db(statement, params))[0] ?? null;
