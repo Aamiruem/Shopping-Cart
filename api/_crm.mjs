@@ -7,6 +7,8 @@ import { query, safely, limit, postgresStore } from './_auth.mjs';
 import { addNote, createCustomer, deleteNote, exportCustomers, getCustomer, importCustomers, listCustomers, updateCustomer } from './_crm_customers.mjs';
 import { catalogSettings, getCatalogProduct, listCatalog, saveVerification, setProductStatus } from './_crm_catalog.mjs';
 import { insights } from './_crm_insights.mjs';
+import { listPayments, listShipments, otpStatusPage, reconcilePayments, sendTestOtp, verifyTestOtp } from './_crm_ops.mjs';
+import { createSettlement, getSeller, listSellers, paySettlement, reviewSeller, setCommission } from './_crm_sellers.mjs';
 import { createLead, getLead, LEAD_SOURCES, listLeads, syncAutoLeads } from './_crm_leads.mjs';
 import {
   cancelCampaign, createCampaign, deleteCampaign, getCampaign, listCampaigns, listMessages, listSubscribers, publicUnsubscribe, retryMessages, runAutomations,
@@ -22,12 +24,44 @@ import { assignable, audit, crmUser, DEFAULT_SETTINGS, fail, getSettings, NOTIFI
 import { channelStatus, siteUrl } from './_messaging.mjs';
 import { providerStatus } from './_otp.mjs';
 
+// ---------- My security: authenticator-app MFA ----------
+async function mfaStatus({ staff }) {
+  return { body: { enabled: staff.mfaEnabled, thisSession: staff.mfa } };
+}
+async function mfaSetup({ db, staff }) {
+  const { newSecret, otpauthUrl, seal } = await import('./_mfa.mjs');
+  if (staff.mfaEnabled) fail('MFA is already on. Turn it off first to set up a new device.', 409);
+  const secret = newSecret();
+  await db('UPDATE users SET mfa_pending_secret = $2 WHERE id = $1', [staff.id, seal(secret)]);
+  return { body: { secret, otpauthUrl: otpauthUrl(secret, staff.email) } };
+}
+async function mfaEnable({ db, staff, body }) {
+  const { matchStep, unseal } = await import('./_mfa.mjs');
+  const [u] = await db('SELECT mfa_pending_secret FROM users WHERE id = $1', [staff.id]);
+  const secret = unseal(u?.mfa_pending_secret);
+  if (!secret) fail('Start the setup again', 409);
+  const step = matchStep(secret, body.code);
+  if (step === null) fail('That code is not correct. Check the time on your phone and try the newest code.');
+  await db('UPDATE users SET mfa_secret = mfa_pending_secret, mfa_pending_secret = NULL, mfa_enabled_at = NOW(), mfa_last_step = $2, sessions_revoked_at = NOW() WHERE id = $1', [staff.id, step]);
+  await audit(db, staff, 'mfa.enable', 'user', staff.id, {});
+  return { body: { enabled: true, signInAgain: true } }; // every session ends: sign in again with the code
+}
+async function mfaDisable({ db, staff, body }) {
+  const { verifyUserCode } = await import('./_mfa.mjs');
+  const [u] = await db('SELECT id, mfa_secret FROM users WHERE id = $1', [staff.id]);
+  if (!u.mfa_secret) fail('MFA is not on', 409);
+  if (!(await verifyUserCode(db, u, body.code))) fail('That code is not correct');
+  await db('UPDATE users SET mfa_secret = NULL, mfa_enabled_at = NULL, mfa_last_step = NULL WHERE id = $1', [staff.id]);
+  await audit(db, staff, 'mfa.disable', 'user', staff.id, {});
+  return { body: { enabled: false } };
+}
+
 async function me({ db, staff }) {
   const settings = await getSettings(db);
   return {
     body: {
       id: staff.id, name: staff.name, email: staff.email, role: staff.role, roleName: staff.roleName, title: staff.title ?? null,
-      permissions: [...staff.permissions], owner: staff.owner, sessionId: staff.sessionId,
+      permissions: [...staff.permissions], owner: staff.owner, sessionId: staff.sessionId, mfa: staff.mfa, mfaEnabled: staff.mfaEnabled,
       company: settings.company.name, leadSources: LEAD_SOURCES, reports: REPORTS,
     },
   };
@@ -42,7 +76,7 @@ function integrations() {
       siteUrl: siteUrl(env) || null,
       messaging,
       otp: providerStatus(env),
-      payments: { provider: 'razorpay', configured: has('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET'), webhook: has('RAZORPAY_WEBHOOK_SECRET') },
+      payments: { provider: 'razorpay', configured: has('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET'), mode: env.PAYMENTS_MODE === 'live' ? 'live' : 'test', webhook: has('RAZORPAY_WEBHOOK_SECRET') },
       shipping: { provider: 'shiprocket', configured: has('SHIPROCKET_EMAIL', 'SHIPROCKET_PASSWORD', 'SHIPROCKET_PICKUP_POSTCODE'), webhook: has('SHIPROCKET_WEBHOOK_TOKEN') },
       cron: { configured: has('CRON_SECRET') },
       encryption: { configured: has('DATA_ENCRYPTION_KEY') },
@@ -77,6 +111,10 @@ async function settingsPut({ db, staff, body }) {
 const routes = [
   // [method, path, permission (null = any CRM user), handler]
   ['GET', 'me', null, me],
+  ['GET', 'mfa', null, mfaStatus],
+  ['POST', 'mfa/setup', null, mfaSetup],
+  ['POST', 'mfa/enable', null, mfaEnable],
+  ['POST', 'mfa/disable', null, mfaDisable],
   ['GET', 'team', null, async ({ db, params }) => ({ body: await assignable(db, params.permission || null) })],
   ['GET', 'feed', null, feed],
   ['POST', 'feed/seen', null, markFeedSeen],
@@ -120,6 +158,19 @@ const routes = [
   ['GET', 'catalog/:id', 'catalog.view', getCatalogProduct],
   ['POST', 'catalog/:id/verification', 'catalog.verify', saveVerification],
   ['POST', 'catalog/:id/status', 'catalog.verify', setProductStatus],
+
+  ['GET', 'sellers', 'sellers.view', listSellers],
+  ['GET', 'sellers/:id', 'sellers.view', getSeller],
+  ['POST', 'sellers/:id/review', 'sellers.manage', reviewSeller],
+  ['PATCH', 'sellers/:id/commission', 'sellers.manage', setCommission],
+  ['POST', 'sellers/:id/settlements', 'settlements.manage', createSettlement],
+  ['POST', 'settlements/:id/paid', 'settlements.manage', paySettlement],
+  ['GET', 'payments', 'sales.view', listPayments],
+  ['POST', 'payments/reconcile', 'payments.manage', reconcilePayments],
+  ['GET', 'shipments', 'sales.view', listShipments],
+  ['GET', 'otp', 'otp.diagnostics', otpStatusPage],
+  ['POST', 'otp/test', 'otp.diagnostics', sendTestOtp],
+  ['POST', 'otp/test/verify', 'otp.diagnostics', verifyTestOtp],
 
   ['GET', 'tickets', 'support.view', listTickets],
   ['POST', 'tickets', 'support.edit', createTicket],
@@ -218,7 +269,7 @@ export function handleCrm({ method, rest, body, params = {}, authorization, ip =
     }
     const route = findRoute(method, rest);
     if (!route) fail('Not found', 404);
-    const staff = await crmUser(db, authorization, { ip, userAgent });
+    const staff = await crmUser(db, authorization, { ip, userAgent, mfaSetup: ['me', 'mfa', 'mfa/setup', 'mfa/enable'].includes(rest.join('/')) });
     if (route.permission) need(staff, route.permission);
     // Writes are rate-limited per person: generous for real work, a ceiling for a runaway script or a stolen token
     if (method !== 'GET') await limit(postgresStore(db), `crm-write:${staff.id}`, 600, 'Too many changes in a short time. Please wait a few minutes.');

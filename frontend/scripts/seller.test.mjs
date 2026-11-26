@@ -4,8 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { before, beforeEach, test } from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
-import jwt from 'jsonwebtoken';
-import { handleAuth, postgresStore } from '../../api/_auth.mjs';
+import { createToken, handleAuth, postgresStore } from '../../api/_auth.mjs';
 import { getProduct, listProducts } from '../../api/_catalog.mjs';
 import { STORE_SCHEMA } from '../../api/_schema.mjs';
 import { decrypt, encrypt, handleSeller, syncSellerProducts, validateProduct } from '../../api/_seller.mjs';
@@ -24,7 +23,8 @@ async function account(email, password = 'secret123') {
     { method: 'POST', rest: 'register', body: { name: email.split('@')[0], email, password }, ip: '1.1.1.1' },
     { store: postgresStore(db), domainError: async () => null },
   );
-  let authorization = `Bearer ${body.token}`;
+  // Seller Hub sessions come from the seller portal (/seller/login)
+  let authorization = `Bearer ${createToken(body.user, 'seller')}`;
   const seller = (method, path, payload, params) => handleSeller({ method, rest: path.split('/'), body: payload, params, authorization }, { db });
   const shop = (method, path, payload) => handleShop({ method, segments: path.split('/'), body: payload, authorization, ip: '1.1.1.1' }, { db });
   return {
@@ -34,9 +34,13 @@ async function account(email, password = 'secret123') {
     get authorization() {
       return authorization;
     },
+    // Applies, then an admin approves (what CRM → Sellers does), so the account can sell
     async becomeSeller(storeName) {
       const result = await seller('POST', 'register', { storeName });
-      if (result.status === 200) authorization = `Bearer ${result.body.token}`;
+      if (result.status === 201) {
+        await db("UPDATE sellers SET status = 'approved' WHERE user_id = $1", [body.user.id]);
+        await db("UPDATE users SET role = 'seller' WHERE id = $1 AND role <> 'admin'", [body.user.id]);
+      }
       return result;
     },
   };
@@ -55,14 +59,24 @@ beforeEach(async () => {
   await sync();
 });
 
-test('becoming a seller: store name rules, one store per account, a new token with the seller role', async () => {
+test('becoming a seller: an application an admin must approve; store name rules, one store per account', async () => {
   const asha = await account('asha@example.com');
   assert.equal((await asha.seller('POST', 'register', { storeName: 'ab' })).status, 400);
   assert.equal((await asha.seller('POST', 'register', { storeName: 'Asha Crafts', gstin: 'NOTAGSTIN' })).status, 400);
-  const done = await asha.becomeSeller('Asha Crafts');
-  assert.equal(done.status, 200);
-  assert.equal(jwt.decode(done.body.token).role, 'seller');
+  assert.equal((await asha.seller('POST', 'register', { storeName: 'Asha Crafts', pan: 'BAD' })).status, 400);
+  const applied = await asha.seller('POST', 'register', { storeName: 'Asha Crafts', pan: 'ABCDE1234F' });
+  assert.equal(applied.status, 201);
+  assert.equal(applied.body.status, 'pending');
+  assert.match(applied.body.seller_code, /^ARV-SEL-\d{4}-\d{6}$/);
+  // Nothing to sell with until it is approved
+  assert.match((await asha.seller('POST', 'products', PRODUCT)).body.error, /being reviewed/);
+  assert.equal((await db("SELECT role FROM users WHERE email = 'asha@example.com'"))[0].role, 'customer');
   assert.equal((await asha.seller('POST', 'register', { storeName: 'Another Store' })).status, 409);
+  await db("UPDATE sellers SET status = 'approved' WHERE user_id = $1", [asha.id]);
+  await db("UPDATE users SET role = 'seller' WHERE id = $1", [asha.id]);
+  assert.equal((await asha.seller('POST', 'products', PRODUCT)).status, 201);
+  // A customer-portal session can't use the hub at all
+  assert.equal((await handleSeller({ method: 'GET', rest: ['products'], authorization: `Bearer ${createToken({ id: asha.id, email: 'asha@example.com', role: 'seller' })}` }, { db })).status, 401);
   const ravi = await account('ravi@example.com');
   assert.match((await ravi.seller('POST', 'register', { storeName: 'asha crafts' })).body.error, /taken/);
 });

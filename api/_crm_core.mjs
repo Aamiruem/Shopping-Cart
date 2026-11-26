@@ -8,7 +8,7 @@
 //   - Each login token used on the CRM becomes a crm_sessions row (login history); a revoked session, a deactivated
 //     account, or "end all sessions" (users.sessions_revoked_at) is refused at once.
 import { createHash } from 'node:crypto';
-import { ApiError, assertSessionValid, tokenClaims } from './_auth.mjs';
+import { ApiError, assertSessionValid, portalOf, tokenClaims } from './_auth.mjs';
 
 export const PERMISSIONS = {
   'dashboard.view': 'See the CRM dashboard',
@@ -36,6 +36,11 @@ export const PERMISSIONS = {
   'catalog.view': 'See every product with its verification status',
   'catalog.verify': 'Verify, approve, reject, publish and withdraw products',
   'shipping.manage': 'Book shipments with the courier',
+  'sellers.view': 'See sellers and their applications',
+  'sellers.manage': 'Approve, reject, suspend sellers and set commission',
+  'settlements.manage': 'Create seller settlements and record payouts',
+  'payments.manage': 'Reconcile payments with the gateway',
+  'otp.diagnostics': 'See OTP delivery diagnostics and send test codes to yourself',
   'staff.manage': 'Add team members, roles and permissions',
   'settings.manage': 'Change CRM settings',
   'audit.view': 'See the audit log',
@@ -173,13 +178,22 @@ export const tokenHash = (authorization) => createHash('sha256').update(String(a
  * The signed-in CRM user, after checking their token, account, session and CRM role. Records the session (first use =
  * a CRM login in the audit log). Throws 401 / 403 otherwise.
  */
-export async function crmUser(db, authorization, { ip = 'unknown', userAgent = '' } = {}) {
+export async function crmUser(db, authorization, { ip = 'unknown', userAgent = '', mfaSetup = false } = {}) {
   const claims = tokenClaims(authorization);
-  const [u] = await db('SELECT id, name, email, role, disabled_at, sessions_revoked_at FROM users WHERE id = $1', [claims.id]);
+  const [u] = await db('SELECT id, name, email, role, disabled_at, sessions_revoked_at, mfa_secret FROM users WHERE id = $1', [claims.id]);
   if (!u) fail('Please log in again', 401);
   assertSessionValid(u, claims);
   const access = await accessFor(db, u);
   if (!access) fail('You don’t have access to the CRM', 403);
+  // Only sessions from the admin portal (/admin/login) reach the CRM: a customer or seller session never does
+  if (portalOf(claims) !== 'admin') throw new ApiError(401, 'Please sign in through the admin portal', { 'X-Portal': 'admin' });
+  // MFA: an account with an authenticator must have used it for this session; when the store requires MFA, an
+  // account without one can only set it up
+  if (u.mfa_secret && !claims.mfa) throw new ApiError(401, 'Please sign in again with your authenticator code', { 'X-Portal': 'admin' });
+  if (!u.mfa_secret && !mfaSetup) {
+    const [row] = await db("SELECT value FROM crm_settings WHERE key = 'security'");
+    if (row?.value?.requireMfa === true) fail('Set up your authenticator app first (CRM → My security)', 403);
+  }
   const [s] = await db(
     `INSERT INTO crm_sessions (user_id, token_hash, ip, user_agent, issued_at)
      VALUES ($1, $2, $3, $4, to_timestamp($5))
@@ -188,7 +202,7 @@ export async function crmUser(db, authorization, { ip = 'unknown', userAgent = '
     [u.id, tokenHash(authorization), String(ip).slice(0, 64), text(userAgent, 200), claims.iat ?? Math.floor(Date.now() / 1000)],
   );
   if (s.revoked_at) fail('This session was ended by an administrator. Please log in again.', 401);
-  const staff = { id: u.id, name: u.name, email: u.email, ...access, sessionId: s.id, ip };
+  const staff = { id: u.id, name: u.name, email: u.email, ...access, sessionId: s.id, ip, mfa: Boolean(claims.mfa), mfaEnabled: Boolean(u.mfa_secret) };
   if (s.fresh) await audit(db, staff, 'crm.login', 'session', s.id, { userAgent: text(userAgent, 200) });
   return staff;
 }
@@ -240,6 +254,12 @@ export const NOTIFICATION_EVENTS = {
   shipping_update: 'Order shipped',
   delivery_confirmation: 'Order delivered',
   support_update: 'Reply on a support ticket',
+  seller_new_order: 'Seller: a new order for their products',
+  seller_approved: 'Seller: application approved',
+  seller_rejected: 'Seller: application not approved',
+  seller_suspended: 'Seller: account suspended',
+  product_approved: 'Seller: product approved and on sale',
+  product_rejected: 'Seller: product not approved',
 };
 export const DEFAULT_SETTINGS = {
   company: { name: 'Arvixa Store', legalName: '', address: '', gstin: '', email: '', phone: '', invoicePrefix: 'ARV' },
@@ -248,6 +268,7 @@ export const DEFAULT_SETTINGS = {
   notifications: Object.fromEntries(Object.keys(NOTIFICATION_EVENTS).map((e) => [e, { email: true, sms: false, whatsapp: false }])),
   leads: { registrationLeads: true, abandonedCartLeads: true, abandonedCartHours: 6, autoAssign: false, duplicateWindowHours: 72 },
   support: { firstResponseHours: 24, resolutionHours: 72 },
+  security: { requireMfa: false },
   automations: { abandonedCartReminder: false, abandonedCartCoupon: '', birthday: false, birthdayCoupon: '', anniversary: false, winBack: false, winBackDays: 90 },
 };
 const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS);

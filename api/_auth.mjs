@@ -74,7 +74,15 @@ function jwtSecret() {
   return secret;
 }
 
-export const createToken = (u) => jwt.sign({ id: u.id, email: u.email, role: u.role }, jwtSecret(), { algorithm: 'HS256', expiresIn: TOKEN_SECONDS });
+// Three portals, three kinds of session: 'customer' (the store), 'seller' (Seller Hub) and 'admin' (the CRM, 12 hours,
+// with `mfa: true` when an authenticator code was checked). The server decides what each portal's token may do:
+// the CRM accepts only admin-portal sessions, the Seller Hub only seller- and admin-portal sessions.
+export const PORTALS = ['customer', 'seller', 'admin'];
+const ADMIN_TOKEN_SECONDS = 12 * 60 * 60;
+export const createToken = (u, portal = 'customer', extra = {}) =>
+  jwt.sign({ id: u.id, email: u.email, role: u.role, portal, ...extra }, jwtSecret(), { algorithm: 'HS256', expiresIn: portal === 'admin' ? ADMIN_TOKEN_SECONDS : TOKEN_SECONDS });
+/** The portal a token was issued for. Tokens from before the portals existed are customer sessions. */
+export const portalOf = (claims) => (PORTALS.includes(claims?.portal) ? claims.portal : 'customer');
 
 /** The verified token's claims ({ id, email, role, iat, exp }); throws 401 for a missing, forged or expired token. */
 export function tokenClaims(header) {
@@ -114,11 +122,23 @@ async function publicUser(u, store) {
     hasPassword: Boolean(u.password_hash),
     googleLinked: Boolean(u.google_id),
     storeName: ['seller', 'admin'].includes(u.role) ? await store.storeName(u.id) : null,
+    seller: await sellerInfo(store.db, u.id), // { status, sellerId } once they applied to sell
+    mfaEnabled: Boolean(u.mfa_secret),
     // CRM access (role and permissions) decides whether "CRM Dashboard" shows in the More menu. The server checks
     // permissions again on every CRM request; this is only for the menu.
     crm: await crmAccess(store.db, u),
     createdAt: u.created_at,
   };
+}
+
+async function sellerInfo(db, userId) {
+  if (!db) return null;
+  try {
+    const [s] = await db('SELECT status, seller_code FROM sellers WHERE user_id = $1', [userId]);
+    return s ? { status: s.status, sellerId: s.seller_code } : null;
+  } catch {
+    return null;
+  }
 }
 
 async function crmAccess(db, u) {
@@ -132,7 +152,7 @@ async function crmAccess(db, u) {
   }
 }
 
-export const session = async (u, store) => ({ token: createToken(u), user: await publicUser(u, store) });
+export const session = async (u, store, portal = 'customer', extra = {}) => ({ token: createToken(u, portal, extra), user: { ...(await publicUser(u, store)), portal } });
 
 export async function limit(store, key, max, message = 'Too many login attempts. Please try again in 15 minutes.') {
   const digest = createHash('sha256').update(key).digest('hex'); // the table never holds a raw IP or email
@@ -364,8 +384,72 @@ async function login(body, ctx) {
   if (user && !user.password_hash) throw new ApiError(400, 'This account uses Google sign-in. Please use “Continue with Google”.');
   if (!user || !(await bcrypt.compare(password, user.password_hash))) throw new ApiError(401, 'Invalid email or password');
   assertSessionValid({ disabled_at: user.disabled_at }); // only after the password: never reveals the state to a guesser
+  // The store admin's account is privileged: it signs in only through the admin portal (with MFA when enabled)
+  if (user.role === 'admin') throw new ApiError(403, 'This account signs in through the admin portal.');
   await ctx.store.touchLogin(user.id);
   return { body: await session(user, ctx.store) };
+}
+
+// ---------- Admin portal: /admin/login (never linked from the store) ----------
+// Only the store admin and active CRM team members. Password, then an authenticator code when MFA is on. Accounts are
+// provisioned by an admin (CRM → Team); there is no public admin sign-up.
+async function adminLogin(body, ctx) {
+  const email = normalizeEmail(body.email);
+  const password = text(body.password);
+  if (emailError(email) || !password) throw new ApiError(400, 'Please enter your email and password');
+  await limit(ctx.store, `admin-login:${ctx.ip}`, 10, 'Too many sign-in attempts. Please try again in 15 minutes.');
+  await limit(ctx.store, `admin-login-email:${email}`, 6, 'Too many sign-in attempts. Please try again in 15 minutes.');
+  const user = await ctx.store.findByEmail(email);
+  const ok = user?.password_hash && (await bcrypt.compare(password, user.password_hash));
+  const { accessFor, audit } = await import('./_crm_core.mjs');
+  const access = ok && !user.disabled_at ? await accessFor(ctx.store.db, user) : null;
+  if (!access) {
+    // One answer for a wrong password, a customer account or no account at all
+    if (user) await audit(ctx.store.db, { id: user.id, name: user.name, ip: ctx.ip }, 'admin.login_failed', 'user', user.id, {}).catch(() => {});
+    throw new ApiError(401, 'Invalid credentials for the admin portal');
+  }
+  let mfa = false;
+  if (user.mfa_secret) {
+    if (!body.code) return { body: { mfaRequired: true } };
+    const { verifyUserCode } = await import('./_mfa.mjs');
+    if (!(await verifyUserCode(ctx.store.db, user, body.code))) {
+      await audit(ctx.store.db, { id: user.id, name: user.name, ip: ctx.ip }, 'admin.mfa_failed', 'user', user.id, {}).catch(() => {});
+      throw new ApiError(401, 'That authenticator code is not correct or was already used');
+    }
+    mfa = true;
+  }
+  await ctx.store.touchLogin(user.id);
+  await audit(ctx.store.db, { id: user.id, name: user.name, ip: ctx.ip }, 'admin.login', 'user', user.id, { mfa }).catch(() => {});
+  return { body: await session(user, ctx.store, 'admin', { mfa }) };
+}
+
+// ---------- Seller portal: /seller/login and /seller/register ----------
+// A separate sign-in for selling. Anyone may apply; only an admin's approval lets them sell (api/_seller.mjs).
+async function sellerLogin(body, ctx) {
+  const email = normalizeEmail(body.email);
+  const password = text(body.password);
+  if (emailError(email) || !password) throw new ApiError(400, 'Please enter your email and password');
+  await limit(ctx.store, `login:${ctx.ip}`, IP_LIMIT);
+  await limit(ctx.store, `login-email:${email}`, EMAIL_LIMIT);
+  const user = await ctx.store.findByEmail(email);
+  if (!user || !user.password_hash || !(await bcrypt.compare(password, user.password_hash))) throw new ApiError(401, 'Invalid email or password');
+  assertSessionValid({ disabled_at: user.disabled_at });
+  if (user.role === 'admin') throw new ApiError(403, 'This account signs in through the admin portal.');
+  await ctx.store.touchLogin(user.id);
+  return { body: await session(user, ctx.store, 'seller') };
+}
+
+async function sellerSignup(body, ctx) {
+  const name = text(body.name).trim();
+  const email = normalizeEmail(body.email);
+  const phone = text(body.phone).trim() || null;
+  await limit(ctx.store, `register:${ctx.ip}`, IP_LIMIT);
+  const error = nameError(name) || emailError(email) || (phone ? phoneError(phone) : 'Please enter your mobile number') || passwordError(body.password) || (await ctx.domainError(email));
+  if (error) throw new ApiError(400, error);
+  await emailFree(ctx, email);
+  const user = await ctx.store.create({ name, email, phone, passwordHash: await bcrypt.hash(body.password, BCRYPT_ROUNDS) });
+  if (!user) throw new ApiError(409, 'An account with this email already exists. Please sign in.');
+  return { status: 201, body: await session(user, ctx.store, 'seller') };
 }
 
 async function signedInUser(ctx) {
@@ -402,7 +486,10 @@ async function changePassword(body, ctx) {
 const ROUTES = {
   'POST register': register,
   'POST login': login,
-  'GET me': async (_, ctx) => ({ body: await publicUser(await signedInUser(ctx), ctx.store) }),
+  'POST admin/login': adminLogin,
+  'POST seller/login': sellerLogin,
+  'POST seller/register': sellerSignup,
+  'GET me': async (_, ctx) => ({ body: { ...(await publicUser(await signedInUser(ctx), ctx.store)), portal: portalOf(tokenClaims(ctx.authorization)) } }),
   'PUT me': updateProfile,
   'PUT password': changePassword,
   // One-time codes: which channels work, signup, passwordless login, password reset, phone numbers, admin report

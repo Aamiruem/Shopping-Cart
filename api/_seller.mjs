@@ -3,7 +3,7 @@
 // live in `seller_products` (one JSON document per product, in the catalog's shape) and join the catalog within 30 s.
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import { ApiError, currentUserId, postgresStore, query, safely, session } from './_auth.mjs';
+import { ApiError, assertSessionValid, portalOf, query, safely, tokenClaims } from './_auth.mjs';
 import { setSellerProducts } from './_catalog.mjs';
 import { razorpayClient } from './_payments.mjs';
 import { listCatalog, resetCatalogProduct, updateCatalogProduct } from './_inventory.mjs';
@@ -60,30 +60,76 @@ export function decrypt(token) {
 }
 
 // ---------- Who may use the hub ----------
+// The store admin, or a seller whose application an admin approved and who isn't suspended
 async function sellerRole(db, userId) {
-  const [row] = await db('SELECT role FROM users WHERE id = $1', [userId]);
+  const [row] = await db('SELECT u.role, s.status FROM users u LEFT JOIN sellers s ON s.user_id = u.id WHERE u.id = $1', [userId]);
   if (!row) fail('Account not found', 401);
-  if (!['seller', 'admin'].includes(row.role)) fail('Seller account required', 403);
-  return row.role;
+  if (row.role === 'admin') return 'admin';
+  if (!row.status) fail('Seller account required', 403);
+  if (row.status === 'pending') fail('Your seller application is being reviewed. You can sell once it is approved.', 403);
+  if (row.status === 'rejected') fail('Your seller application was not approved', 403);
+  if (row.status === 'suspended') fail('Your seller account is suspended. Please contact the store team.', 403);
+  if (row.role !== 'seller') fail('Seller account required', 403);
+  return 'seller';
 }
 
-// ---------- Becoming a seller, profile and payouts ----------
+// ---------- Applying to sell (an admin reviews it in CRM → Sellers), profile and payouts ----------
+const PAN_RE = /^[A-Z]{5}\d{4}[A-Z]$/;
+const BUSINESS_TYPES = ['individual', 'proprietorship', 'partnership', 'llp', 'private_limited', 'other'];
+const DOC_TYPES = ['pan', 'gst_certificate', 'cancelled_cheque', 'address_proof', 'trade_licence', 'other'];
+
 async function register({ db, userId, body }) {
   const store = text(body.storeName);
   const gstin = text(body.gstin).toUpperCase() || null;
+  const pan = text(body.pan).toUpperCase() || null;
   const phone = text(body.phone) || null;
+  const businessType = BUSINESS_TYPES.includes(body.businessType) ? body.businessType : 'individual';
+  const address = text(body.businessAddress);
   if (store.length < 3 || store.length > 120) fail('Store name must be 3–120 characters');
   if (gstin && !GSTIN_RE.test(gstin)) fail('Please enter a valid 15-character GSTIN, e.g. 29ABCDE1234F1Z5');
+  if (pan && !PAN_RE.test(pan)) fail('Please enter a valid 10-character PAN, e.g. ABCDE1234F');
   if (phone && !PHONE_RE.test(phone)) fail('Please enter a valid 10-digit mobile number starting with 6, 7, 8 or 9');
-  if ((await db('SELECT 1 FROM sellers WHERE user_id = $1', [userId])).length) fail('You are already registered as a seller', 409);
-  if ((await db('SELECT 1 FROM sellers WHERE lower(store_name) = lower($1)', [store])).length) fail('That store name is taken. Please choose another.', 409);
-  const [user] = await db(
-    `WITH store AS (INSERT INTO sellers (user_id, store_name, gstin, phone) VALUES ($1, $2, $3, $4) RETURNING user_id)
-     UPDATE users SET role = CASE WHEN role = 'admin' THEN role ELSE 'seller' END WHERE id = (SELECT user_id FROM store) RETURNING *`,
-    [userId, store, gstin, phone],
+  if (address && address.length > 400) fail('The business address is too long');
+  const [existing] = await db('SELECT status FROM sellers WHERE user_id = $1', [userId]);
+  if (existing && existing.status !== 'rejected') fail(existing.status === 'pending' ? 'Your application is already being reviewed' : 'You are already registered as a seller', 409);
+  if ((await db('SELECT 1 FROM sellers WHERE lower(store_name) = lower($1) AND user_id <> $2', [store, userId])).length) fail('That store name is taken. Please choose another.', 409);
+  // A rejected applicant may apply again: the same row goes back to pending. Nobody sells until approved.
+  await db(
+    `INSERT INTO sellers (user_id, store_name, gstin, phone, pan, business_type, business_address, status) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+     ON CONFLICT (user_id) DO UPDATE SET store_name = EXCLUDED.store_name, gstin = EXCLUDED.gstin, phone = EXCLUDED.phone, pan = EXCLUDED.pan,
+       business_type = EXCLUDED.business_type, business_address = EXCLUDED.business_address, status = 'pending', review_note = NULL, updated_at = NOW()`,
+    [userId, store, gstin, phone, pan, businessType, address || null],
   );
-  // A new token: the role is inside it
-  return { body: await session(user, postgresStore(db)) };
+  return { status: 201, body: await application({ db, userId }).then((r) => r.body) };
+}
+
+/** The applicant's own application: status, what's still needed, documents */
+async function application({ db, userId }) {
+  const [s] = await db(
+    `SELECT s.store_name, s.gstin, s.pan, s.phone, s.business_type, s.business_address, s.documents, s.status, s.review_note, s.seller_code,
+            s.created_at, s.reviewed_at, u.email_verified, u.phone_verified
+       FROM sellers s JOIN users u ON u.id = s.user_id WHERE s.user_id = $1`,
+    [userId],
+  );
+  if (!s) return { body: null };
+  const missing = [];
+  if (!s.email_verified && !s.phone_verified) missing.push('Verify your email or mobile number (Account → Profile)');
+  if (!s.pan) missing.push('PAN');
+  if (!(s.documents || []).some((d) => d.type === 'pan')) missing.push('A copy of the PAN card');
+  if (!(s.documents || []).some((d) => d.type === 'cancelled_cheque')) missing.push('A cancelled cheque or bank statement for payouts');
+  return { body: { ...s, missing } };
+}
+
+/** Documents for the review: uploaded first through /api/seller/uploads (Vercel Blob), then attached here */
+async function addDocument({ db, userId, body }) {
+  const type = DOC_TYPES.includes(body.type) ? body.type : fail(`Document type must be one of: ${DOC_TYPES.join(', ')}`);
+  const url = text(body.url);
+  if (!/^https:\/\/[\w.-]+\.public\.blob\.vercel-storage\.com\//.test(url)) fail('Upload the file first');
+  const [s] = await db('SELECT status, documents FROM sellers WHERE user_id = $1', [userId]);
+  if (!s) fail('Apply to sell first', 404);
+  if ((s.documents || []).length >= 10) fail('At most 10 documents');
+  await db(`UPDATE sellers SET documents = documents || $2::jsonb, updated_at = NOW() WHERE user_id = $1`, [userId, JSON.stringify([{ type, url, uploaded_at: new Date().toISOString() }])]);
+  return application({ db, userId });
 }
 
 const mask = (last4) => (last4 ? `••••${last4}` : null);
@@ -439,7 +485,7 @@ export async function syncSellerProducts(db = query, now = Date.now()) {
   try {
     const rows = await db(
       `SELECT p.*, s.store_name FROM seller_products p LEFT JOIN sellers s ON s.user_id = p.seller_id
-        WHERE (p.data->>'active')::boolean IS NOT FALSE ORDER BY p.created_at`,
+        WHERE (p.data->>'active')::boolean IS NOT FALSE AND (s.status IS NULL OR s.status = 'approved') ORDER BY p.created_at`,
       [],
     );
     setSellerProducts(rows.map(productJson));
@@ -452,6 +498,8 @@ export async function syncSellerProducts(db = query, now = Date.now()) {
 // ---------- Routes ----------
 const ROUTES = {
   'POST register': register,
+  'GET application': application,
+  'POST application/documents': addDocument,
   'GET profile': getProfile,
   'GET overview': ({ db, userId, role }) => overview({ db, userId, role }).then((body) => ({ body })),
   'PUT profile': updateProfile,
@@ -466,6 +514,10 @@ const ROUTES = {
   'GET orders': myOrders,
   'PATCH orders/:id': updateFulfilment,
   'GET earnings': earnings,
+  'GET settlements': async ({ db, userId, role }) => ({
+    body: await db(`SELECT id, period_from, period_to, gross::float, commission::float, net::float, lines, status, reference, paid_at, created_at
+                      FROM seller_settlements WHERE seller_id = $1 ORDER BY period_to DESC`, [role === 'admin' ? -1 : userId]),
+  }),
   'GET returns': listReturns,
   'PATCH returns/:id': actOnReturn,
   // The store's own catalog: the admin edits price, stock, name, description, or hides a product
@@ -482,6 +534,7 @@ function findRoute(method, rest) {
   const [first, second, third, ...extra] = rest;
   if (extra.length) return null;
   if (first === 'products' && second === 'bulk' && !third) return { key: `${method} products/bulk` };
+  if (first === 'application' && second === 'documents' && !third) return Object.hasOwn(ROUTES, `${method} application/documents`) ? { key: `${method} application/documents` } : null;
   const key = [first, second && ':id', third].filter(Boolean).join('/');
   return Object.hasOwn(ROUTES, `${method} ${key}`) ? { key: `${method} ${key}`, id: second } : null;
 }
@@ -490,9 +543,15 @@ export const isSellerRoute = (method, rest) => Boolean(findRoute(method, rest));
 
 export function handleSeller({ method, rest, body, params = {}, authorization }, { db = query, rz = razorpayClient() } = {}) {
   return safely(async () => {
-    const userId = currentUserId(authorization);
+    const claims = tokenClaims(authorization);
+    const userId = claims.id;
+    // Seller Hub is for seller-portal sessions (/seller/login) and the admin portal; a customer session can't use it
+    if (!['seller', 'admin'].includes(portalOf(claims))) fail('Please sign in through the seller portal', 401);
+    const [account] = await db('SELECT disabled_at, sessions_revoked_at FROM users WHERE id = $1', [userId]);
+    if (!account) fail('Account not found', 401);
+    assertSessionValid(account, claims);
     const { key, id } = findRoute(method, rest);
-    const role = key === 'POST register' ? null : await sellerRole(db, userId);
+    const role = ['POST register', 'GET application', 'POST application/documents'].includes(key) ? null : await sellerRole(db, userId);
     return ROUTES[key]({ db, userId, role, id, body: body ?? {}, params, rz });
   });
 }

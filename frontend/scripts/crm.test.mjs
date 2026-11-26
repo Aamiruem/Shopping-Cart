@@ -1,11 +1,12 @@
 // Run with: npm test (from frontend/). The CRM (api/_crm*.mjs) on PGlite, a real PostgreSQL engine, with the schema the
 // live database gets. Providers are never called: tests pass a fake `fetch` and their own environment.
+import { portalToken } from './portal-token.mjs';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { before, beforeEach, test } from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
-import { handleAuth, postgresStore } from '../../api/_auth.mjs';
+import { createToken, handleAuth, postgresStore } from '../../api/_auth.mjs';
 import { listProducts } from '../../api/_catalog.mjs';
 import { handleCrm, isCrmRoute } from '../../api/_crm.mjs';
 import { forecastSeries } from '../../api/_crm_insights.mjs';
@@ -28,9 +29,9 @@ async function person(email, role = 'customer', { crmRole = null, phone = '98765
     { method: 'POST', rest: 'register', body: { name: email.split('@')[0].replace(/^./, (c) => c.toUpperCase()), email, password: 'secret123', phone }, ip: `9.9.9.${++n}` },
     { store: postgresStore(db), domainError: async () => null, env: { JWT_SECRET: process.env.JWT_SECRET } },
   );
-  if (role !== 'customer') await db('UPDATE users SET role = $1 WHERE id = $2', [role, body.user.id]);
   if (crmRole) await db('INSERT INTO crm_staff (user_id, role_key) VALUES ($1, $2)', [body.user.id, crmRole]);
-  const authorization = `Bearer ${body.token}`;
+  // CRM team members and admins sign in through the admin portal; customers through the store
+  const authorization = crmRole ? `Bearer ${createToken({ ...body.user, role: 'customer' }, 'admin', { mfa: false })}` : role === 'customer' ? `Bearer ${body.token}` : await portalToken(db, body.user.id, role);
   return {
     id: body.user.id,
     token: body.token,

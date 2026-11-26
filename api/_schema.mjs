@@ -388,4 +388,68 @@ CREATE TABLE IF NOT EXISTS shipment_events (
 );
 -- Delivery estimate and courier check made at checkout, kept with the order
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_check JSONB;
+
+-- ================= Separate portals, seller onboarding, MFA, OTP delivery, settlements =================
+-- Sellers apply and are reviewed: pending -> approved | rejected; an approved seller can be suspended. Sellers that
+-- already existed keep selling (they become 'approved' once); every new application starts 'pending'.
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS status VARCHAR(12) NOT NULL DEFAULT 'approved';
+ALTER TABLE sellers ALTER COLUMN status SET DEFAULT 'pending';
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS business_type    VARCHAR(30);
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS pan              VARCHAR(10);
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS business_address TEXT;
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS documents        JSONB NOT NULL DEFAULT '[]';   -- [{ type, url, uploaded_at }]
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS review_note      TEXT;
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS reviewed_by      INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS reviewed_at      TIMESTAMPTZ;
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS commission_rate  NUMERIC(5, 2) NOT NULL DEFAULT 10;
+CREATE SEQUENCE IF NOT EXISTS arv_seller_seq;
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS seller_code VARCHAR(24);
+UPDATE sellers SET seller_code = 'ARV-SEL-' || to_char(created_at, 'YYYY') || '-' || lpad(nextval('arv_seller_seq')::text, 6, '0')
+ WHERE seller_code IS NULL AND user_id IN (SELECT user_id FROM sellers WHERE seller_code IS NULL ORDER BY created_at, user_id);
+ALTER TABLE sellers ALTER COLUMN seller_code SET DEFAULT 'ARV-SEL-' || to_char(NOW(), 'YYYY') || '-' || lpad(nextval('arv_seller_seq')::text, 6, '0');
+CREATE UNIQUE INDEX IF NOT EXISTS sellers_code_idx ON sellers (seller_code);
+CREATE INDEX IF NOT EXISTS sellers_status_idx ON sellers (status, created_at DESC);
+
+-- What each approved seller is paid: periods of delivered, not-returned sales minus the commission
+CREATE TABLE IF NOT EXISTS seller_settlements (
+  id          SERIAL        PRIMARY KEY,
+  seller_id   INTEGER       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  period_from DATE          NOT NULL,
+  period_to   DATE          NOT NULL,
+  gross       NUMERIC(12, 2) NOT NULL,
+  commission  NUMERIC(12, 2) NOT NULL,
+  net         NUMERIC(12, 2) NOT NULL,
+  lines       INTEGER       NOT NULL,
+  status      VARCHAR(10)   NOT NULL DEFAULT 'pending',  -- pending | paid
+  reference   VARCHAR(60),                               -- UTR of the transfer
+  paid_at     TIMESTAMPTZ,
+  created_by  INTEGER       REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS seller_settlements_seller_idx ON seller_settlements (seller_id, period_to DESC);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS settlement_id INTEGER REFERENCES seller_settlements(id) ON DELETE SET NULL;
+
+-- Authenticator-app MFA for admin-portal accounts. The secret is encrypted (AES-256-GCM); the last used time step
+-- stops a code being replayed.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret         TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_pending_secret TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled_at     TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_last_step      BIGINT;
+
+-- OTP delivery: what the provider said and when (delivered only from the provider's own report)
+ALTER TABLE otp_delivery_logs ADD COLUMN IF NOT EXISTS provider_code VARCHAR(40);
+ALTER TABLE otp_delivery_logs ADD COLUMN IF NOT EXISTS latency_ms    INTEGER;
+ALTER TABLE otp_delivery_logs ADD COLUMN IF NOT EXISTS attempts      INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE otp_delivery_logs ADD COLUMN IF NOT EXISTS delivered_at  TIMESTAMPTZ;
+ALTER TABLE otp_delivery_logs ADD COLUMN IF NOT EXISTS updated_at    TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS otp_delivery_logs_ref_idx ON otp_delivery_logs (provider, provider_ref) WHERE provider_ref IS NOT NULL;
+
+-- Address details for couriers: house, street, area and landmark (line1 keeps them together for older code), district,
+-- country
+ALTER TABLE addresses ADD COLUMN IF NOT EXISTS house    VARCHAR(80);
+ALTER TABLE addresses ADD COLUMN IF NOT EXISTS street   VARCHAR(120);
+ALTER TABLE addresses ADD COLUMN IF NOT EXISTS area     VARCHAR(120);
+ALTER TABLE addresses ADD COLUMN IF NOT EXISTS landmark VARCHAR(120);
+ALTER TABLE addresses ADD COLUMN IF NOT EXISTS district VARCHAR(100);
+ALTER TABLE addresses ADD COLUMN IF NOT EXISTS country  VARCHAR(40) NOT NULL DEFAULT 'India';
 `;

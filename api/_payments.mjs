@@ -26,7 +26,10 @@ function sameHmac(secret, message, signature) {
 export function razorpayClient(env = process.env) {
   const keyId = env.RAZORPAY_KEY_ID || '';
   const secret = env.RAZORPAY_KEY_SECRET || '';
-  const configured = Boolean(keyId && secret);
+  // Test and live are kept apart: PAYMENTS_MODE (default "test") must match the key (rzp_test_… / rzp_live_…), and live
+  // needs PAYMENTS_MODE=live set on purpose, after the test-mode checks have passed. A mismatch leaves payments off.
+  const mode = env.PAYMENTS_MODE === 'live' ? 'live' : 'test';
+  const configured = Boolean(keyId && secret && keyId.startsWith(`rzp_${mode}_`));
   async function call(method, path, body) {
     if (!configured) throw new ApiError(503, 'Online payments are not set up yet. Please choose cash on delivery.');
     let res;
@@ -47,7 +50,10 @@ export function razorpayClient(env = process.env) {
   const id = (value) => encodeURIComponent(String(value));
   return {
     configured,
+    mode,
+    modeMismatch: Boolean(keyId && secret && !keyId.startsWith(`rzp_${mode}_`)),
     keyId: configured ? keyId : null,
+    fetchOrderPayments: (orderId) => call('GET', `/orders/${id(orderId)}/payments`),
     // Razorpay works in paise (1 rupee = 100 paise)
     createOrder: (rupees, receipt, notes) => call('POST', '/orders', { amount: Math.round(rupees * 100), currency: 'INR', receipt, notes }),
     // expand[]=card says whether a card was credit or debit

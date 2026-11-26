@@ -214,7 +214,7 @@ const rupees = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { maximumFrac
 async function orderFacts(db, orderId) {
   const [o] = await db('SELECT id, order_number, user_id, total, payment_method, status, created_at FROM orders WHERE id = $1', [orderId]);
   if (!o) return null;
-  const items = await db('SELECT name, qty, price, courier, tracking_number FROM order_items WHERE order_id = $1 ORDER BY id', [orderId]);
+  const items = await db('SELECT name, qty, price, courier, tracking_number, seller_id FROM order_items WHERE order_id = $1 ORDER BY id', [orderId]);
   return { ...o, items };
 }
 
@@ -257,6 +257,36 @@ export function compose(event, { user, order, ticket, reply, payment, company, e
       text: `Hi ${first},\n\nYour payment of ${rupees(payment.amount)} didn’t go through, so no order was placed. If any money left your account, it is returned automatically by your bank or payment app, usually within 5–7 working days.\n\nYour cart is saved: you can try again${base ? ` at ${base}/cart` : ''}, or choose cash on delivery.`,
       short: `Payment of ${rupees(payment.amount)} failed; no order was placed. Your cart is saved to try again.`,
     },
+    seller_new_order: order && {
+      subject: `New order ${no} for your store`,
+      text: `Hi ${first},\n\nA customer ordered from your store (${no}, ${order.payment_method === 'cod' ? 'cash on delivery' : 'paid online'}):\n\n${order.items.filter((i) => i.seller_id === user.id).map((i) => `• ${i.name} × ${i.qty}`).join('\n')}\n\nPack it and mark it shipped in the Seller Hub${base ? `: ${base}/seller/orders` : ''}.`,
+      short: `New order ${no} for your store. Open the Seller Hub to pack and ship it.`,
+    },
+    seller_approved: {
+      subject: 'Your seller application is approved',
+      text: `Hi ${first},\n\nWelcome aboard: your Arvixa seller account is approved. Sign in to the Seller Hub to add products; each product is checked by our team before it goes on sale.${base ? `\n\n${base}/seller/login` : ''}`,
+      short: 'Your Arvixa seller account is approved. Sign in to the Seller Hub to add products.',
+    },
+    seller_rejected: {
+      subject: 'About your seller application',
+      text: `Hi ${first},\n\nWe couldn’t approve your seller application this time:\n\n“${String(reply || '').slice(0, 800)}”\n\nYou can update it and apply again from the seller portal.`,
+      short: 'Your Arvixa seller application was not approved. See your email or the seller portal for why.',
+    },
+    seller_suspended: {
+      subject: 'Your seller account is suspended',
+      text: `Hi ${first},\n\nYour Arvixa seller account has been suspended and your products are off sale:\n\n“${String(reply || '').slice(0, 800)}”\n\nPlease contact the store team to resolve this.`,
+      short: 'Your Arvixa seller account is suspended. Please contact the store team.',
+    },
+    product_approved: {
+      subject: 'Your product is approved and on sale',
+      text: `Hi ${first},\n\n“${String(reply || '').slice(0, 200)}” passed verification and is now on sale.`,
+      short: `Your product ${String(reply || '').slice(0, 60)} is approved and on sale.`,
+    },
+    product_rejected: {
+      subject: 'Your product was not approved',
+      text: `Hi ${first},\n\n${String(reply || '').slice(0, 800)}\n\nYou can correct it in the Seller Hub; editing sends it back for verification.`,
+      short: 'One of your products was not approved. See the Seller Hub for why.',
+    },
     support_update: ticket && {
       subject: `Update on your ticket #${ticket.id}: ${ticket.subject}`,
       text: `Hi ${first},\n\nOur support team replied to your ticket #${ticket.id}:\n\n“${String(reply || '').slice(0, 1500)}”${base ? `\n\nReply here: ${base}/help` : ''}`,
@@ -285,7 +315,7 @@ export async function notify(db, event, { userId, orderId = null, ticketId = nul
     const [payment] = paymentId ? await db('SELECT id, amount, error FROM payments WHERE id = $1 AND user_id = $2', [paymentId, userId]) : [];
     const content = compose(event, { user, order, ticket, reply, payment, company: settings.company, env });
     if (!content) return [];
-    const ref = paymentId ? `payment:${paymentId}` : orderId ? `order:${orderId}` : ticketId ? `ticket:${ticketId}:${messageId}` : `user:${userId}`;
+    const ref = paymentId ? `payment:${paymentId}` : orderId ? `order:${orderId}:${userId}` : !ticketId && reply ? `user:${userId}:${Date.now()}` : ticketId ? `ticket:${ticketId}:${messageId}` : `user:${userId}`;
     const sent = [];
     for (const channel of wanted) {
       // Texts go only to a number the customer verified: a mistyped number must not get someone else's order details

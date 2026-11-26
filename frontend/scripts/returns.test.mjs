@@ -1,5 +1,6 @@
 // Run with: npm test (from frontend/). Returns, refunds (api/_returns.mjs) and complaints (api/_support.mjs) on PGlite,
 // a real PostgreSQL engine, with the same schema the live database gets.
+import { portalToken } from './portal-token.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { before, beforeEach, test } from 'node:test';
@@ -40,8 +41,7 @@ async function person(email, role = 'customer') {
     { method: 'POST', rest: 'register', body: { name: email.split('@')[0], email, password: 'secret123' }, ip: '1.1.1.1' },
     { store: postgresStore(db), domainError: async () => null },
   );
-  if (role !== 'customer') await db('UPDATE users SET role = $1 WHERE id = $2', [role, body.user.id]);
-  const authorization = `Bearer ${body.token}`;
+  const authorization = role === 'customer' ? `Bearer ${body.token}` : await portalToken(db, body.user.id, role);
   return {
     id: body.user.id,
     shop: (method, path, payload) => handleShop({ method, segments: path.split('/'), body: payload, authorization, ip: '1.1.1.1' }, { db, rz }),
@@ -220,7 +220,7 @@ test('sellers handle returns of their own orders only; manual refunds are for th
   assert.deepEqual(queue.map((r) => [r.order_id, r.canManage]).sort(), [[o.id, true], [mixed.id, false]].sort());
   assert.equal((await other.seller('PATCH', `returns/${o.id}`, { action: 'approve' })).status, 404);
   assert.equal((await mine.seller('PATCH', `returns/${mixed.id}`, { action: 'approve' })).status, 403);
-  assert.equal((await asha.seller('GET', 'returns')).status, 403); // customers aren't sellers
+  assert.equal((await asha.seller('GET', 'returns')).status, 401); // a customer session isn't a seller-portal session
   await mine.seller('PATCH', `returns/${o.id}`, { action: 'approve' });
   // The seller can't move an order with a return in progress back along the delivery steps
   assert.match((await mine.seller('PATCH', `orders/${o.id}`, { fulfilment: 'shipped' })).body.error, /return in progress/);

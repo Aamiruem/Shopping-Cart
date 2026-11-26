@@ -29,10 +29,11 @@ export const discountPercent = (price, mrp) => (!mrp || mrp <= price ? 0 : Math.
 //   discontinued          not listed; its page says so   unavailable           not listed; its page says so
 // A product without a status is pending verification once the store requires verification (CRM → Catalog; switched
 // on for the live database by scripts/setup-db.mjs), so no unchecked product can be sold by default.
-export const PRODUCT_STATUSES = ['draft', 'pending_verification', 'available', 'out_of_stock', 'coming_soon', 'discontinued', 'unavailable'];
+export const PRODUCT_STATUSES = ['draft', 'pending_verification', 'approved', 'available', 'out_of_stock', 'coming_soon', 'discontinued', 'unavailable', 'rejected'];
 export const PUBLIC_STATUSES = ['available', 'out_of_stock', 'coming_soon'];
 const LISTED = ['available', 'out_of_stock'];
 const VISIBLE = [...PUBLIC_STATUSES, 'discontinued', 'unavailable'];
+// approved = verified and ready, not yet published; rejected = failed verification: neither is ever public
 let requireVerification = false;
 
 export function statusOf(p) {
@@ -41,9 +42,16 @@ export function statusOf(p) {
   return requireVerification ? 'pending_verification' : 'available';
 }
 
-/** What shoppers see: the status, with "available" turning into out of stock when none are left */
+/**
+ * What shoppers see: the status, with "available" turning into out of stock when none are left. The store's own
+ * catalogue items that nobody has verified yet appear as Coming Soon, never purchasable and with no price (the file's
+ * prices aren't confirmed, so none is shown). Unverified seller submissions are never shown.
+ */
 function withAvailability(p) {
   const status = statusOf(p);
+  if (status === 'pending_verification' && !p.sellerId) {
+    return { ...p, status, availability: 'coming_soon', purchasable: false, unverified: true, price: null, mrp: null, discount: 0, stock: null };
+  }
   const availability = status === 'available' && !(p.stock > 0) ? 'out_of_stock' : status;
   return { ...p, status, availability, purchasable: availability === 'available' };
 }
@@ -96,7 +104,7 @@ function visibleProducts() {
     const reviews = reviewStats.get(p._id);
     return reviews ? { ...p, reviewRating: reviews.average, reviewCount: reviews.count } : p;
   };
-  visible = [...loadBaseProducts().map(withState), ...sellerProducts.map(withReviews)].map(withAvailability).filter((p) => VISIBLE.includes(p.status));
+  visible = [...loadBaseProducts().map(withState), ...sellerProducts.map(withReviews)].map(withAvailability).filter((p) => VISIBLE.includes(p.availability));
   return visible;
 }
 
@@ -104,15 +112,22 @@ function visibleProducts() {
 export function loadProducts() {
   if (merged) return merged;
   visible = null;
-  merged = visibleProducts().filter((p) => LISTED.includes(p.status));
+  merged = visibleProducts().filter((p) => LISTED.includes(p.availability));
   return merged;
 }
 
-/** Verified products announced but not on sale yet (their own section; never purchasable) */
-export const comingSoon = () => (loadProducts(), visibleProducts().filter((p) => p.status === 'coming_soon'));
+/** Products announced but not on sale (their own section; never purchasable): verified ones first */
+export const comingSoon = () => (loadProducts(), visibleProducts().filter((p) => p.availability === 'coming_soon').sort((a, b) => Number(Boolean(a.unverified)) - Number(Boolean(b.unverified))));
+/** What the public catalogue pages browse: products on sale (or sold out), then Coming Soon */
+const browsable = () => [...loadProducts(), ...comingSoon()];
 
 /** The store's own catalog for the admin, hidden products included. */
-export const storeCatalog = () => loadBaseProducts().map((p) => ({ ...withAvailability(withState(p)), edited: overrides.has(p._id) ? Object.keys(overrides.get(p._id)) : [] }));
+// The admin sees the real values and status (nothing hidden), to verify against
+export const storeCatalog = () => loadBaseProducts().map((p) => {
+  const s = withState(p);
+  const status = statusOf(s);
+  return { ...s, status, availability: status === 'available' && !(s.stock > 0) ? 'out_of_stock' : status, edited: overrides.has(p._id) ? Object.keys(overrides.get(p._id)) : [] };
+});
 
 /** The store's own product as it came from the file, before any edit. */
 export const baseProduct = (id) => loadBaseProducts().find((p) => p._id === id) || null;
@@ -179,7 +194,7 @@ export function listProducts(params = {}) {
   const minRating = number(params.minRating);
   const base = baseFilter(params);
   const brands = brand ? brand.split(',') : null;
-  const found = loadProducts().filter(
+  const found = browsable().filter(
     (p) =>
       base(p) &&
       (!subCategory || p.subCategory === subCategory) &&
@@ -187,8 +202,8 @@ export function listProducts(params = {}) {
       anyOf(p.colors, color) &&
       anyOf(p.ageGroups, ageGroup) &&
       (!brands || brands.includes(p.brand)) &&
-      (low === null || p.price >= low) &&
-      (high === null || p.price <= high) &&
+      (low === null || (p.price !== null && p.price >= low)) &&
+      (high === null || (p.price !== null && p.price <= high)) &&
       (minRating === null || p.rating >= minRating) &&
       (featured !== 'true' || p.featured === true),
   );
@@ -199,7 +214,8 @@ export function listProducts(params = {}) {
   const limit = Math.max(1, Math.min(Number(params.limit) || 200, 200));
   // skip pages through long lists ("Load more"); the response stays a plain array
   const skip = Math.max(0, Math.min(Math.trunc(Number(params.skip)) || 0, 5000));
-  const sorted = found.sort((a, b) => rank(a) - rank(b) || order(a, b));
+  // Things you can buy come first; Coming Soon after them, whatever the sort
+  const sorted = found.sort((a, b) => Number(!a.purchasable) - Number(!b.purchasable) || rank(a) - rank(b) || order(a, b));
   const unfiltered = sort === 'relevance' && !needle && !params.category && !params.use && !subCategory && !brand && featured !== 'true'
     && low === null && high === null && minRating === null;
   return (unfiltered ? fashionFirst(sorted) : sorted).slice(skip, skip + limit);
@@ -219,8 +235,8 @@ function groupCovers(products, key, order) {
   return [...groups.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export const categories = () => groupCovers(loadProducts(), 'category', SORTS.rating);
-export const subcategories = (category) => groupCovers(loadProducts().filter((p) => p.category === category), 'subCategory', SORTS.popularity);
+export const categories = () => groupCovers(browsable(), 'category', SORTS.rating);
+export const subcategories = (category) => groupCovers(browsable().filter((p) => p.category === category), 'subCategory', SORTS.popularity);
 
 const SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', 'Free Size'];
 function compareSizes(a, b) {
@@ -230,9 +246,9 @@ function compareSizes(a, b) {
 }
 
 export function facets(params = {}) {
-  const found = loadProducts().filter(baseFilter(params));
+  const found = browsable().filter(baseFilter(params));
   const unique = (values) => [...new Set(values.filter(Boolean))];
-  const prices = found.map((p) => p.price);
+  const prices = found.map((p) => p.price).filter((v) => v !== null);
   return {
     brands: unique(found.map((p) => p.brand)).sort(),
     minPrice: prices.length ? Math.min(...prices) : 0,

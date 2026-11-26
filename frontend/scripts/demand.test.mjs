@@ -1,5 +1,6 @@
 // Run with: npm test (from frontend/). Stock and catalog edits (api/_inventory.mjs), reviews (api/_reviews.mjs),
 // recommendations from demand (api/_recommend.mjs) and how card payments are recorded, on PGlite (real PostgreSQL).
+import { portalToken } from './portal-token.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { before, beforeEach, test } from 'node:test';
@@ -34,8 +35,7 @@ async function person(email, role = 'customer') {
     { method: 'POST', rest: 'register', body: { name: 'Asha Rao', email, password: 'secret123' }, ip: '1.1.1.1' },
     { store: postgresStore(db), domainError: async () => null },
   );
-  if (role !== 'customer') await db('UPDATE users SET role = $1 WHERE id = $2', [role, body.user.id]);
-  const authorization = `Bearer ${body.token}`;
+  const authorization = role === 'customer' ? `Bearer ${body.token}` : await portalToken(db, body.user.id, role);
   return {
     id: body.user.id,
     authorization,

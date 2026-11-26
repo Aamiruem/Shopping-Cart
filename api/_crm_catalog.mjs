@@ -41,7 +41,8 @@ export async function listCatalog({ db, params }) {
   const verifications = new Map((await db('SELECT * FROM product_verifications')).map((v) => [v.product_id, v]));
   const q = text(params.q, 80).toLowerCase();
   const items = products
-    .filter((p) => (!params.status || p.status === params.status) && (!params.source || p.source === params.source) && (!q || `${p.name} ${p.brand} ${p._id} ${p.seller || ''}`.toLowerCase().includes(q)))
+    .filter((p) => (!params.status || p.status === params.status) && (!params.source || p.source === params.source) && (!q || `${p.name} ${p.brand} ${p._id} ${p.seller || ''}`.toLowerCase().includes(q))
+      && (params.stock !== 'low' || (p.stock > 0 && p.stock < 10)) && (params.stock !== 'out' || !(p.stock > 0)))
     .map((p) => {
       const v = verifications.get(p._id);
       const done = v ? Object.keys(CHECKS).filter((k) => v.checks?.[k] === true).length : 0;
@@ -93,11 +94,11 @@ export async function saveVerification({ db, staff, id, body }) {
 export async function setProductStatus({ db, staff, id, body }) {
   need(staff, 'catalog.verify');
   const p = await findProduct(db, id);
-  const status = body.status;
+  const status = body.reject ? 'rejected' : body.status;
   if (!PRODUCT_STATUSES.includes(status)) fail('Unknown status');
   const reason = text(body.reason, 500);
   const [v] = await db('SELECT * FROM product_verifications WHERE product_id = $1', [p._id]);
-  if (PUBLIC_STATUSES.includes(status) && !complete(v)) {
+  if ([...PUBLIC_STATUSES, 'approved'].includes(status) && !complete(v)) {
     fail('Finish the verification first: every check, the supplier, the evidence you saw and the condition. Unverified products can’t be shown or sold.', 409);
   }
   if (body.reject && reason.length < 5) fail('Please give the reason for rejecting');
@@ -109,6 +110,11 @@ export async function setProductStatus({ db, staff, id, body }) {
     );
   } else {
     await db(`UPDATE seller_products SET data = jsonb_set(data, '{status}', to_jsonb($2::text)), updated_at = NOW() WHERE id = $1`, [p._id, status]);
+    if (body.reject || status === 'available') {
+      // The seller hears the decision on their product (CRM → Settings → Notifications)
+      const { notify } = await import('./_messaging.mjs');
+      await notify(db, body.reject ? 'product_rejected' : 'product_approved', { userId: p.sellerId, reply: body.reject ? `${p.name}: ${reason}` : p.name }).catch(() => {});
+    }
   }
   if (status === 'available' || body.reject) {
     await db(

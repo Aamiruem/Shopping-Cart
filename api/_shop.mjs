@@ -326,6 +326,9 @@ export async function createOrder(db, { userId, address, method, summary, delive
   const [order] = rows;
   if (order) await syncCatalogState(db, Date.now(), true); // this instance shows the new stock straight away
   if (order) await notifyLater(db, 'order_confirmation', { userId, orderId: order.id });
+  if (order) {
+    for (const sellerId of [...new Set(details.map((d) => d.seller_id).filter(Boolean))]) await notifyLater(db, 'seller_new_order', { userId: sellerId, orderId: order.id });
+  }
   return order ? orderJson(order) : null;
 }
 

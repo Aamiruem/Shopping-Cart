@@ -1,5 +1,6 @@
 // Run with: npm test (from frontend/). Public-launch rules on PGlite (a real PostgreSQL engine): only verified products
 // are shown or sold, customer and order numbers, mobile sign-up, courier checks and tracking, and privacy.
+import { portalToken } from './portal-token.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { before, beforeEach, test } from 'node:test';
@@ -22,8 +23,7 @@ const auth = (rest, body, extra = {}) => handleAuth({ method: 'POST', rest, body
 async function person(email, role = 'customer') {
   const { body } = await handleAuth({ method: 'POST', rest: 'register', body: { name: email.split('@')[0], email, password: 'secret123', phone: '9876543210' }, ip: `2.2.2.${++n}` },
     { store: postgresStore(db), domainError: async () => null, env: { JWT_SECRET: process.env.JWT_SECRET } });
-  if (role !== 'customer') await db('UPDATE users SET role = $1 WHERE id = $2', [role, body.user.id]);
-  const authorization = `Bearer ${body.token}`;
+  const authorization = role === 'customer' ? `Bearer ${body.token}` : await portalToken(db, body.user.id, role);
   return {
     id: body.user.id, user: body.user, authorization,
     shop: (method, path, payload) => handleShop({ method, segments: path.split('/'), body: payload, authorization, ip: `3.3.3.${n}` }, { db, rz: { configured: false } }),
@@ -56,12 +56,17 @@ beforeEach(async () => {
 test('with verification required, nothing unverified is listed, shown or sold, and checkout checks again', async () => {
   const sample = storeCatalog().find((p) => p.stock >= 20 && !p.sizes?.length);
   await requireVerification(true);
-  assert.equal(loadProducts().length, 0, 'an unverified catalog lists nothing');
-  assert.equal(getProduct(sample._id), null, 'not even by direct link');
-  assert.equal(listProducts({ q: sample.name }).length, 0);
+  assert.equal(loadProducts().length, 0, 'nothing unverified is on sale');
+  // Unverified catalogue items show as Coming Soon: never purchasable, and with no (unconfirmed) price
+  const shown = getProduct(sample._id);
+  assert.deepEqual([shown.availability, shown.purchasable, shown.price, shown.mrp, shown.stock], ['coming_soon', false, null, null, null]);
+  const found = listProducts({ q: sample.name });
+  assert.ok(found.length >= 1 && found.every((p) => !p.purchasable && p.price === null));
   const owner = await person('owner@example.com', 'admin');
   const asha = await person('asha@example.com');
-  assert.equal((await asha.shop('POST', 'cart', { productId: sample._id, qty: 1 })).status, 404);
+  assert.equal((await asha.shop('POST', 'cart', { productId: sample._id, qty: 1 })).status, 409);
+  // The admin still sees the real values to verify against
+  assert.equal((await owner.crm('GET', `catalog/${sample._id}`)).body.product.price, sample.price);
 
   // Approval needs the whole checklist, the supplier, the evidence and the condition
   assert.equal((await owner.crm('POST', `catalog/${sample._id}/status`, { status: 'available' })).status, 409);
@@ -76,7 +81,7 @@ test('with verification required, nothing unverified is listed, shown or sold, a
   const addressId = await withAddress(asha);
   await owner.crm('POST', `catalog/${sample._id}/status`, { status: 'coming_soon' });
   assert.equal(getProduct(sample._id).purchasable, false);
-  assert.equal(listProducts({ availability: 'coming_soon' }).length, 1);
+  assert.ok(listProducts({ availability: 'coming_soon' }).some((p) => p._id === sample._id && !p.unverified && p.price === sample.price), 'verified Coming Soon keeps its real price');
   assert.equal(loadProducts().length, 0, 'coming soon is its own section');
   const placed = await asha.shop('POST', 'orders', { addressId, paymentMethod: 'cod' });
   assert.equal(placed.status, 409);
@@ -86,10 +91,14 @@ test('with verification required, nothing unverified is listed, shown or sold, a
   // Out of stock, discontinued: visible by link, never purchasable
   await owner.crm('POST', `catalog/${sample._id}/status`, { status: 'discontinued' });
   assert.equal(getProduct(sample._id).availability, 'discontinued');
+  // Rejecting needs a reason and hides it completely
+  assert.equal((await owner.crm('POST', `catalog/${sample._id}/status`, { reject: true })).status, 400);
+  await owner.crm('POST', `catalog/${sample._id}/status`, { reject: true, reason: 'Supplier could not show an invoice' });
+  assert.equal(getProduct(sample._id), null);
   assert.equal(loadProducts().length, 0);
   assert.equal((await owner.crm('PUT', 'catalog/settings', { requireVerification: false })).status, 409, 'can’t be switched off');
   const audit = await db("SELECT action FROM crm_audit_log WHERE entity = 'product' ORDER BY id");
-  assert.deepEqual(audit.map((a) => a.action), ['product.verification', 'product.available', 'product.coming_soon', 'product.discontinued']);
+  assert.deepEqual(audit.map((a) => a.action), ['product.verification', 'product.available', 'product.coming_soon', 'product.discontinued', 'product.reject']);
   // A customer can't reach the catalog tools
   assert.equal((await asha.crm('GET', 'catalog')).status, 403);
 });

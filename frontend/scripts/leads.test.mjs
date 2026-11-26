@@ -1,5 +1,6 @@
 // Run with: npm test (from frontend/). Enquiries and newsletter sign-ups (api/_leads.mjs) on PGlite, a real PostgreSQL
 // engine, with the same schema the live database gets.
+import { portalToken } from './portal-token.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { before, beforeEach, test } from 'node:test';
@@ -21,8 +22,7 @@ async function person(email, role = 'customer') {
     { method: 'POST', rest: 'register', body: { name: email.split('@')[0], email, password: 'secret123' }, ip: '1.1.1.1' },
     { store: postgresStore(db), domainError: async () => null },
   );
-  if (role !== 'customer') await db('UPDATE users SET role = $1 WHERE id = $2', [role, body.user.id]);
-  const authorization = `Bearer ${body.token}`;
+  const authorization = role === 'customer' ? `Bearer ${body.token}` : await portalToken(db, body.user.id, role);
   return {
     id: body.user.id,
     authorization,

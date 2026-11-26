@@ -27,6 +27,7 @@ const PURPOSE_TEXT = {
   reset: 'reset your Arvixa Store password',
   phone: 'verify your mobile number on Arvixa',
   mobile: 'sign in to Arvixa Store',
+  test: 'confirm a test delivery from the Arvixa admin panel',
 };
 
 const num = (value, fallback, min, max) => {
@@ -134,7 +135,11 @@ export async function deliver({ channel, target, code, purpose }, env = process.
   if (channel === 'sms') {
     const body = await post(`https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`, {
       headers: { Authorization: `Basic ${Buffer.from(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ To: e164(target), From: env.TWILIO_SMS_FROM, Body: `${code} is your Arvixa Store code to ${why}. It expires in ${minutes} min. Never share it.` }),
+      body: new URLSearchParams({
+        To: e164(target), From: env.TWILIO_SMS_FROM, Body: `${code} is your Arvixa Store code to ${why}. It expires in ${minutes} min. Never share it.`,
+        // Delivery reports come back to the store (api/_crm_webhooks.mjs): only they mark a code delivered
+        ...(env.SITE_URL && (env.VERCEL_ENV === 'production' || env.NODE_ENV === 'production') ? { StatusCallback: `${env.SITE_URL.replace(/\/$/, '')}/api/webhooks/twilio` } : {}),
+      }),
     });
     return { provider: 'twilio', ref: body.sid ?? null };
   }
@@ -168,17 +173,53 @@ export const sentResponse = (target, channel, env = process.env) => ({ sentTo: m
 
 async function log(db, entry) {
   await db(
-    `INSERT INTO otp_delivery_logs (verification_id, purpose, channel, provider, target_masked, status, provider_ref, error)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [entry.id ?? null, entry.purpose, entry.channel, entry.provider ?? null, entry.masked, entry.status, entry.ref ?? null, entry.error ?? null],
+    `INSERT INTO otp_delivery_logs (verification_id, purpose, channel, provider, target_masked, status, provider_ref, error, provider_code, latency_ms, attempts)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [entry.id ?? null, entry.purpose, entry.channel, entry.provider ?? null, entry.masked, entry.status, entry.ref ?? null, entry.error ?? null,
+      entry.code ?? null, entry.ms ?? null, entry.attempts ?? 1],
+  ).catch(() =>
+    // Before db:setup added the new columns: the original log line still gets written
+    db(`INSERT INTO otp_delivery_logs (verification_id, purpose, channel, provider, target_masked, status, provider_ref, error) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [entry.id ?? null, entry.purpose, entry.channel, entry.provider ?? null, entry.masked, entry.status, entry.ref ?? null, entry.error ?? null]),
   ).catch((err) => console.error('otp log not written', err.message)); // a lost log line never blocks a login
+}
+
+// A provider timeout, network error or 5xx is worth one more try after a short pause; a 4xx (bad number, template,
+// credentials) is not: the same request would fail the same way.
+const transient = (err) => /timeout|aborted|fetch failed|ECONN|ENOTFOUND|EAI_AGAIN| 5\d\d:/i.test(String(err?.message || err));
+const httpCode = (err) => String(err?.message || '').match(/\b(\d{3}):/)?.[1] ?? (transient(err) ? 'network' : null);
+async function sendWithRetry(send, args, env, retries = 1, pauseMs = 800) {
+  let attempts = 0;
+  for (;;) {
+    attempts += 1;
+    try {
+      return { ...(await send(args, env)), attempts };
+    } catch (err) {
+      if (attempts > retries || !transient(err)) {
+        err.attempts = attempts;
+        throw err;
+      }
+      await new Promise((r) => setTimeout(r, pauseMs * attempts));
+    }
+  }
+}
+
+/** A provider's delivery report for a code it accepted: only this ever marks a code delivered (or failed). */
+export async function applyOtpStatus(db, provider, ref, status, error = null) {
+  if (!ref || !['delivered', 'failed'].includes(status)) return 0;
+  const rows = await db(
+    `UPDATE otp_delivery_logs SET status = $3, error = COALESCE($4, error), delivered_at = CASE WHEN $3 = 'delivered' THEN NOW() ELSE delivered_at END, updated_at = NOW()
+      WHERE provider = $1 AND provider_ref = $2 AND status IN ('accepted', 'delivered') RETURNING id`,
+    [provider, ref, status, error],
+  ).catch(() => []);
+  return rows.length;
 }
 
 /**
  * Creates and sends a code for (purpose, target) by `channel`. user_id / payload ride along to the check.
  * `send` is the delivery function (tests pass a fake one).
  */
-export async function sendCode(db, { purpose, target, channel, userId = null, payload = null }, { env = process.env, send = deliver } = {}) {
+export async function sendCode(db, { purpose, target, channel, userId = null, payload = null }, { env = process.env, send = deliver, retries = 1 } = {}) {
   const channels = availableChannels(env);
   if (!channels[channel]) fail(503, `${LABEL[channel] || 'That'} codes aren’t available right now. Please choose another way.`);
   if (!secret(env) || secret(env).length < 32) fail(503, 'Verification is temporarily unavailable. Please try again later.');
@@ -208,14 +249,16 @@ export async function sendCode(db, { purpose, target, channel, userId = null, pa
     await log(db, { id: row.id, purpose, channel, provider: 'dev', masked, status: 'not_sent_dev' });
     return { ...sentResponse(target, channel, env), devCode: code }; // local development only: nothing is sent
   }
+  const started = Date.now();
   try {
-    const { provider, ref } = await send({ channel, target, code, purpose }, env);
-    await log(db, { id: row.id, purpose, channel, provider, masked, status: 'accepted', ref });
+    const { provider, ref, attempts } = await sendWithRetry(send, { channel, target, code, purpose }, env, retries);
+    // "accepted" = sent to the provider. It is not "delivered": only the provider's delivery report says that.
+    await log(db, { id: row.id, purpose, channel, provider, masked, status: 'accepted', ref, code: '2xx', ms: Date.now() - started, attempts });
   } catch (err) {
     // Not sent: the code must not stay usable, and the shopper is told the truth
     await db('UPDATE verification_codes SET used_at = NOW() WHERE id = $1', [row.id]);
     const reason = String(err.message || err).replace(/\b\d{4,8}\b/g, '******').slice(0, 300); // never log a code
-    await log(db, { id: row.id, purpose, channel, provider: providerStatus(env)[channel].provider, masked, status: 'failed', error: reason });
+    await log(db, { id: row.id, purpose, channel, provider: providerStatus(env)[channel].provider, masked, status: 'failed', error: reason, code: httpCode(err), ms: Date.now() - started, attempts: err.attempts ?? 1 });
     console.error(`otp ${channel} not sent:`, reason);
     fail(502, `We couldn’t send the ${channel === 'email' ? 'email' : LABEL[channel]} right now. Please try again in a minute or choose another way.`);
   }
@@ -244,6 +287,8 @@ export async function checkCode(db, { purpose, target, code }, { env = process.e
   // One-time use: only the request that flips used_at gets the row, so two quick submits can't both succeed
   const [used] = await db('UPDATE verification_codes SET used_at = NOW(), verified_at = NOW() WHERE id = $1 AND used_at IS NULL RETURNING *', [row.id]);
   if (!used) fail(400, 'This code has already been used. Please request a new one.');
+  // The person typed the code in, so it reached them: delivered, whatever the provider has reported so far
+  await db(`UPDATE otp_delivery_logs SET status = 'delivered', delivered_at = COALESCE(delivered_at, NOW()), updated_at = NOW() WHERE verification_id = $1 AND status IN ('accepted', 'delivered')`, [row.id]).catch(() => {});
   return { ...used, payload: typeof used.payload === 'string' ? JSON.parse(used.payload) : used.payload };
 }
 
@@ -268,8 +313,61 @@ export async function otpReport(db, env = process.env) {
   for (const channel of Object.keys(status)) {
     const last = recent.find((r) => r.channel === channel && r.status !== 'not_sent_dev');
     // Health from real outcomes: the last delivery this channel attempted
-    status[channel].health = !status[channel].configured ? 'not_configured' : !last ? 'unused' : last.status === 'accepted' ? 'healthy' : 'failing';
+    status[channel].health = !status[channel].configured ? 'not_configured' : !last ? 'unused' : ['accepted', 'delivered'].includes(last.status) ? 'healthy' : 'failing';
     status[channel].lastError = last?.status === 'failed' ? last.error : null;
   }
   return { channels: status, devCodes: devCodes(env), last24h: { ...codes, delivery }, recent };
+}
+
+/**
+ * Admin-only OTP diagnostics (CRM → Notifications → OTP): per channel the provider, whether it is configured (and
+ * which variables are missing), the last request, the last code a provider accepted, the last confirmed delivery,
+ * the last failure with the provider's response code, the 7-day funnel and the delivery-report webhook.
+ * Never includes a code, a secret, a token or a full address.
+ */
+export async function otpDiagnostics(db, env = process.env) {
+  const status = providerStatus(env);
+  const hooks = { email: Boolean(env.RESEND_WEBHOOK_SECRET), sms: status.sms.provider === 'twilio' ? Boolean(env.TWILIO_AUTH_TOKEN) : false, whatsapp: Boolean(env.WHATSAPP_APP_SECRET && env.WHATSAPP_VERIFY_TOKEN) };
+  const rows = await db(
+    `SELECT channel,
+            max(created_at) AS last_request,
+            max(created_at) FILTER (WHERE status IN ('accepted', 'delivered')) AS last_accepted,
+            max(COALESCE(delivered_at, created_at)) FILTER (WHERE status = 'delivered') AS last_delivered,
+            count(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days')::int AS sent_7d,
+            count(*) FILTER (WHERE status IN ('accepted', 'delivered') AND created_at > NOW() - INTERVAL '7 days')::int AS accepted_7d,
+            count(*) FILTER (WHERE status = 'delivered' AND created_at > NOW() - INTERVAL '7 days')::int AS delivered_7d,
+            count(*) FILTER (WHERE status = 'failed' AND created_at > NOW() - INTERVAL '7 days')::int AS failed_7d
+       FROM otp_delivery_logs WHERE status <> 'not_sent_dev' GROUP BY channel`,
+  );
+  const failures = await db(
+    `SELECT DISTINCT ON (channel) channel, created_at, error, provider, provider_code FROM otp_delivery_logs
+      WHERE status = 'failed' ORDER BY channel, created_at DESC`,
+  ).catch(() => db(`SELECT DISTINCT ON (channel) channel, created_at, error, provider FROM otp_delivery_logs WHERE status = 'failed' ORDER BY channel, created_at DESC`));
+  const [codes] = await db(
+    `SELECT count(*)::int AS requested, count(*) FILTER (WHERE verified_at IS NOT NULL)::int AS verified,
+            count(*) FILTER (WHERE used_at IS NULL AND expires_at < NOW())::int AS expired
+       FROM verification_codes WHERE created_at > NOW() - INTERVAL '7 days'`,
+  );
+  const recent = await db(
+    `SELECT id, purpose, channel, provider, target_masked, status, error, created_at FROM otp_delivery_logs ORDER BY created_at DESC, id DESC LIMIT 40`,
+  );
+  const channels = {};
+  for (const ch of ['email', 'sms', 'whatsapp']) {
+    const r = rows.find((x) => x.channel === ch) || {};
+    const f = failures.find((x) => x.channel === ch);
+    channels[ch] = {
+      provider: status[ch].provider,
+      state: status[ch].switchedOff ? 'switched_off' : !status[ch].configured ? 'not_configured' : !r.last_request ? 'never_used' : f && (!r.last_accepted || f.created_at > r.last_accepted) ? 'failing' : 'working',
+      missing: status[ch].missing,
+      webhook: hooks[ch],
+      lastRequest: r.last_request ?? null,
+      lastAccepted: r.last_accepted ?? null,
+      lastDelivered: r.last_delivered ?? null,
+      lastFailure: f ? { at: f.created_at, reason: f.error, code: f.provider_code ?? null } : null,
+      last7Days: { sent: r.sent_7d ?? 0, acceptedByProvider: r.accepted_7d ?? 0, deliveredConfirmed: r.delivered_7d ?? 0, failed: r.failed_7d ?? 0 },
+    };
+  }
+  const funnel = { requested: codes.requested, sentToProvider: rows.reduce((n, r) => n + r.accepted_7d, 0), delivered: rows.reduce((n, r) => n + r.delivered_7d, 0),
+    failed: rows.reduce((n, r) => n + r.failed_7d, 0), verified: codes.verified, expired: codes.expired };
+  return { channels, funnel, recent, devCodes: devCodes(env), settings: settings(env) };
 }

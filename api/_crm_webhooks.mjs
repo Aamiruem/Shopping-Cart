@@ -10,6 +10,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { captureWhatsApp } from './_crm_leads.mjs';
 import { unsubscribeAddress } from './_crm_marketing.mjs';
 import { applyStatus, queueMessage, suppress } from './_messaging.mjs';
+import { applyOtpStatus } from './_otp.mjs';
 
 const same = (a, b) => {
   const x = Buffer.from(String(a));
@@ -60,6 +61,7 @@ export async function handleProviderWebhook(provider, { method, url, headers, ra
     const status = RESEND[event.type];
     const ref = event.data?.email_id;
     const updated = status ? await applyStatus(db, 'resend', ref, status, event.type === 'email.bounced' ? String(event.data?.bounce?.message || 'Bounced').slice(0, 300) : null) : 0;
+    await applyOtpStatus(db, 'resend', ref, status === 'delivered' ? 'delivered' : ['bounced', 'failed'].includes(status) ? 'failed' : null, event.type);
     if (event.type === 'email.complained') for (const to of event.data?.to || []) await suppress(db, 'email', to, 'complained');
     return { status: 200, body: { ok: true, updated } };
   }
@@ -74,6 +76,7 @@ export async function handleProviderWebhook(provider, { method, url, headers, ra
         const v = change.value || {};
         for (const s of v.statuses || []) {
           statuses += await applyStatus(db, 'meta', s.id, META[s.status], s.errors?.[0] ? String(s.errors[0].title || s.errors[0].message || '').slice(0, 300) : null);
+          await applyOtpStatus(db, 'meta', s.id, ['delivered', 'read'].includes(s.status) ? 'delivered' : s.status === 'failed' ? 'failed' : null, s.errors?.[0]?.title ?? null);
         }
         for (const m of v.messages || []) {
           const from = String(m.from || '');
@@ -95,6 +98,7 @@ export async function handleProviderWebhook(provider, { method, url, headers, ra
     const form = Object.fromEntries(new URLSearchParams(raw));
     if (!verifyTwilio(url, form, h['x-twilio-signature'], env.TWILIO_AUTH_TOKEN)) return { status: 401, body: { error: 'Invalid signature' } };
     const updated = await applyStatus(db, 'twilio', form.MessageSid, TWILIO[form.MessageStatus], form.ErrorCode ? `Twilio error ${form.ErrorCode}` : null);
+    await applyOtpStatus(db, 'twilio', form.MessageSid, form.MessageStatus === 'delivered' ? 'delivered' : ['failed', 'undelivered'].includes(form.MessageStatus) ? 'failed' : null, form.ErrorCode ? `Twilio error ${form.ErrorCode}` : null);
     return { status: 200, body: { ok: true, updated } };
   }
   if (provider === 'courier') {
