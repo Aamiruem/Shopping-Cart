@@ -27,6 +27,38 @@ same app and database. It does not use MongoDB, Socket.IO or Redis; see "Design 
 | Shipping | `api/_shipping.mjs` | Shiprocket serviceability at checkout, shipment booking (real AWB), tracking webhook |
 | Launch features | `api/_catalog.mjs`, `api/_auth.mjs`, `context/CartContext.jsx`, `components/account/WelcomeSheet.jsx` | Product statuses, customer/order numbers, mobile OTP sign-up, guest cart, welcome popup |
 
+## 1b. Three portals, sellers, MFA, OTP diagnostics (second round)
+
+| Portal | Sign-in | Session can use | Notes |
+|---|---|---|---|
+| Customer | `/login`, welcome popup (mobile OTP or email) | the store, cart, orders, account | the store admin's account is refused here |
+| Seller | `/seller/login`, `/seller/signup` | Seller Hub (after approval) | applying never makes anyone a seller; an admin approves in CRM → Sellers |
+| Admin | `/admin/login` (not linked from the store, `noindex`) | CRM (+ Seller Hub admin pages) | store admin + CRM team only; authenticator MFA; 12-hour sessions; every sign-in and failed attempt audited |
+
+Tokens carry the portal they came from; `api/_crm_core.mjs` (CRM) and `api/_seller.mjs` (hub) refuse any other portal.
+Tokens from before this change are customer sessions, so **the admin signs in again at `/admin/login` after deploying**.
+
+- **Sellers** (`api/_crm_sellers.mjs`): application → contact verified → reviewer confirms PAN (Income Tax portal),
+  GSTIN (GST portal), bank (penny-drop or cheque on a video call) → approve (`ARV-SEL-YYYY-NNNNNN`) / reject / suspend
+  (hub closed and products off sale at once) / reinstate. Commission per seller; settlements of delivered,
+  not-returned lines (each line once), payout recorded with its UTR. No identity documents are uploaded: the photo
+  store is public, so that would expose them. Existing sellers are kept as approved.
+- **Products**: also `approved` (verified, not on sale) and `rejected`. The store's unverified catalogue items show as
+  **Coming Soon with no price** (the file's prices aren't confirmed) and can't be bought; unverified seller products
+  are never shown.
+- **MFA**: CRM → My security; TOTP secret encrypted (AES-256-GCM), each code usable once; Settings → `security.requireMfa`
+  makes it compulsory.
+- **OTP pipeline**: one retry with backoff on provider timeouts / 5xx (never on 4xx), provider response code, latency
+  and attempts logged; statuses Requested → Sent to provider → Delivered (provider webhook, or the person typing the
+  code in) / Failed / Expired / Verified. CRM → Notifications & OTP shows per-channel state, missing variables, last
+  request / delivery / failure and webhooks, and sends a test code to the admin's own verified address only.
+- **Payments**: `PAYMENTS_MODE` (default `test`) must match the key prefix; CRM → Payments reconciles unfinished
+  attempts with Razorpay (reports only; never marks anything paid).
+- **Addresses**: house, street, area, landmark, city, district, state, PIN, country (India) stored separately.
+- **Why OTP isn't arriving on the live site (diagnosed 2026-11-26):** production Vercel has no provider variables at
+  all (only the database, `JWT_SECRET` and Blob), so `/api/auth/otp/channels` answers all-false. It needs the
+  provider accounts in section 5.
+
 ## 2. Database changes (`api/_schema.mjs`, applied by `npm run db:setup`)
 
 All additive and idempotent. New tables: `crm_roles`, `crm_staff`, `crm_sessions`, `crm_audit_log`,
