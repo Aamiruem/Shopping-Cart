@@ -108,6 +108,23 @@ function ProductDrawer({ id, onClose, onChange }) {
     </Drawer>
   );
 }
+// Switching verification on is the owner's business decision: every product nobody has verified becomes Coming Soon
+// (no price, can't be bought) until it is. It can't be switched off again from here.
+function VerificationSwitch({ onDone }) {
+  const { can, confirm } = useCrm();
+  const { run, busy } = useAction();
+  const turnOn = async () => {
+    if (!(await confirm({ title: 'Require verification for every product?', message: 'From now on only products you verify can be bought. Everything else shows as Coming Soon with no price until it is verified. This can’t be undone from the CRM.', confirmLabel: 'Require verification', danger: true }))) return;
+    if (await run(() => crm.put('/catalog/settings', { requireVerification: true }), 'Verification is now required for every product')) onDone();
+  };
+  return (
+    <div className="alert warn">
+      Verification isn’t required yet: products that nobody has verified can still be bought.
+      {can('settings.manage') && <> <button type="button" className="b sm danger" onClick={turnOn} disabled={busy}>Require verification</button></>}
+    </div>
+  );
+}
+
 const PUBLIC = (s) => ['available', 'out_of_stock', 'coming_soon'].includes(s);
 
 // `inventory`: the same products by stock level (CRM → Inventory); stock is edited in Seller Hub → Store catalog
@@ -120,7 +137,7 @@ export default function Catalog({ inventory = false }) {
   return (
     <>
       <PageHead title={inventory ? 'Inventory' : 'Product verification'} subtitle={inventory ? 'Stock levels from the database: stock taken by orders and put back by cancellations and returns. Change stock in Seller Hub → Store catalog (or the seller’s own Products page).' : 'Only products an admin has verified can be shown or sold. Nothing is treated as genuine automatically.'} />
-      {data && !data.requireVerification && <div className="alert warn">Verification isn’t enforced on this database yet: run <code>npm run db:setup</code> (it switches it on), or turn it on in Settings.</div>}
+      {data && !data.requireVerification && <VerificationSwitch onDone={reload} />}
       {data && (
         <div className="kpis">
           {Object.entries(STATUS).map(([k, v]) => (
