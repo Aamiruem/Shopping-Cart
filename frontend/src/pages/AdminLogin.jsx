@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import useSeo from '../hooks/useSeo';
 
-// The admin portal's own sign-in (/admin/login). Never linked from the store; search engines are told to skip it.
+// The admin portal's own sign-in (/admin/login). Linked from the header's Admin button and the footer; search engines are told to skip it.
 // Only the store admin and CRM team members get in; accounts are provisioned in CRM → Team, never signed up here.
 // With MFA on, the authenticator code is asked after the password.
 export default function AdminLogin() {

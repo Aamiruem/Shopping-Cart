@@ -230,6 +230,16 @@ export default function Navbar() {
             <Icon name="grid" size={18} />
             <span className="nav-label">Shop All</span>
           </NavLink>
+          {/* Staff entry points. Both pages still need an admin-portal sign-in: /admin/login forwards a signed-in admin
+              to the CRM, and /crm sends everyone else to /admin/login first */}
+          <NavLink to="/admin/login" className="nav-item nav-staff" aria-label="Admin portal" title="Admin portal">
+            <Icon name="shield" size={18} />
+            <span className="nav-label">Admin</span>
+          </NavLink>
+          <NavLink to="/crm" className="nav-item nav-staff" aria-label="CRM" title="CRM">
+            <Icon name="barChart" size={18} />
+            <span className="nav-label">CRM</span>
+          </NavLink>
           <AccountMenu />
           <MoreMenu />
           <Link to="/cart" className="nav-item" aria-label={`Cart, ${count} items`}>

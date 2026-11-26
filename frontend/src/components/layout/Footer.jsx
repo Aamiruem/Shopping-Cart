@@ -27,6 +27,14 @@ const COLUMNS = [
       { label: 'Privacy Policy', to: '/privacy' },
     ],
   },
+  {
+    title: 'Staff',
+    links: [
+      { label: 'Admin Portal', to: '/admin/login' },
+      { label: 'CRM', to: '/crm' },
+      { label: 'Seller Portal', to: '/seller/login' },
+    ],
+  },
 ];
 
 const PROMISES = [
