@@ -112,7 +112,7 @@ function Integrations() {
   );
 }
 
-function Audit() {
+export function Audit() {
   const [params, setParams] = useState({ action: '', entity: '', from: '', to: '', page: 1 });
   const { data, error, loading, reload } = useCrmData('/audit', params);
   const set = (k) => (e) => setParams({ ...params, [k]: e.target.value, page: 1 });

@@ -11,14 +11,21 @@ const NAV = [
   { to: '/crm/customers', icon: 'users', label: 'Customers', perm: 'customers.view' },
   { to: '/crm/leads', icon: 'zap', label: 'Leads', perm: 'leads.view' },
   { to: '/crm/sales', icon: 'shoppingBag', label: 'Sales & orders', perm: 'sales.view' },
-  { to: '/crm/catalog', icon: 'tag', label: 'Catalog verification', perm: 'catalog.view' },
+  { to: '/crm/catalog', icon: 'tag', label: 'Product verification', perm: 'catalog.view' },
+  { to: '/crm/inventory', icon: 'package', label: 'Inventory', perm: 'catalog.view' },
+  { to: '/crm/sellers', icon: 'store', label: 'Sellers', perm: 'sellers.view' },
+  { to: '/crm/payments', icon: 'wallet', label: 'Payments', perm: 'sales.view' },
+  { to: '/crm/deliveries', icon: 'truck', label: 'Deliveries', perm: 'sales.view' },
   { to: '/crm/marketing', icon: 'send', label: 'Marketing', perm: 'marketing.view' },
   { to: '/crm/support', icon: 'headphones', label: 'Support', perm: 'support.view' },
   { to: '/crm/tasks', icon: 'check', label: 'Tasks', perm: null },
   { to: '/crm/reports', icon: 'barChart', label: 'Reports', perm: 'reports.view' },
   { to: '/crm/insights', icon: 'activity', label: 'AI insights', perm: 'insights.view' },
   { to: '/crm/team', icon: 'shield', label: 'Team & roles', perm: 'staff.manage' },
+  { to: '/crm/notifications', icon: 'mail', label: 'Notifications & OTP', perm: 'marketing.view' },
+  { to: '/crm/audit', icon: 'eye', label: 'Audit logs', perm: 'audit.view' },
   { to: '/crm/settings', icon: 'settings', label: 'Settings', perm: 'settings.manage' },
+  { to: '/crm/security', icon: 'lock', label: 'My security (MFA)', perm: null },
 ];
 const POLL_MS = 20_000;
 const THEME_KEY = 'crm-theme';

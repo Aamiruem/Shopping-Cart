@@ -219,15 +219,25 @@ function addressError(a) {
 }
 
 async function addAddress({ db, userId, body }) {
-  const a = Object.fromEntries(['name', 'phone', 'line1', 'city', 'state', 'pincode'].map((field) => [field, text(body[field])]));
+  const a = Object.fromEntries(['name', 'phone', 'line1', 'city', 'state', 'pincode', 'house', 'street', 'area', 'landmark', 'district'].map((field) => [field, text(body[field])]));
+  // The detailed form (house, street, area, landmark) is kept field by field and also joined into line1, which older
+  // code and the order's one-line address use. An address with only line1 is still accepted.
+  if (a.house || a.street || a.area) {
+    for (const [field, label, max] of [['house', 'House / flat no.', 80], ['street', 'Street', 120], ['area', 'Area / locality', 120], ['landmark', 'Landmark', 120], ['district', 'District', 100]]) {
+      if (field !== 'landmark' && field !== 'district' && !a[field]) throw new ApiError(400, `${label} is required`);
+      if (a[field].length > max) throw new ApiError(400, `${label} is too long`);
+    }
+    a.line1 = [a.house, a.street, a.area, a.landmark && `near ${a.landmark.replace(/^near\s+/i, '')}`].filter(Boolean).join(', ');
+  }
+  if (body.country && text(body.country) !== 'India') throw new ApiError(400, 'We deliver within India only');
   const error = addressError(a);
   if (error) throw new ApiError(400, error);
   const [{ saved }] = await db('SELECT count(*)::int AS saved FROM addresses WHERE user_id = $1', [userId]);
   if (saved >= MAX_ADDRESSES) throw new ApiError(400, 'You have saved the maximum number of addresses');
   const [created] = await db(
-    `INSERT INTO addresses (user_id, name, phone, line1, city, state, pincode, type)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [userId, a.name, a.phone, a.line1, a.city, a.state, a.pincode, body.type === 'work' ? 'work' : 'home'],
+    `INSERT INTO addresses (user_id, name, phone, line1, city, state, pincode, type, house, street, area, landmark, district, country)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'India') RETURNING *`,
+    [userId, a.name, a.phone, a.line1, a.city, a.state, a.pincode, body.type === 'work' ? 'work' : 'home', a.house || null, a.street || null, a.area || null, a.landmark || null, a.district || null],
   );
   return { status: 201, body: created };
 }
@@ -247,7 +257,8 @@ export async function resolveAddress(db, userId, addressId) {
   if (!ID_RE.test(String(addressId ?? ''))) throw new ApiError(400, 'Shipping address is required');
   const [a] = await db('SELECT * FROM addresses WHERE id = $1 AND user_id = $2', [Number(addressId), userId]);
   if (!a) throw new ApiError(404, 'Address not found');
-  return `${a.name}, ${a.line1}, ${a.city}, ${a.state} - ${a.pincode}. Phone: ${a.phone}`;
+  const city = a.district && a.district.toLowerCase() !== a.city.toLowerCase() ? `${a.city} (${a.district} district)` : a.city;
+  return `${a.name}, ${a.line1}, ${city}, ${a.state} - ${a.pincode}. Phone: ${a.phone}`;
 }
 
 /** The cart and its price breakdown, after checking it isn't empty and everything is in stock. */

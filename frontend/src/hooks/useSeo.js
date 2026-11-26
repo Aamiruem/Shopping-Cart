@@ -70,7 +70,8 @@ export const breadcrumbLd = (items) => ({
 
 // Google's Product rich results need a real offer: sent once the store takes orders at these prices (store and live
 // modes), never in browse-only preview. aggregateRating comes from real buyers' reviews only.
-export const productLd = (p) => (!SHOPPING ? null : {
+// Coming Soon and other products that can't be bought get no offer: no price is advertised that isn't real
+export const productLd = (p) => (!SHOPPING || p.purchasable === false || p.price === null || p.price === undefined ? null : {
   '@type': 'Product',
   name: p.name,
   description: p.description,

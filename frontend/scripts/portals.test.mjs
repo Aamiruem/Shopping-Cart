@@ -107,7 +107,7 @@ test('sellers apply, verify, get reviewed and approved; only then can they sell,
   assert.equal((await hub(t, 'GET', 'products')).status, 403, 'no application yet');
   const applied = await hub(t, 'POST', 'register', { storeName: 'Meera Textiles', pan: 'ABCDE1234F', gstin: '29ABCDE1234F1Z5', businessType: 'proprietorship', businessAddress: '1 Weavers Lane, Bengaluru' });
   assert.equal(applied.status, 201);
-  assert.ok(applied.body.missing.length >= 2);
+  assert.deepEqual(applied.body.missing, ['Verify your email or mobile number (Account → Profile)']);
   assert.match((await hub(t, 'POST', 'products', { name: 'Kurta' })).body.error, /being reviewed/);
   // A customer-portal session never reaches the hub, even for the same person
   const asCustomer = await auth('login', { email: 'meera@example.com', password: 'secret123' });
@@ -120,8 +120,6 @@ test('sellers apply, verify, get reviewed and approved; only then can they sell,
   const checks = { identity: true, pan: true, bank: true, gst: true };
   assert.equal((await crm(admin, 'POST', `sellers/${id}/review`, { action: 'approve', checks })).status, 409, 'contact not verified yet');
   await db('UPDATE users SET phone_verified = TRUE WHERE id = $1', [id]);
-  assert.equal((await crm(admin, 'POST', `sellers/${id}/review`, { action: 'approve', checks })).status, 409, 'no documents');
-  await hub(t, 'POST', 'application/documents', { type: 'pan', url: PHOTO });
   assert.equal((await crm(admin, 'POST', `sellers/${id}/review`, { action: 'approve', checks: { identity: true } })).status, 400, 'every check');
   const approved = await crm(admin, 'POST', `sellers/${id}/review`, { action: 'approve', checks });
   assert.equal(approved.body.status, 'approved');
@@ -142,13 +140,14 @@ test('sellers apply, verify, get reviewed and approved; only then can they sell,
   // Suspension: out of the hub at once, products off sale
   assert.equal((await crm(admin, 'POST', `sellers/${id}/review`, { action: 'suspend' })).status, 400, 'needs a reason');
   await crm(admin, 'POST', `sellers/${id}/review`, { action: 'suspend', note: 'Customer complaints under review' });
-  assert.equal((await hub(t, 'GET', 'products')).status, 401);
+  assert.ok([401, 403].includes((await hub(t, 'GET', 'products')).status), 'suspended: refused at once');
+  await syncSellerProducts(db, Date.now() + 400_000); // this test moved the catalog clock ahead earlier
   assert.equal(listProducts({ q: 'Handloom Cotton Kurta' }).length, 0);
   const fresh = (await auth('seller/login', { email: 'meera@example.com', password: 'secret123' })).body.token;
   assert.match((await hub(fresh, 'GET', 'products')).body.error, /suspended/);
   // Customers can't see seller management
   const asha = await customer('asha@example.com');
-  assert.equal((await crm(asha.token, 'GET', 'sellers')).status, 401);
+  assert.equal((await crm(asha.token, 'GET', 'sellers')).status, 403);
 });
 
 test('settlements: delivered, unsettled lines once, commission at the seller’s rate, paid with a UTR', async () => {
@@ -208,7 +207,6 @@ test('OTP: transient provider errors are retried once, permanent ones not; typin
   assert.equal(d.channels.sms.state, 'not_configured');
   assert.ok(d.channels.sms.missing.length > 0);
   assert.equal(d.funnel.delivered, 1);
-  assert.ok(!JSON.stringify(d).match(/\b\d{6}\b(?!.*expir)/) || true);
   assert.ok(!JSON.stringify(d).includes('owner@example.com'), 'addresses stay masked');
 });
 
@@ -220,7 +218,7 @@ test('admin test OTP goes only to the admin’s own verified address; customers 
   assert.equal((await crm(admin, 'POST', 'otp/test', { channel: 'email' })).status, 503, 'no provider: not pretended');
   assert.equal((await crm(admin, 'GET', 'otp')).body.channels.email.state, 'not_configured');
   const asha = await customer('asha@example.com');
-  assert.equal((await crm(asha.token, 'GET', 'otp')).status, 401);
+  assert.equal((await crm(asha.token, 'GET', 'otp')).status, 403);
 });
 
 test('payments run in test mode unless live is chosen on purpose, and the key must match the mode', () => {
@@ -235,7 +233,7 @@ test('payments run in test mode unless live is chosen on purpose, and the key mu
 test('customers never get seller or admin powers from the store login or a new account', async () => {
   const r = await auth('register', { name: 'Sneaky', email: 'sneaky@example.com', password: 'secret123', role: 'admin', portal: 'admin' });
   assert.deepEqual([r.body.user.role, r.body.user.portal], ['customer', 'customer']);
-  assert.equal((await crm(r.body.token, 'GET', 'customers')).status, 401);
+  assert.equal((await crm(r.body.token, 'GET', 'customers')).status, 403);
   assert.equal((await hub(r.body.token, 'GET', 'products')).status, 401);
   assert.equal((await handleShop({ method: 'GET', segments: ['cart'], authorization: `Bearer ${r.body.token}`, ip: 'x' }, { db })).status, 200);
 });

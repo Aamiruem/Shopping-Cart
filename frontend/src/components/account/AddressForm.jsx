@@ -14,7 +14,7 @@ const STATES = [
 // Address services spell some states differently, e.g. "Jammu & Kashmir"
 const matchState = (name = '') => STATES.find((s) => s.toLowerCase() === name.replace('&', 'and').toLowerCase()) || '';
 
-const EMPTY = { name: '', phone: '', pincode: '', line1: '', city: '', state: '', type: 'home' };
+const EMPTY = { name: '', phone: '', pincode: '', house: '', street: '', area: '', landmark: '', city: '', district: '', state: '', country: 'India', type: 'home' };
 
 // Saves a new address and hands it back via onSaved
 export default function AddressForm({ defaults = {}, onSaved, onCancel }) {
@@ -32,7 +32,7 @@ export default function AddressForm({ defaults = {}, onSaved, onCancel }) {
     setForm((f) => ({ ...f, pincode }));
     if (pincode.length !== 6) return;
     const place = await api.pincode(pincode).catch(() => null);
-    if (place?.found) setForm((f) => ({ ...f, city: f.city || place.city, state: matchState(place.state) || f.state }));
+    if (place?.found) setForm((f) => ({ ...f, city: f.city || place.city, district: f.district || place.city, state: matchState(place.state) || f.state, ...(place.areas?.length === 1 && !f.area ? { area: place.areas[0] } : {}) }));
     else if (place?.found === false) setError('We couldn’t find this pincode. Please check it.');
   };
 
@@ -44,7 +44,7 @@ export default function AddressForm({ defaults = {}, onSaved, onCancel }) {
       async ({ coords }) => {
         try {
           const found = await api.reverseGeocode(coords.latitude, coords.longitude);
-          setForm((f) => ({ ...f, ...found, line1: f.line1 || found.line1, state: matchState(found.state) || f.state }));
+          setForm((f) => ({ ...f, ...found, street: f.street || found.line1 || '', state: matchState(found.state) || f.state }));
         } catch (err) {
           setError(err.message);
         } finally {
@@ -83,8 +83,13 @@ export default function AddressForm({ defaults = {}, onSaved, onCancel }) {
         <label className="field">Full name<input name="name" value={form.name} onChange={set} required autoComplete="name" /></label>
         <label className="field">10-digit mobile number<input name="phone" value={form.phone} onChange={digits(10)} required inputMode="numeric" autoComplete="tel-national" /></label>
         <label className="field">Pincode<input name="pincode" value={form.pincode} onChange={onPincode} required inputMode="numeric" autoComplete="postal-code" /></label>
-        <label className="field">City / District / Town<input name="city" value={form.city} onChange={set} required autoComplete="address-level2" /></label>
-        <label className="field span-2">Address (house no, building, street, area)<textarea name="line1" value={form.line1} onChange={set} required rows={3} autoComplete="street-address" /></label>
+        <label className="field">House / flat no. and building<input name="house" value={form.house} onChange={set} required maxLength={80} autoComplete="address-line1" /></label>
+        <label className="field">Street / road<input name="street" value={form.street} onChange={set} required maxLength={120} autoComplete="address-line2" /></label>
+        <label className="field">Area / locality<input name="area" value={form.area} onChange={set} required maxLength={120} autoComplete="address-level3" /></label>
+        <label className="field">Landmark (optional)<input name="landmark" value={form.landmark} onChange={set} maxLength={120} placeholder="e.g. near City Hospital" /></label>
+        <label className="field">City / town<input name="city" value={form.city} onChange={set} required autoComplete="address-level2" /></label>
+        <label className="field">District<input name="district" value={form.district} onChange={set} required maxLength={100} /></label>
+        <label className="field">Country<input name="country" value="India" readOnly aria-readonly="true" /></label>
         <label className="field">
           State
           <select name="state" value={form.state} onChange={set} required autoComplete="address-level1">

@@ -33,6 +33,13 @@ export function AuthProvider({ children }) {
     user,
     ready,
     login: async (email, password) => saveSession(await api.login({ email, password })),
+    // Admin portal: { mfaRequired: true } until the authenticator code is given, then the session
+    adminLogin: async (email, password, code) => {
+      const result = await api.adminLogin({ email, password, ...(code ? { code } : {}) });
+      return result.token ? { user: saveSession(result) } : result;
+    },
+    sellerLogin: async (email, password) => saveSession(await api.sellerLogin({ email, password })),
+    sellerSignup: async (form) => saveSession(await api.sellerSignup(form)),
     otpLogin: async (identifier, code) => saveSession(await api.otpLoginVerify(identifier, code)),
     // Mobile sign-in: signs in, or returns { needsProfile, signupToken } for a number with no account yet
     mobileLogin: async (phone, code) => {
@@ -51,7 +58,11 @@ export function AuthProvider({ children }) {
     verifySignup: async (email, code) => saveSession(await api.verifySignup({ email, code })),
     googleLogin: async (credential) => saveSession(await api.googleLogin(credential)),
     setUser,
-    updateProfile: async (form) => setUser(await api.updateProfile(form)),
+    // A profile change keeps the portal this session came from
+    updateProfile: async (form) => {
+      const next = await api.updateProfile(form);
+      setUser((prev) => ({ ...next, portal: prev?.portal }));
+    },
     logout: () => {
       localStorage.removeItem(TOKEN_KEY);
       setUser(null);

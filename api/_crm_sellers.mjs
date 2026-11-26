@@ -10,7 +10,13 @@ import { syncSellerProducts } from './_seller.mjs';
 import { audit, can, DATE_RE, fail, ID_RE, like, mask, need, pageOf, paging, text, where } from './_crm_core.mjs';
 
 const STATUSES = ['pending', 'approved', 'rejected', 'suspended'];
-const REVIEW_CHECKS = { identity: 'Identity matches the PAN card', pan: 'PAN is valid and matches the business', bank: 'Bank proof matches the payout account holder', gst: 'GSTIN checked on the GST portal (if given)' };
+// Checked by the reviewer on official sources; nothing is uploaded or stored but the outcome (see api/_seller.mjs)
+const REVIEW_CHECKS = {
+  identity: 'Spoke to the applicant (video or phone call) and the name matches the PAN',
+  pan: 'PAN verified on the Income Tax e-filing portal (“Verify Your PAN”)',
+  bank: 'Payout bank account verified (penny-drop, or a cancelled cheque shown on a video call)',
+  gst: 'GSTIN verified on the GST portal (“Search Taxpayer”), if given',
+};
 
 const SELLER_STATS = `
   SELECT s.user_id AS id, s.seller_code, s.store_name, s.status, s.business_type, s.gstin, s.pan, s.phone AS business_phone, s.business_address,
@@ -81,7 +87,6 @@ export async function reviewSeller({ db, staff, id, body }) {
     const missing = Object.keys(REVIEW_CHECKS).filter((k) => k !== 'gst' && body.checks?.[k] !== true);
     if (s.gstin && body.checks?.gst !== true) missing.push('gst');
     if (missing.length) fail(`Confirm every check before approving: ${missing.map((k) => REVIEW_CHECKS[k]).join('; ')}`);
-    if (!(s.documents || []).length) fail('No documents were uploaded to check', 409);
     status = 'approved';
   } else if (action === 'reject') {
     if (s.status !== 'pending') fail(`This seller is ${s.status}`, 409);
@@ -103,7 +108,7 @@ export async function reviewSeller({ db, staff, id, body }) {
     [s.id, status, note || null, staff.id],
   );
   if (status === 'suspended') await db('UPDATE users SET sessions_revoked_at = NOW() WHERE id = $1', [s.id]); // out of the hub now
-  await syncSellerProducts(db, Date.now() + 60_000); // their products join or leave the catalog at once
+  await syncSellerProducts(db, Date.now(), true); // their products join or leave the catalog at once
   await audit(db, staff, `seller.${action}`, 'seller', s.id, { note: note || undefined, checks: body.checks });
   try {
     const { notify } = await import('./_messaging.mjs');
@@ -149,6 +154,8 @@ export async function createSettlement({ db, staff, id, body }) {
     [s.id, from, to, s.commission_rate, staff.id],
   );
   if (!row) fail('No delivered, unsettled sales in this period', 409);
+  const [payout] = await db('SELECT payout_upi, bank_account_last4 FROM sellers WHERE user_id = $1', [s.id]);
+  if (!payout?.payout_upi && !payout?.bank_account_last4) await audit(db, staff, 'settlement.no_payout_details', 'seller', s.id, { settlementId: row.id });
   await audit(db, staff, 'settlement.create', 'seller', s.id, { settlementId: row.id, net: row.net, from, to });
   return { status: 201, body: row };
 }

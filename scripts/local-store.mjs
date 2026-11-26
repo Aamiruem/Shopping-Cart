@@ -8,14 +8,15 @@
 //   asha@example.com    customer: delivered orders to review or return, one on its way, a return, a complaint
 //   ravi@example.com    customer with a few orders, so "bought together" and trending have data
 //   seller@example.com  seller with their own listed product and an order to ship
-//   owner@example.com   admin: returns, refunds, complaints, leads and the store catalog in the Seller Hub; the CRM
+//   owner@example.com   admin (sign in at /admin/login): the CRM, and the Seller Hub's admin pages
+//   (seller@example.com signs in at /seller/login; customers at /login)
 //   sales@example.com   CRM team member (Sales Executive): sees the CRM with fewer sections; a shopper otherwise
 // Online payments stay off (no Razorpay keys) and photo uploads need Vercel Blob, so those two answer with their
 // usual "not set up yet" messages.
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { PGlite } from '@electric-sql/pglite';
-import { handleAuth, postgresStore, useLocalDatabase } from '../api/_auth.mjs';
+import { createToken, handleAuth, postgresStore, useLocalDatabase } from '../api/_auth.mjs';
 import { handleLeads } from '../api/_leads.mjs';
 import { listProducts } from '../api/_catalog.mjs';
 import { syncCatalogState } from '../api/_inventory.mjs';
@@ -45,7 +46,9 @@ const store = postgresStore(db);
 async function account(name, email, role = 'customer') {
   const { body } = await handleAuth({ method: 'POST', rest: 'register', body: { name, email, password: 'secret123', phone: '9876543210' }, ip: 'local' }, { store, domainError: async () => null });
   if (role !== 'customer') await db('UPDATE users SET role = $1 WHERE id = $2', [role, body.user.id]);
-  const authorization = `Bearer ${body.token}`;
+  // Each demo account acts through its own portal: the admin through the admin portal, the seller through the seller portal
+  const portal = role === 'admin' ? 'admin' : role === 'seller' ? 'seller' : 'customer';
+  const authorization = `Bearer ${createToken({ ...body.user, role }, portal)}`;
   return {
     id: body.user.id,
     shop: (method, path, payload) => handleShop({ method, segments: path.split('/'), body: payload, authorization, ip: `seed-${email}` }, { db, rz }),
@@ -77,7 +80,7 @@ await db("INSERT INTO crm_staff (user_id, role_key, title) VALUES ($1, 'sales_ex
 for (const who of [asha, ravi]) {
   await who.shop('POST', 'addresses', { name: who === asha ? 'Asha Rao' : 'Ravi Kumar', phone: '9876543210', line1: '12 MG Road', city: 'Bengaluru', state: 'Karnataka', pincode: '560001' });
 }
-await db("INSERT INTO sellers (user_id, store_name) VALUES ($1, 'Meera Textiles') ON CONFLICT DO NOTHING", [seller.id]);
+await db("INSERT INTO sellers (user_id, store_name, pan, status) VALUES ($1, 'Meera Textiles', 'ABCDE1234F', 'approved') ON CONFLICT DO NOTHING", [seller.id]);
 const listed = await seller.seller('POST', 'products', {
   name: 'Handloom Cotton Kurta (demo)', description: 'A demo seller listing for testing: soft hand-woven cotton.', category: 'fashion', brand: 'Meera',
   price: 1299, mrp: 1599, stock: 25, images: ['/catalog/002cff2c3902d3ea.jpg'], audience: 'men', sizes: ['M', 'L', 'XL'],

@@ -183,3 +183,16 @@ input:-webkit-autofill:focus {
 .map-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: var(--fs-sm); font-weight: 600; color: var(--brand); text-decoration: none; }
 .map-link:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) { .tinted .app-main { transition: none; } }
+.price-tba { font-weight: 600; color: var(--text-muted); font-size: var(--fs-sm); }
+
+/* Admin and seller portal sign-in pages */
+.portal-page { display: grid; place-items: center; padding: 48px 16px; min-height: 60vh; }
+.portal-card { display: grid; gap: 14px; width: min(100%, 440px); padding: 30px 28px; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+.portal-card h1 { margin: 0; font-size: var(--fs-xl); }
+.portal-card p { margin: 0; }
+.portal-kicker { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand); }
+.portal-card .btn-link { background: none; border: 0; color: var(--brand); font-weight: 600; cursor: pointer; justify-self: center; }
+.portal-facts { display: grid; gap: 6px; margin: 0; }
+.portal-facts div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border-light); padding-bottom: 6px; }
+.portal-facts dt { color: var(--text-muted); }
+.portal-facts dd { margin: 0; font-weight: 600; }

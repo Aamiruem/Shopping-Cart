@@ -4,10 +4,10 @@ import { crm } from '../../api/client';
 import { Badge, count, dateTime, Drawer, ErrorBox, Field, label, Loading, money, PageHead, Pager, Table, useAction, useCrm, useCrmData } from '../../components/crm/ui';
 
 export const STATUS = {
-  draft: 'Draft', pending_verification: 'Pending verification', available: 'Available', out_of_stock: 'Out of stock',
-  coming_soon: 'Coming soon', discontinued: 'Discontinued', unavailable: 'Unavailable',
+  draft: 'Draft', pending_verification: 'Pending verification', approved: 'Approved (not on sale)', available: 'Available', out_of_stock: 'Out of stock',
+  coming_soon: 'Coming soon', discontinued: 'Discontinued', unavailable: 'Unavailable', rejected: 'Rejected',
 };
-const TONE = { draft: 'none', pending_verification: 'warn', available: 'good', out_of_stock: 'warn', coming_soon: 'info', discontinued: 'bad', unavailable: 'bad' };
+const TONE = { draft: 'none', pending_verification: 'warn', approved: 'info', available: 'good', out_of_stock: 'warn', coming_soon: 'info', discontinued: 'bad', unavailable: 'bad', rejected: 'bad' };
 
 function ProductDrawer({ id, onClose, onChange }) {
   const { can, confirm } = useCrm();
@@ -110,15 +110,16 @@ function ProductDrawer({ id, onClose, onChange }) {
 }
 const PUBLIC = (s) => ['available', 'out_of_stock', 'coming_soon'].includes(s);
 
-export default function Catalog() {
+// `inventory`: the same products by stock level (CRM → Inventory); stock is edited in Seller Hub → Store catalog
+export default function Catalog({ inventory = false }) {
   const [search, setSearch] = useSearchParams();
-  const [params, setParams] = useState({ q: '', status: 'pending_verification', source: '', page: 1 });
+  const [params, setParams] = useState({ q: '', status: inventory ? '' : 'pending_verification', source: '', stock: inventory ? 'low' : '', page: 1 });
   const { data, error, loading, reload } = useCrmData('/catalog', params);
   const set = (k) => (e) => setParams({ ...params, [k]: e.target.value, page: 1 });
   const openId = search.get('product');
   return (
     <>
-      <PageHead title="Catalog verification" subtitle="Only products an admin has verified can be shown or sold. Nothing is treated as genuine automatically." />
+      <PageHead title={inventory ? 'Inventory' : 'Product verification'} subtitle={inventory ? 'Stock levels from the database: stock taken by orders and put back by cancellations and returns. Change stock in Seller Hub → Store catalog (or the seller’s own Products page).' : 'Only products an admin has verified can be shown or sold. Nothing is treated as genuine automatically.'} />
       {data && !data.requireVerification && <div className="alert warn">Verification isn’t enforced on this database yet: run <code>npm run db:setup</code> (it switches it on), or turn it on in Settings.</div>}
       {data && (
         <div className="kpis">
@@ -134,6 +135,7 @@ export default function Catalog() {
           <input type="search" placeholder="Search name, brand, seller or ID" value={params.q} onChange={set('q')} aria-label="Search products" />
           <select value={params.status} onChange={set('status')} aria-label="Status"><option value="">Every status</option>{Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           <select value={params.source} onChange={set('source')} aria-label="Source"><option value="">Store and sellers</option><option value="store">Store catalog</option><option value="seller">Seller products</option></select>
+          {inventory && <select value={params.stock} onChange={set('stock')} aria-label="Stock"><option value="">Any stock</option><option value="low">Low (1–9)</option><option value="out">Out of stock</option></select>}
         </div>
         <ErrorBox error={error} onRetry={reload} />
         {loading && !data ? <Loading /> : (

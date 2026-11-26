@@ -117,6 +117,12 @@ export const api = {
   phoneOtp: (phone, channel) => request('/auth/phone/otp', { method: 'POST', body: { phone, channel } }),
   phoneVerify: (phone, code) => request('/auth/phone/verify', { method: 'POST', body: { phone, code } }),
   login: (body) => request('/auth/login', { method: 'POST', body }),
+  // Separate portals: the admin portal (password + authenticator code) and the seller portal
+  adminLogin: (body) => request('/auth/admin/login', { method: 'POST', body }),
+  sellerLogin: (body) => request('/auth/seller/login', { method: 'POST', body }),
+  sellerSignup: (body) => request('/auth/seller/register', { method: 'POST', body }),
+  sellerApplication: () => request('/seller/application'),
+  sellerSettlements: () => request('/seller/settlements'),
   // Passwordless login: code to the account's email, or SMS / WhatsApp to its verified mobile
   otpLogin: (identifier, channel) => request('/auth/otp', { method: 'POST', body: { identifier, channel } }),
   otpLoginVerify: (identifier, code) => request('/auth/otp/verify', { method: 'POST', body: { identifier, code } }),

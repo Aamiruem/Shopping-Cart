@@ -130,7 +130,8 @@
 .crm .empty strong { display: block; color: var(--c-text); margin-bottom: 4px; }
 
 /* Badges */
-.crm .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 600; background: var(--c-raised); color: var(--c-muted); border: 1px solid var(--c-border); white-space: nowrap; }
+/* The storefront's .badge is the cart-count bubble (absolute, fixed size): undone here */
+.crm .badge { position: static; top: auto; right: auto; min-width: 0; height: auto; place-items: initial; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 600; background: var(--c-raised); color: var(--c-muted); border: 1px solid var(--c-border); white-space: nowrap; }
 .crm .badge.good { background: var(--c-good-soft); color: var(--c-good); border-color: transparent; }
 .crm .badge.warn { background: var(--c-warn-soft); color: var(--c-warn); border-color: transparent; }
 .crm .badge.bad { background: var(--c-bad-soft); color: var(--c-bad); border-color: transparent; }

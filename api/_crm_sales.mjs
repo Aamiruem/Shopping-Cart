@@ -10,7 +10,7 @@
 //   returning         2+ orders in total and one of them in the period
 //   retention rate    of customers who ordered in the previous period of the same length, the share who ordered again
 //   CLV               lifetime revenue / customers who ever paid (historic average, not a prediction)
-import { getProduct } from './_catalog.mjs';
+import { getProduct, storeCatalog } from './_catalog.mjs';
 import { restockOrder } from './_inventory.mjs';
 import { razorpayClient, refundPaidOrder } from './_payments.mjs';
 import { actOnReturn, listReturns } from './_returns.mjs';
@@ -134,6 +134,25 @@ export async function dashboard({ db, staff, params }) {
     [staff.id],
   );
   const { funnel, lost } = await leadFunnel(db);
+  // Sellers, products by verification status, and OTP delivery over the same period
+  const sellerCounts = await db('SELECT status, count(*)::int AS n FROM sellers GROUP BY status').catch(() => []);
+  const sellerProducts = await db("SELECT COALESCE(data->>'status', 'pending_verification') AS status, count(*)::int AS n FROM seller_products GROUP BY 1");
+  const productStatus = {};
+  for (const p of storeCatalog()) productStatus[p.status] = (productStatus[p.status] || 0) + 1;
+  for (const r of sellerProducts) productStatus[r.status] = (productStatus[r.status] || 0) + r.n;
+  const [otp] = await db(
+    `SELECT count(*) FILTER (WHERE status <> 'not_sent_dev')::int AS sent, count(*) FILTER (WHERE status IN ('accepted', 'delivered'))::int AS ok,
+            count(*) FILTER (WHERE status = 'delivered')::int AS delivered, count(*) FILTER (WHERE status = 'failed')::int AS failed
+       FROM otp_delivery_logs WHERE created_at >= $1::date AND created_at < $2::date + 1`,
+    [from, to],
+  ).catch(() => [{ sent: 0, ok: 0, delivered: 0, failed: 0 }]);
+  const [verified] = await db("SELECT count(*) FILTER (WHERE email_verified OR phone_verified)::int AS n FROM users WHERE role <> 'admin'");
+  const [paidOrders] = await db(
+    `SELECT count(*) FILTER (WHERE o.payment_method <> 'cod' OR NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.fulfilment <> 'delivered'))::int AS paid,
+            count(*) FILTER (WHERE o.payment_method = 'cod' AND EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.fulfilment <> 'delivered'))::int AS pending
+       FROM orders o WHERE o.status = 'placed' AND o.created_at >= $1::date AND o.created_at < $2::date + 1`,
+    [from, to],
+  );
   const avg = orders.paid_orders ? Math.round(orders.revenue / orders.paid_orders) : 0;
   const contact = can(staff, 'customers.contact');
   return {
@@ -151,6 +170,12 @@ export async function dashboard({ db, staff, params }) {
         pendingPayments: { codOrders: orders.cod_pending, codAmount: orders.cod_pending_amount, refundsPending: payments.refund_pending, failedPayments: payments.failed },
         refunds: { requests: refunds.requests, approved: refunds.approved, toRefund: refunds.to_refund, toRefundAmount: refunds.to_refund_amount },
         tickets,
+        verifiedCustomers: verified.n,
+        sellers: { total: sellerCounts.reduce((s, r) => s + r.n, 0), approved: sellerCounts.find((r) => r.status === 'approved')?.n ?? 0, pending: sellerCounts.find((r) => r.status === 'pending')?.n ?? 0 },
+        products: { total: Object.values(productStatus).reduce((a, b) => a + b, 0), verified: (productStatus.available || 0) + (productStatus.out_of_stock || 0) + (productStatus.coming_soon || 0) + (productStatus.approved || 0),
+          pending: productStatus.pending_verification || 0, comingSoon: productStatus.coming_soon || 0, outOfStock: storeCatalog().filter((p) => p.status === 'available' && !(p.stock > 0)).length + (productStatus.out_of_stock || 0) },
+        paidOrders: paidOrders.paid, pendingOrders: paidOrders.pending,
+        otp: { sent: otp.sent, successRate: pct(otp.ok, otp.sent), deliveredConfirmed: otp.delivered, failureRate: pct(otp.failed, otp.sent) },
       },
       trend, growth, categories,
       funnel, lostLeads: lost,

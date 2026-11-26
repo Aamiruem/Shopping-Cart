@@ -59,7 +59,8 @@ function useHubTheme() {
 export default function SellerLayout() {
   const { user } = useAuth();
   const { theme, toggle } = useHubTheme();
-  const isSeller = ['seller', 'admin'].includes(user.role);
+  // An admin, or a seller whose application was approved (and who isn't suspended)
+  const isSeller = user.role === 'admin' || (user.role === 'seller' && (!user.seller || user.seller.status === 'approved'));
   const { data: profile, reload } = useApi(() => (isSeller ? api.sellerProfile() : Promise.resolve(null)), [isSeller]);
   if (!isSeller) return <Navigate to="/seller/register" replace />;
 

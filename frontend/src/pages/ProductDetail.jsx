@@ -145,7 +145,7 @@ export default function ProductDetail() {
     path: productPath(product),
     image: product.image,
     type: 'product',
-    jsonLd: [productLd(product), breadcrumbLd([{ name: 'Home', path: '/' }, { name: categoryLabel(product.category), path: `/products?category=${product.category}` }, { name: product.name, path: productPath(product) }])],
+    jsonLd: [productLd(product), breadcrumbLd([{ name: 'Home', path: '/' }, { name: categoryLabel(product.category), path: `/products?category=${product.category}` }, { name: product.name, path: productPath(product) }])].filter(Boolean),
   } : { title: 'Product', noindex: true });
 
   if (error) return <div className="container"><EmptyState title="Product not found" message={error} action={{ to: '/products', label: 'Continue shopping' }} /></div>;

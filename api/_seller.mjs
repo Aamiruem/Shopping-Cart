@@ -74,9 +74,10 @@ async function sellerRole(db, userId) {
 }
 
 // ---------- Applying to sell (an admin reviews it in CRM → Sellers), profile and payouts ----------
+// Identity documents are never uploaded here (the photo store is public): the reviewer checks the PAN and GSTIN on the
+// government portals and the bank account by a penny-drop or a cheque seen on a video call, and records each check.
 const PAN_RE = /^[A-Z]{5}\d{4}[A-Z]$/;
 const BUSINESS_TYPES = ['individual', 'proprietorship', 'partnership', 'llp', 'private_limited', 'other'];
-const DOC_TYPES = ['pan', 'gst_certificate', 'cancelled_cheque', 'address_proof', 'trade_licence', 'other'];
 
 async function register({ db, userId, body }) {
   const store = text(body.storeName);
@@ -115,21 +116,7 @@ async function application({ db, userId }) {
   const missing = [];
   if (!s.email_verified && !s.phone_verified) missing.push('Verify your email or mobile number (Account → Profile)');
   if (!s.pan) missing.push('PAN');
-  if (!(s.documents || []).some((d) => d.type === 'pan')) missing.push('A copy of the PAN card');
-  if (!(s.documents || []).some((d) => d.type === 'cancelled_cheque')) missing.push('A cancelled cheque or bank statement for payouts');
   return { body: { ...s, missing } };
-}
-
-/** Documents for the review: uploaded first through /api/seller/uploads (Vercel Blob), then attached here */
-async function addDocument({ db, userId, body }) {
-  const type = DOC_TYPES.includes(body.type) ? body.type : fail(`Document type must be one of: ${DOC_TYPES.join(', ')}`);
-  const url = text(body.url);
-  if (!/^https:\/\/[\w.-]+\.public\.blob\.vercel-storage\.com\//.test(url)) fail('Upload the file first');
-  const [s] = await db('SELECT status, documents FROM sellers WHERE user_id = $1', [userId]);
-  if (!s) fail('Apply to sell first', 404);
-  if ((s.documents || []).length >= 10) fail('At most 10 documents');
-  await db(`UPDATE sellers SET documents = documents || $2::jsonb, updated_at = NOW() WHERE user_id = $1`, [userId, JSON.stringify([{ type, url, uploaded_at: new Date().toISOString() }])]);
-  return application({ db, userId });
 }
 
 const mask = (last4) => (last4 ? `••••${last4}` : null);
@@ -479,8 +466,8 @@ async function earnings({ db, userId, role }) {
 let lastSync = 0;
 
 /** Loads listed seller products into the catalog at most every 30 s; on a database error the catalog keeps what it had. */
-export async function syncSellerProducts(db = query, now = Date.now()) {
-  if (now - lastSync < SYNC_MS) return;
+export async function syncSellerProducts(db = query, now = Date.now(), force = false) {
+  if (!force && now - lastSync < SYNC_MS) return;
   lastSync = now;
   try {
     const rows = await db(
@@ -499,7 +486,6 @@ export async function syncSellerProducts(db = query, now = Date.now()) {
 const ROUTES = {
   'POST register': register,
   'GET application': application,
-  'POST application/documents': addDocument,
   'GET profile': getProfile,
   'GET overview': ({ db, userId, role }) => overview({ db, userId, role }).then((body) => ({ body })),
   'PUT profile': updateProfile,
@@ -534,7 +520,6 @@ function findRoute(method, rest) {
   const [first, second, third, ...extra] = rest;
   if (extra.length) return null;
   if (first === 'products' && second === 'bulk' && !third) return { key: `${method} products/bulk` };
-  if (first === 'application' && second === 'documents' && !third) return Object.hasOwn(ROUTES, `${method} application/documents`) ? { key: `${method} application/documents` } : null;
   const key = [first, second && ':id', third].filter(Boolean).join('/');
   return Object.hasOwn(ROUTES, `${method} ${key}`) ? { key: `${method} ${key}`, id: second } : null;
 }
@@ -551,7 +536,7 @@ export function handleSeller({ method, rest, body, params = {}, authorization },
     if (!account) fail('Account not found', 401);
     assertSessionValid(account, claims);
     const { key, id } = findRoute(method, rest);
-    const role = ['POST register', 'GET application', 'POST application/documents'].includes(key) ? null : await sellerRole(db, userId);
+    const role = ['POST register', 'GET application'].includes(key) ? null : await sellerRole(db, userId);
     return ROUTES[key]({ db, userId, role, id, body: body ?? {}, params, rz });
   });
 }

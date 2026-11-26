@@ -48,6 +48,11 @@ export default function Dashboard() {
         <Kpi label="Pending payments" value={money(k.pendingPayments.codAmount)} sub={`${k.pendingPayments.codOrders} cash-on-delivery orders to collect${k.pendingPayments.failedPayments ? ` · ${k.pendingPayments.failedPayments} failed online` : ''}`} />
         <Kpi label="Refund requests" value={count(k.refunds.requests)} sub={`${k.refunds.toRefund} to refund (${money(k.refunds.toRefundAmount)})${k.pendingPayments.refundsPending ? ` · ${k.pendingPayments.refundsPending} online refunds pending` : ''}`} />
         <Kpi label="Open tickets" value={count(k.tickets.open)} sub={`${k.tickets.urgent} urgent`} />
+        <Kpi label="Verified customers" value={count(k.verifiedCustomers)} sub="Email or mobile verified" />
+        <Kpi label="Sellers" value={count(k.sellers.total)} sub={`${k.sellers.approved} approved · ${k.sellers.pending} applications waiting`} />
+        <Kpi label="Products" value={count(k.products.total)} sub={`${k.products.verified} verified · ${k.products.pending} pending · ${k.products.comingSoon} coming soon · ${k.products.outOfStock} out of stock`} />
+        <Kpi label="Paid / pending orders" value={`${count(k.paidOrders)} / ${count(k.pendingOrders)}`} sub="Pending = cash on delivery not yet delivered" />
+        <Kpi label="OTP success rate" value={pctText(k.otp.successRate)} sub={`${k.otp.sent} codes · ${k.otp.deliveredConfirmed} confirmed delivered · ${pctText(k.otp.failureRate)} failed`} />
       </div>
 
       <div className="cards wide">

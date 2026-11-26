@@ -124,7 +124,7 @@ export async function setProductStatus({ db, staff, id, body }) {
     );
   }
   await syncCatalogState(db, Date.now(), true);
-  await syncSellerProducts(db, Date.now() + 60_000);
+  await syncSellerProducts(db, Date.now(), true);
   await audit(db, staff, body.reject ? 'product.reject' : `product.${status}`, 'product', p._id, { from: p.status, to: status, reason: reason || undefined, name: p.name });
   return getCatalogProduct({ db, id: p._id });
 }

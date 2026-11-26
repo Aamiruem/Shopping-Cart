@@ -134,7 +134,7 @@ function AccountMenu() {
           )}
           <p className="menu-title">Your Account</p>
           {links.map((l) => <MenuLink key={l.to} {...l} />)}
-          {!isSellerRole(user) && <MenuLink to="/sell" icon="store" label="Become a Seller" />}
+          {!isSellerRole(user) && <MenuLink to="/seller/signup" icon="store" label="Become a Seller" />}
           <MenuLink to="/help" icon="headphones" label="Customer Care" />
           <InstallAppItem onDone={() => setOpen(false)} />
           {user && (
@@ -148,8 +148,33 @@ function AccountMenu() {
   );
 }
 
+// The CRM's sections, in More only for admin-portal sessions with the matching permission (user.crm comes from the
+// server, which checks every CRM request again)
+const CRM_LINKS = [
+  ['/crm', 'grid', 'CRM Dashboard', 'dashboard.view'],
+  ['/crm/customers', 'users', 'Customer Management', 'customers.view'],
+  ['/crm/sellers', 'store', 'Seller Management', 'sellers.view'],
+  ['/crm/leads', 'zap', 'Lead Management', 'leads.view'],
+  ['/crm/catalog', 'check', 'Product Verification', 'catalog.view'],
+  ['/crm/inventory', 'package', 'Inventory Management', 'catalog.view'],
+  ['/crm/sales', 'shoppingBag', 'Order Management', 'sales.view'],
+  ['/crm/payments', 'wallet', 'Payment Management', 'sales.view'],
+  ['/crm/deliveries', 'truck', 'Delivery Management', 'sales.view'],
+  ['/crm/sales?tab=refunds', 'returns', 'Return & Refund Management', 'sales.view'],
+  ['/crm/marketing', 'send', 'Marketing Automation', 'marketing.view'],
+  ['/crm/support', 'headphones', 'Customer Support', 'support.view'],
+  ['/crm/team', 'shield', 'Employee Management', 'staff.manage'],
+  ['/crm/tasks', 'clock', 'Task Management', null],
+  ['/crm/reports', 'barChart', 'Reports & Analytics', 'reports.view'],
+  ['/crm/notifications', 'mail', 'Notifications', 'marketing.view'],
+  ['/crm/audit', 'eye', 'Audit Logs', 'audit.view'],
+  ['/crm/settings', 'settings', 'CRM Settings', 'settings.manage'],
+];
+
 function MoreMenu() {
   const { user } = useAuth();
+  const admin = user?.portal === 'admin' && user.crm;
+  const may = (p) => !p || !user.crm.permissions?.length || user.crm.permissions.includes(p);
   const muted = useSyncExternalStore(soundStore.subscribe, soundStore.isMuted);
   const { open, setOpen, toggle, wrapper } = useDropdown();
 
@@ -162,15 +187,19 @@ function MoreMenu() {
       </button>
       {open && (
         <div className="menu-panel menu-panel-more">
-          <p className="menu-title">More</p>
-          {!isSellerRole(user) && <MenuLink to="/sell" icon="store" label="Become a Seller" />}
+          <p className="menu-title">More Options</p>
+          {admin && (
+            <>
+              {CRM_LINKS.filter(([, , , p]) => may(p)).map(([to, icon, label]) => <MenuLink key={to} to={to} icon={icon} label={label} />)}
+              <p className="menu-title">Store</p>
+            </>
+          )}
+          {/* The seller portal has its own sign-in; customers never become sellers from here */}
+          {!admin && user?.portal !== 'seller' && <MenuLink to="/seller/login" icon="store" label="Seller portal: sell on Arvixa" />}
           <MenuLink to="/products" icon="grid" label="Shop all products" />
           <MenuLink to="/grocery" icon="home" label="Grocery Store" />
           {/* Seller Hub: sellers and admins only, and only in this menu */}
-          {isSellerRole(user) && <MenuLink to="/seller/dashboard" icon="barChart" label="Seller Hub" />}
-          {/* CRM Dashboard: only for the store admin and CRM team members (user.crm comes from the server). The API
-              checks every CRM request again, so this link is a convenience, not the protection. */}
-          {user?.crm && <MenuLink to="/crm" icon="users" label="CRM Dashboard" />}
+          {['seller', 'admin'].includes(user?.portal) && isSellerRole(user) && <MenuLink to="/seller/dashboard" icon="barChart" label="Seller Hub" />}
           <MenuLink to="/help" icon="headphones" label="Customer Care" />
           <MenuLink to="/orders" icon="package" label="Track your orders" />
           <button type="button" className="menu-link" onClick={() => { setOpen(false); window.dispatchEvent(new Event(OPEN_CHAT_EVENT)); }}>

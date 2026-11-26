@@ -12,6 +12,7 @@ import MobileTabBar, { showsTabBar } from './components/layout/MobileTabBar';
 import PageToolbar from './components/layout/PageToolbar';
 import SiteHeader from './components/layout/SiteHeader';
 import { AuthModalProvider } from './context/AuthModalContext';
+import PortalRoute from './components/routing/PortalRoute';
 import ProtectedRoute from './components/routing/ProtectedRoute';
 import ScrollToTop from './components/routing/ScrollToTop';
 import { About, OpeningSoon, Privacy, Refunds, Shipping, Terms } from './pages/Legal';
@@ -66,14 +67,23 @@ const CrmInsights = lazy(() => import('./pages/crm/Insights'));
 const CrmTeam = lazy(() => import('./pages/crm/Team'));
 const CrmSettings = lazy(() => import('./pages/crm/Settings'));
 const Unsubscribe = lazy(() => import('./pages/Unsubscribe'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
+const SellerLogin = lazy(() => import('./pages/seller/SellerLogin'));
+const CrmSellers = lazy(() => import('./pages/crm/Sellers'));
+const CrmPayments = lazy(() => import('./pages/crm/Payments'));
+const CrmDeliveries = lazy(() => import('./pages/crm/Deliveries'));
+const CrmNotifications = lazy(() => import('./pages/crm/Notifications'));
+const CrmSecurity = lazy(() => import('./pages/crm/Security'));
+const CrmAudit = lazy(() => import('./pages/crm/Audit'));
 
 // Pages that show the category strip under the navbar
 const WITH_CATEGORY_BAR = ['/', '/products', '/grocery'];
 
 const privateRoute = (element) => <ProtectedRoute>{element}</ProtectedRoute>;
 const shopRoute = (element) => (SHOPPING ? privateRoute(element) : <OpeningSoon />);
-// The Seller Hub runs on the api/ functions too; only its analytics dashboard needs the full API
-const sellerRoute = (element) => (SHOPPING ? privateRoute(element) : <OpeningSoon />);
+// Three portals, each with its own sign-in: the Seller Hub needs a seller-portal session, the CRM an admin-portal one
+const sellerRoute = (element) => (SHOPPING ? <PortalRoute portals={['seller', 'admin']} login="/seller/login">{element}</PortalRoute> : <OpeningSoon />);
+const adminRoute = (element) => (SHOPPING ? <PortalRoute portals={['admin']} login="/admin/login">{element}</PortalRoute> : <OpeningSoon />);
 
 function ProductRedirect() {
   const { id, slug } = useParams();
@@ -104,7 +114,12 @@ export default function App() {
           <Routes>
             {/* Old and guessed addresses: /product/:id and /admin go to the real pages */}
             <Route path="/product/:id/:slug?" element={<ProductRedirect />} />
-            <Route path="/admin/*" element={<Navigate to="/seller/dashboard" replace />} />
+            {/* The admin portal: its own sign-in, never linked from the store */}
+            <Route path="/admin/login" element={SHOPPING ? <AdminLogin /> : <OpeningSoon />} />
+            <Route path="/admin/*" element={<Navigate to="/crm" replace />} />
+            {/* The seller portal's own sign-in and sign-up */}
+            <Route path="/seller/login" element={SHOPPING ? <SellerLogin /> : <OpeningSoon />} />
+            <Route path="/seller/signup" element={SHOPPING ? <SellerLogin mode="register" /> : <OpeningSoon />} />
             {/* Public */}
             <Route path="/" element={<Home />} />
             <Route path="/products" element={<Products />} />
@@ -147,7 +162,7 @@ export default function App() {
           </Route>
 
             {/* CRM: hidden from everyone but the store team, and every API call is permission-checked on the server */}
-            <Route path="/crm" element={sellerRoute(<CrmLayout />)}>
+            <Route path="/crm" element={adminRoute(<CrmLayout />)}>
               <Route index element={<CrmDashboard />} />
               <Route path="customers" element={<CrmCustomers />} />
               <Route path="customers/:id" element={<CrmCustomer />} />
@@ -155,6 +170,13 @@ export default function App() {
               <Route path="sales" element={<CrmSales />} />
               <Route path="invoice/:id" element={<CrmInvoice />} />
               <Route path="catalog" element={<CrmCatalog />} />
+              <Route path="inventory" element={<CrmCatalog key="inventory" inventory />} />
+              <Route path="sellers" element={<CrmSellers />} />
+              <Route path="payments" element={<CrmPayments />} />
+              <Route path="deliveries" element={<CrmDeliveries />} />
+              <Route path="notifications" element={<CrmNotifications />} />
+              <Route path="security" element={<CrmSecurity />} />
+              <Route path="audit" element={<CrmAudit />} />
               <Route path="marketing" element={<CrmMarketing />} />
               <Route path="support" element={<CrmSupport />} />
               <Route path="tasks" element={<CrmTasks />} />

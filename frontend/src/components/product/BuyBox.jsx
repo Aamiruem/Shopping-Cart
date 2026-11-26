@@ -84,8 +84,8 @@ export default function BuyBox({ product, options = {}, ready = () => true, inCa
 
   return (
     <aside className="buy-box" aria-label="Buy this product">
-      <p className="buy-box-price">{formatPrice(product.price)}</p>
-      <p className="muted small">{product.price >= 499 ? 'Free delivery on this item' : 'Free delivery on orders of ₹499 or more'}</p>
+      <p className="buy-box-price">{product.price === null ? 'Price at launch' : formatPrice(product.price)}</p>
+      {product.price !== null && <p className="muted small">{product.price >= 499 ? 'Free delivery on this item' : 'Free delivery on orders of ₹499 or more'}</p>}
       <DeliverTo />
       <p className={`buy-box-stock ${outOfStock ? 'text-error' : 'text-success'}`}>
         {!outOfStock ? 'In stock' : product.availability === 'coming_soon' ? 'Coming soon: not available to order yet' : product.availability === 'discontinued' ? 'Discontinued: no longer sold' : product.availability === 'unavailable' ? 'Currently unavailable' : 'Currently out of stock'}
