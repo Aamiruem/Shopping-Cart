@@ -46,6 +46,48 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
 .cat-tab::after { background: var(--brand-ink); }
 .toolbar-btn { box-shadow: none; }
 
+/* Navbar: frosted bar, quieter items, one divider before the wishlist and cart */
+/* backdrop-filter makes the bar its own stacking layer: lift it above the category bar so its menus aren't covered */
+.navbar { position: relative; z-index: 2; background: rgba(255, 255, 255, 0.94); backdrop-filter: saturate(180%) blur(12px); }
+.navbar-inner { gap: 24px; }
+.nav-actions { gap: 2px; }
+.nav-item { padding: 9px 14px; letter-spacing: -0.005em; }
+.nav-shop { padding: 10px 18px; margin-right: 8px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.14); }
+.nav-shop:hover, .nav-shop.active { color: #fff; }
+.nav-divider { width: 1px; height: 24px; margin: 0 6px; background: var(--border); }
+.nav-icon-only { padding: 9px 11px; }
+.nav-icon-only .nav-icon { margin-right: 0; }
+.nav-cart .nav-icon { margin-right: 2px; }
+.navbar .badge { top: -7px; right: -9px; background: var(--brand); }
+/* Admin menu: only for a signed-in store team */
+.nav-staff { color: var(--brand); background: var(--brand-light); }
+.nav-staff:hover, .nav-staff.open { background: var(--brand); color: #fff; }
+.menu-panel-staff { min-width: 310px; padding: 0 0 8px; }
+.staff-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px 10px; }
+.staff-badge { padding: 3px 10px; border-radius: var(--radius-pill); background: var(--brand-light); color: var(--brand); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.staff-head strong { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
+.staff-primary { display: grid; gap: 8px; padding: 0 12px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--border-light); }
+.staff-tile { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border-light); border-radius: var(--radius); color: var(--text); transition: border-color var(--transition), background var(--transition); }
+.staff-tile:hover { border-color: var(--brand); background: var(--brand-faint); }
+.staff-tile .icon { flex-shrink: 0; color: var(--brand); }
+.staff-tile span { display: flex; flex-direction: column; gap: 2px; }
+.staff-tile small { color: var(--text-muted); font-size: var(--fs-xs); }
+.menu-panel-staff .menu-link { padding: 9px 20px; }
+@media (max-width: 900px) {
+  .nav-divider { display: none; }
+  .nav-shop { margin-right: 2px; padding: 9px 12px; }
+}
+/* Phones: the wishlist is in the account menu and the tab bar, so the icons fit beside the logo */
+@media (max-width: 520px) {
+  .nav-icon-only { display: none; }
+  .nav-actions .nav-item { padding: 9px 8px; }
+}
+
+/* Seller Hub: an admin's way back to the CRM */
+.hub-staff-links { display: grid; gap: 4px; margin: 12px 16px 0; padding-top: 12px; border-top: 1px solid var(--border-light); }
+.hub-staff-link { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius); color: var(--text-muted); font-size: var(--fs-sm); font-weight: 600; }
+.hub-staff-link:hover { background: var(--brand-faint); color: var(--brand); }
+
 /* ---------- Home: editorial hero ---------- */
 .page-home { padding-top: 8px; }
 .home-hero { padding: clamp(24px, 4.4vw, 64px); background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--radius-lg); }

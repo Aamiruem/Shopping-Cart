@@ -148,33 +148,63 @@ function AccountMenu() {
   );
 }
 
-// The CRM's sections, in More only for admin-portal sessions with the matching permission (user.crm comes from the
-// server, which checks every CRM request again)
-const CRM_LINKS = [
-  ['/crm', 'grid', 'CRM Dashboard', 'dashboard.view'],
-  ['/crm/customers', 'users', 'Customer Management', 'customers.view'],
-  ['/crm/sellers', 'store', 'Seller Management', 'sellers.view'],
-  ['/crm/leads', 'zap', 'Lead Management', 'leads.view'],
-  ['/crm/catalog', 'check', 'Product Verification', 'catalog.view'],
-  ['/crm/inventory', 'package', 'Inventory Management', 'catalog.view'],
-  ['/crm/sales', 'shoppingBag', 'Order Management', 'sales.view'],
-  ['/crm/payments', 'wallet', 'Payment Management', 'sales.view'],
-  ['/crm/deliveries', 'truck', 'Delivery Management', 'sales.view'],
-  ['/crm/sales?tab=refunds', 'returns', 'Return & Refund Management', 'sales.view'],
-  ['/crm/marketing', 'send', 'Marketing Automation', 'marketing.view'],
-  ['/crm/support', 'headphones', 'Customer Support', 'support.view'],
-  ['/crm/team', 'shield', 'Employee Management', 'staff.manage'],
-  ['/crm/tasks', 'clock', 'Task Management', null],
-  ['/crm/reports', 'barChart', 'Reports & Analytics', 'reports.view'],
-  ['/crm/notifications', 'mail', 'Notifications', 'marketing.view'],
-  ['/crm/audit', 'eye', 'Audit Logs', 'audit.view'],
-  ['/crm/settings', 'settings', 'CRM Settings', 'settings.manage'],
+// Shortcuts for the store team. Shoppers never see them: the menu appears only for an admin-portal session
+// (signed in at /admin/login), and each entry only with its CRM permission (the server checks every request again).
+const STAFF_LINKS = [
+  ['/crm/sales', 'shoppingBag', 'Orders', 'sales.view'],
+  ['/crm/customers', 'users', 'Customers', 'customers.view'],
+  ['/crm/catalog', 'tag', 'Product verification', 'catalog.view'],
+  ['/crm/inventory', 'package', 'Inventory', 'catalog.view'],
+  ['/crm/sellers', 'store', 'Sellers', 'sellers.view'],
+  ['/crm/support', 'headphones', 'Support tickets', 'support.view'],
+  ['/crm/reports', 'activity', 'Reports', 'reports.view'],
+  ['/crm/team', 'shield', 'Team & roles', 'staff.manage'],
+  ['/crm/settings', 'settings', 'Settings', 'settings.manage'],
+  ['/crm/security', 'lock', 'My email & password', null],
 ];
+
+function StaffMenu() {
+  const { user } = useAuth();
+  const { open, wrapper, toggle } = useDropdown();
+  if (user?.portal !== 'admin' || !user.crm) return null;
+  const may = (p) => !p || !user.crm.permissions?.length || user.crm.permissions.includes(p);
+
+  return (
+    <div className="nav-dropdown" {...wrapper}>
+      <button type="button" className={`nav-item nav-staff ${open ? 'open' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="true" aria-label="Admin">
+        <Icon name="shield" size={17} />
+        <span className="nav-label">Admin</span>
+        <Icon name="chevronDown" size={14} className="nav-chevron" />
+      </button>
+      {open && (
+        <div className="menu-panel menu-panel-staff">
+          <div className="staff-head">
+            <span className="staff-badge">Store team</span>
+            <strong>{user.crm.roleName || 'Administrator'}</strong>
+          </div>
+          <div className="staff-primary">
+            <Link to="/crm" className="staff-tile">
+              <Icon name="grid" size={20} />
+              <span><strong>CRM</strong><small>Customers, orders, reports</small></span>
+            </Link>
+            {isSellerRole(user) && (
+              <Link to="/seller/dashboard" className="staff-tile">
+                <Icon name="barChart" size={20} />
+                <span><strong>Seller Hub</strong><small>Products, catalog, payouts</small></span>
+              </Link>
+            )}
+          </div>
+          <p className="menu-title">Quick links</p>
+          {STAFF_LINKS.filter(([, , , p]) => may(p)).map(([to, icon, label]) => <MenuLink key={to} to={to} icon={icon} label={label} />)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function MoreMenu() {
   const { user } = useAuth();
   const admin = user?.portal === 'admin' && user.crm;
-  const may = (p) => !p || !user.crm.permissions?.length || user.crm.permissions.includes(p);
   const muted = useSyncExternalStore(soundStore.subscribe, soundStore.isMuted);
   const { open, setOpen, toggle, wrapper } = useDropdown();
 
@@ -188,18 +218,12 @@ function MoreMenu() {
       {open && (
         <div className="menu-panel menu-panel-more">
           <p className="menu-title">More Options</p>
-          {admin && (
-            <>
-              {CRM_LINKS.filter(([, , , p]) => may(p)).map(([to, icon, label]) => <MenuLink key={to} to={to} icon={icon} label={label} />)}
-              <p className="menu-title">Store</p>
-            </>
-          )}
           {/* The seller portal has its own sign-in; customers never become sellers from here */}
           {!admin && user?.portal !== 'seller' && <MenuLink to="/seller/login" icon="store" label="Seller portal: sell on Arvixa" />}
           <MenuLink to="/products" icon="grid" label="Shop all products" />
           <MenuLink to="/grocery" icon="home" label="Grocery Store" />
-          {/* Seller Hub: sellers and admins only, and only in this menu */}
-          {['seller', 'admin'].includes(user?.portal) && isSellerRole(user) && <MenuLink to="/seller/dashboard" icon="barChart" label="Seller Hub" />}
+          {/* Seller Hub: sellers here; admins reach it from the Admin menu */}
+          {user?.portal === 'seller' && isSellerRole(user) && <MenuLink to="/seller/dashboard" icon="barChart" label="Seller Hub" />}
           <MenuLink to="/help" icon="headphones" label="Customer Care" />
           <MenuLink to="/orders" icon="package" label="Track your orders" />
           <button type="button" className="menu-link" onClick={() => { setOpen(false); window.dispatchEvent(new Event(OPEN_CHAT_EVENT)); }}>
@@ -218,8 +242,13 @@ function MoreMenu() {
 
 export default function Navbar() {
   const { search } = useLocation(); // "Shop All" is highlighted only on the unfiltered listing
+  const { user } = useAuth();
   const { count } = useCart();
+  const { count: wishCount } = useWishlist();
+  const saved = user ? wishCount : 0;
 
+  // Store-team pages (the admin portal, the CRM) are not advertised here: staff sign in from the footer's
+  // "Admin Portal" link, and the Admin menu appears only once they have
   return (
     <header className="navbar">
       <div className="navbar-inner container">
@@ -227,24 +256,22 @@ export default function Navbar() {
         <SearchBar />
         <nav className="nav-actions" aria-label="Main">
           <NavLink to="/products" end className={({ isActive }) => `nav-item nav-shop ${isActive && !search ? 'active' : ''}`} aria-label="Shop all products">
-            <Icon name="grid" size={18} />
+            <Icon name="grid" size={17} />
             <span className="nav-label">Shop All</span>
           </NavLink>
-          {/* Staff entry points. Both pages still need an admin-portal sign-in: /admin/login forwards a signed-in admin
-              to the CRM, and /crm sends everyone else to /admin/login first */}
-          <NavLink to="/admin/login" className="nav-item nav-staff" aria-label="Admin portal" title="Admin portal">
-            <Icon name="shield" size={18} />
-            <span className="nav-label">Admin</span>
-          </NavLink>
-          <NavLink to="/crm" className="nav-item nav-staff" aria-label="CRM" title="CRM">
-            <Icon name="barChart" size={18} />
-            <span className="nav-label">CRM</span>
-          </NavLink>
+          <StaffMenu />
           <AccountMenu />
           <MoreMenu />
-          <Link to="/cart" className="nav-item" aria-label={`Cart, ${count} items`}>
+          <span className="nav-divider" aria-hidden="true" />
+          <Link to="/wishlist" className="nav-item nav-icon-only" aria-label={`Wishlist, ${saved} items`} title="Wishlist">
             <span className="nav-icon">
-              <Icon name="cart" size={22} />
+              <Icon name="heart" size={21} />
+              {saved > 0 && <span className="badge">{saved}</span>}
+            </span>
+          </Link>
+          <Link to="/cart" className="nav-item nav-cart" aria-label={`Cart, ${count} items`}>
+            <span className="nav-icon">
+              <Icon name="cart" size={21} />
               {count > 0 && <span className="badge">{count}</span>}
             </span>
             <span className="nav-label">Cart</span>

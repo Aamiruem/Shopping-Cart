@@ -73,6 +73,12 @@
 .crm-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
 .crm-top .spacer { flex: 1; }
 .crm-menu-btn { display: none; }
+.crm-whoami { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.crm-avatar { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--c-brand); color: #fff; font-weight: 700; }
+.crm-whoami > span:last-child { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.crm-whoami small { color: var(--c-muted); font-size: 12px; }
+.crm-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 640px) { .crm-action-label { display: none; } }
 .crm-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .crm-page-head p { margin: 4px 0 0; color: var(--c-muted); }
 .crm-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

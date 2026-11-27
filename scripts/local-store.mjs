@@ -1,7 +1,7 @@
 // The whole store API on your computer, on an in-memory PostgreSQL (PGlite) filled with demo data, for testing every
 // flow without touching the live Neon database. Nothing is saved: restart it for a fresh store.
 //
-//   npm run local                                   (repository root; serves the API on http://127.0.0.1:5000)
+//   npm run local                                   (repository root; serves the API on http://127.0.0.1:5100)
 //   cd frontend && VITE_STORE_MODE=store npm run dev (another terminal; open http://localhost:5173)
 //
 // Demo accounts (password secret123):
@@ -28,7 +28,7 @@ import { handleShop } from '../api/_shop.mjs';
 import { handleSupport } from '../api/_support.mjs';
 import catalogHandler from '../api/catalog.mjs';
 
-const PORT = Number(process.env.PORT) || 5000;
+const PORT = Number(process.env.PORT) || 5100; // not 5000: that is the Python backend's port
 process.env.JWT_SECRET ||= 'local-store-only-'.padEnd(48, 'x');
 process.env.DATA_ENCRYPTION_KEY ||= Buffer.alloc(32, 7).toString('base64url'); // local only: bank refunds can be tried
 delete process.env.RAZORPAY_KEY_ID; // never charge anything from a local store
@@ -163,11 +163,8 @@ createServer((req, res) => {
   });
 }).on('error', (err) => {
   if (err.code !== 'EADDRINUSE') throw err;
-  // Usually the Python backend (start-dev.ps1) still running: it has no admin portal, CRM or seller portal, so
-  // /admin/login would answer "No route for POST /api/auth/admin/login"
-  console.error(`Port ${PORT} is already in use, probably by the Python backend (start-dev.ps1). Close that window, or stop it with:`);
-  console.error(`  powershell -Command "Get-NetTCPConnection -LocalPort ${PORT} -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }"`);
-  console.error('then run npm run local again.');
+  console.error(`Port ${PORT} is already in use: the store API is probably running already in another window.`);
+  console.error('Use that one, or close it and run npm run local again.');
   process.exit(1);
 }).listen(PORT, '127.0.0.1', () => {
   console.log(`Local store API on http://127.0.0.1:${PORT} (in memory: restart for fresh demo data)`);

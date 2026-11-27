@@ -1,10 +1,63 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { crm } from '../../api/client';
+import { api, crm } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { Badge, ErrorBox, Field, Loading, PageHead, useAction, useCrm, useCrmData } from '../../components/crm/ui';
 
-// My security: authenticator-app MFA for this admin account
+const CARD = { maxWidth: 640 };
+
+// The admin-portal sign-in: the email it uses. The current password confirms the change.
+function EmailCard() {
+  const { user, changeEmail } = useAuth();
+  const { run, busy } = useAction();
+  const [form, setForm] = useState({ newEmail: '', currentPassword: '' });
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const submit = async (e) => {
+    e.preventDefault();
+    const done = await run(() => changeEmail(form.newEmail.trim(), form.currentPassword), (u) => `Your sign-in email is now ${u.email}`);
+    if (done) setForm({ newEmail: '', currentPassword: '' });
+  };
+  return (
+    <form className="card stack" style={CARD} onSubmit={submit}>
+      <div className="row"><strong>Sign-in email</strong><span className="muted small">{user?.email}</span></div>
+      <p className="muted" style={{ margin: 0 }}>The address you use at /admin/login. It must not belong to another account.</p>
+      <Field label="New email"><input type="email" autoComplete="email" required value={form.newEmail} onChange={set('newEmail')} /></Field>
+      <Field label="Current password"><input type="password" autoComplete="current-password" required value={form.currentPassword} onChange={set('currentPassword')} /></Field>
+      <div><button type="submit" className="b primary" disabled={busy || !form.newEmail.trim() || !form.currentPassword}>Change email</button></div>
+    </form>
+  );
+}
+
+// Same rules as sign-up (api/_auth.mjs): 8+ characters with a letter and a number
+const passwordProblem = (p) => (p.length < 8 ? 'At least 8 characters' : !/[a-z]/i.test(p) || !/\d/.test(p) ? 'Use at least one letter and one number' : '');
+
+function PasswordCard() {
+  const { run, busy } = useAction();
+  const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const problem = form.newPassword && passwordProblem(form.newPassword);
+  const mismatch = form.confirm && form.confirm !== form.newPassword;
+  const submit = async (e) => {
+    e.preventDefault();
+    const done = await run(() => api.changePassword({ currentPassword: form.currentPassword, newPassword: form.newPassword }), 'Password changed. Use the new one next time you sign in.');
+    if (done) setForm({ currentPassword: '', newPassword: '', confirm: '' });
+  };
+  return (
+    <form className="card stack" style={CARD} onSubmit={submit}>
+      <strong>Password</strong>
+      <Field label="Current password"><input type="password" autoComplete="current-password" required value={form.currentPassword} onChange={set('currentPassword')} /></Field>
+      <Field label="New password" hint={problem || 'At least 8 characters, with a letter and a number'}>
+        <input type="password" autoComplete="new-password" required value={form.newPassword} onChange={set('newPassword')} />
+      </Field>
+      <Field label="Confirm new password" hint={mismatch ? 'The passwords do not match' : ''}>
+        <input type="password" autoComplete="new-password" required value={form.confirm} onChange={set('confirm')} />
+      </Field>
+      <div><button type="submit" className="b primary" disabled={busy || !form.currentPassword || !form.newPassword || Boolean(problem) || form.confirm !== form.newPassword}>Change password</button></div>
+    </form>
+  );
+}
+
+// My security: sign-in email, password and authenticator-app MFA for this admin account
 export default function Security() {
   const { confirm } = useCrm();
   const { logout } = useAuth();
@@ -31,8 +84,11 @@ export default function Security() {
   if (!data) return error ? <ErrorBox error={error} onRetry={reload} /> : <Loading />;
   return (
     <>
-      <PageHead title="My security" subtitle="Two-step sign-in with an authenticator app (Google Authenticator, Microsoft Authenticator, Authy)" />
-      <section className="card stack" style={{ maxWidth: 640 }}>
+      <PageHead title="My security" subtitle="Your sign-in email and password, and two-step sign-in with an authenticator app" />
+      <div className="stack">
+      <EmailCard />
+      <PasswordCard />
+      <section className="card stack" style={CARD}>
         <div className="row"><strong>Authenticator MFA</strong>{data.enabled ? <Badge tone="good">On</Badge> : <Badge tone="warn">Off</Badge>}</div>
         {data.enabled ? (
           <>
@@ -56,6 +112,7 @@ export default function Security() {
           </>
         )}
       </section>
+      </div>
     </>
   );
 }

@@ -237,3 +237,26 @@ test('customers never get seller or admin powers from the store login or a new a
   assert.equal((await hub(r.body.token, 'GET', 'products')).status, 401);
   assert.equal((await handleShop({ method: 'GET', segments: ['cart'], authorization: `Bearer ${r.body.token}`, ip: 'x' }, { db })).status, 200);
 });
+
+test('the admin changes their sign-in email and password from the CRM, with the current password, and both are audited', async () => {
+  await customer('owner@example.com', 'Store Owner');
+  await customer('asha@example.com');
+  await db("UPDATE users SET role = 'admin' WHERE email = 'owner@example.com'");
+  const token = (await auth('admin/login', { email: 'owner@example.com', password: 'secret123' })).body.token;
+  const put = (rest, body, t = token) => auth(rest, body, { method: 'PUT', authorization: `Bearer ${t}` });
+
+  assert.equal((await put('email', { newEmail: 'boss@example.com', currentPassword: 'wrong1234' })).status, 400, 'needs the current password');
+  assert.equal((await put('email', { newEmail: 'asha@example.com', currentPassword: 'secret123' })).status, 409, 'another account has it');
+  assert.equal((await put('email', { newEmail: 'not-an-email', currentPassword: 'secret123' })).status, 400);
+  const moved = await put('email', { newEmail: 'Boss@Example.com', currentPassword: 'secret123' });
+  assert.equal(moved.status, 200);
+  assert.deepEqual([moved.body.user.email, moved.body.user.portal, moved.body.user.emailVerified], ['boss@example.com', 'admin', false]);
+  assert.equal((await crm(moved.body.token, 'GET', 'me')).status, 200, 'the fresh session still opens the CRM');
+
+  assert.equal((await put('password', { currentPassword: 'secret123', newPassword: 'newpass99' }, moved.body.token)).status, 200);
+  assert.equal((await auth('admin/login', { email: 'owner@example.com', password: 'secret123' })).status, 401, 'the old email no longer signs in');
+  assert.equal((await auth('admin/login', { email: 'boss@example.com', password: 'secret123' })).status, 401, 'the old password no longer works');
+  assert.equal((await auth('admin/login', { email: 'boss@example.com', password: 'newpass99' })).status, 200);
+  const actions = (await db('SELECT action FROM crm_audit_log ORDER BY id')).map((r) => r.action);
+  assert.ok(actions.includes('admin.email_changed') && actions.includes('admin.password_changed'));
+});

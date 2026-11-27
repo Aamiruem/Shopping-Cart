@@ -139,6 +139,7 @@ export const api = {
   me: () => request('/auth/me'),
   updateProfile: (body) => request('/auth/me', { method: 'PUT', body }),
   changePassword: (body) => request('/auth/password', { method: 'PUT', body }),
+  changeEmail: (body) => request('/auth/email', { method: 'PUT', body }),
 
   // Catalog
   products: (params = {}) => request(`/products?${query(params)}`),

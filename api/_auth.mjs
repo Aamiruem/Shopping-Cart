@@ -481,7 +481,40 @@ async function changePassword(body, ctx) {
     throw new ApiError(400, 'Current password is incorrect');
   }
   const updated = await ctx.store.updatePassword(user.id, await bcrypt.hash(body.newPassword, BCRYPT_ROUNDS));
+  await auditAdmin(ctx, user, 'admin.password_changed', {});
   return { body: await publicUser(updated, ctx.store) };
+}
+
+// Moves a signed-in account to a new email address (its sign-in name). The current password is required, so a
+// session left open on someone else's screen can't take the account over. The new address counts as unverified.
+// Answers with a fresh session: the token carries the email.
+async function changeEmail(body, ctx) {
+  const user = await signedInUser(ctx);
+  await limit(ctx.store, `email-change:${ctx.ip}`, IP_LIMIT);
+  const email = normalizeEmail(body.newEmail);
+  const error = emailError(email);
+  if (error) throw new ApiError(400, error);
+  if (!user.password_hash) throw new ApiError(400, 'This account signs in with Google. Set a password first, then change the email.');
+  if (!(await bcrypt.compare(text(body.currentPassword), user.password_hash))) throw new ApiError(400, 'Current password is incorrect');
+  if (email === user.email) throw new ApiError(400, 'That is already your email address');
+  const domainError = await ctx.domainError(email);
+  if (domainError) throw new ApiError(400, domainError);
+  if (await ctx.store.findByEmail(email)) throw new ApiError(409, 'Another account already uses this email');
+  const updated = await ctx.store.updateEmail(user.id, email).catch((err) => {
+    if (err?.code === '23505') throw new ApiError(409, 'Another account already uses this email'); // taken meanwhile
+    throw err;
+  });
+  if (!updated) throw new ApiError(404, 'User not found');
+  await auditAdmin(ctx, user, 'admin.email_changed', { from: user.email, to: email });
+  const claims = tokenClaims(ctx.authorization);
+  return { body: await session(updated, ctx.store, portalOf(claims), claims.mfa === undefined ? {} : { mfa: claims.mfa }) };
+}
+
+// Changes to a store-team account's sign-in go into the CRM audit log
+async function auditAdmin(ctx, user, action, details) {
+  if (portalOf(tokenClaims(ctx.authorization)) !== 'admin') return;
+  const { audit } = await import('./_crm_core.mjs');
+  await audit(ctx.store.db, { id: user.id, name: user.name, ip: ctx.ip }, action, 'user', user.id, details).catch(() => {});
 }
 
 const ROUTES = {
@@ -493,6 +526,7 @@ const ROUTES = {
   'GET me': async (_, ctx) => ({ body: { ...(await publicUser(await signedInUser(ctx), ctx.store)), portal: portalOf(tokenClaims(ctx.authorization)) } }),
   'PUT me': updateProfile,
   'PUT password': changePassword,
+  'PUT email': changeEmail,
   // One-time codes: which channels work, signup, passwordless login, password reset, phone numbers, admin report
   'GET otp/channels': async (_, ctx) => ({ body: availableChannels(ctx.env) }),
   'POST register/resend': resendSignup,
@@ -623,6 +657,7 @@ export function postgresStore(db = query) {
         [name, phone, id],
       ),
     updatePassword: (id, hash) => one('UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING *', [hash, id]),
+    updateEmail: (id, email) => one('UPDATE users SET email = $1, email_verified = FALSE WHERE id = $2 RETURNING *', [email, id]),
     storeName: async (id) => (await one('SELECT store_name FROM sellers WHERE user_id = $1', [id]))?.store_name ?? null,
     async hit(key, seconds) {
       if (Math.random() < 0.01) await one('DELETE FROM auth_rate_limits WHERE reset_at < NOW()', []); // keeps the table small

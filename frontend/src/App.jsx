@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-do
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { Spinner } from './components/common/Feedback';
 import ChatWidget from './components/chat/ChatWidget';
-import { PREVIEW, SHOPPING } from './config';
+import { SHOPPING } from './config';
 import CategoryBar from './components/layout/CategoryBar';
 import Footer from './components/layout/Footer';
 import Navbar from './components/layout/Navbar';
@@ -39,9 +39,8 @@ const VisualSearch = lazy(() => import('./pages/VisualSearch'));
 // Seller hub pages load on demand, so shoppers never download the charting library
 const SellerLayout = lazy(() => import('./pages/seller/SellerLayout'));
 const SellerOnboarding = lazy(() => import('./pages/seller/SellerOnboarding'));
-const AnalyticsDashboard = lazy(() => import('./pages/seller/AnalyticsDashboard'));
+const SellerDashboard = lazy(() => import('./pages/seller/SellerDashboard'));
 // Store mode: the dashboard reads the store API's own database (the ML dashboard needs the full Python API)
-const StoreDashboard = lazy(() => import('./pages/seller/StoreDashboard'));
 const SellerProducts = lazy(() => import('./pages/seller/SellerProducts'));
 const SellerOrders = lazy(() => import('./pages/seller/SellerOrders'));
 const SellerEarnings = lazy(() => import('./pages/seller/SellerEarnings'));
@@ -151,7 +150,7 @@ export default function App() {
             <Route path="/seller/register" element={sellerRoute(<SellerOnboarding />)} />
             <Route path="/seller" element={sellerRoute(<SellerLayout />)}>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={PREVIEW ? <StoreDashboard /> : <AnalyticsDashboard />} />
+              <Route path="dashboard" element={<SellerDashboard />} />
               <Route path="products" element={<SellerProducts />} />
               <Route path="orders" element={<SellerOrders />} />
               <Route path="earnings" element={<SellerEarnings />} />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { crm } from '../../api/client';
 import Icon from '../../components/common/Icon';
 import { CrmContext, ago, ErrorBox, Loading, useConfirm, useToasts } from '../../components/crm/ui';
@@ -25,7 +25,7 @@ const NAV = [
   { to: '/crm/notifications', icon: 'mail', label: 'Notifications & OTP', perm: 'marketing.view' },
   { to: '/crm/audit', icon: 'eye', label: 'Audit logs', perm: 'audit.view' },
   { to: '/crm/settings', icon: 'settings', label: 'Settings', perm: 'settings.manage' },
-  { to: '/crm/security', icon: 'lock', label: 'My security (MFA)', perm: null },
+  { to: '/crm/security', icon: 'lock', label: 'Email, password & MFA', perm: null },
 ];
 const POLL_MS = 20_000;
 const THEME_KEY = 'crm-theme';
@@ -117,7 +117,8 @@ function Bell({ feed, markSeen }) {
 }
 
 export default function CrmLayout() {
-  const { user, ready } = useAuth();
+  const { user, ready, logout } = useAuth();
+  const navigate = useNavigate();
   const { pathname } = useLocation();
   const { show: toast, view: toasts } = useToasts();
   const { confirm, view: confirmView } = useConfirm();
@@ -145,6 +146,10 @@ export default function CrmLayout() {
   if (!me) return <Loading text="Opening the CRM…" />;
 
   const nav = NAV.filter((n) => value.can(n.perm));
+  const signOut = () => {
+    logout();
+    navigate('/admin/login', { replace: true });
+  };
   return (
     <CrmContext.Provider value={value}>
       <div className={`crm ${dark ? 'dark' : ''}`}>
@@ -169,9 +174,25 @@ export default function CrmLayout() {
         <main className="crm-main">
           <div className="crm-top no-print">
             <button type="button" className="b crm-menu-btn" onClick={() => setMenu((m) => !m)} aria-label="Menu"><Icon name="menu" size={16} /></button>
-            <span className="muted small">Signed in as <strong>{me.name}</strong> · {me.roleName}</span>
+            <div className="crm-whoami">
+              <span className="crm-avatar" aria-hidden="true">{me.name?.trim()[0]?.toUpperCase()}</span>
+              <span><strong>{me.name}</strong><small>{me.roleName}</small></span>
+            </div>
             <span className="spacer" />
-            <Bell feed={feed} markSeen={markSeen} />
+            <div className="crm-actions">
+              {user.role === 'admin' && (
+                <Link className="b" to="/seller/dashboard" title="Seller Hub: products, catalog, payouts">
+                  <Icon name="barChart" size={15} /> <span className="crm-action-label">Seller Hub</span>
+                </Link>
+              )}
+              <Link className="b" to="/" title="Open the storefront">
+                <Icon name="store" size={15} /> <span className="crm-action-label">View store</span>
+              </Link>
+              <Bell feed={feed} markSeen={markSeen} />
+              <button type="button" className="b ghost danger" onClick={signOut} title="Sign out of the admin portal">
+                <Icon name="logout" size={15} /> <span className="crm-action-label">Sign out</span>
+              </button>
+            </div>
           </div>
           <Outlet />
         </main>

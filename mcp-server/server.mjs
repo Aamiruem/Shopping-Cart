@@ -6,7 +6,7 @@
 // checks, refund steps) applies here too. Nothing reaches the database directly.
 //
 // Settings (environment variables):
-//   STORE_URL       the store, default https://arvixa-store.vercel.app (http://127.0.0.1:5000 with `npm run local`)
+//   STORE_URL       the store, default https://arvixa-store.vercel.app (http://127.0.0.1:5100 with `npm run local`)
 //   STORE_EMAIL     an account to act as, with STORE_PASSWORD; leave both out for catalog tools only
 //   STORE_PASSWORD
 //   STORE_TOKEN     or a login token instead of email and password

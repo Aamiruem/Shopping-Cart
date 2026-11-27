@@ -57,6 +57,8 @@ export function AuthProvider({ children }) {
     },
     verifySignup: async (email, code) => saveSession(await api.verifySignup({ email, code })),
     googleLogin: async (credential) => saveSession(await api.googleLogin(credential)),
+    // A new sign-in email comes with a fresh session (the token carries the email)
+    changeEmail: async (newEmail, currentPassword) => saveSession(await api.changeEmail({ newEmail, currentPassword })),
     setUser,
     // A profile change keeps the portal this session came from
     updateProfile: async (form) => {

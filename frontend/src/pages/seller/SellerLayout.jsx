@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { api } from '../../api/client';
 import Icon from '../../components/common/Icon';
 import { PREVIEW } from '../../config';
@@ -83,6 +83,12 @@ export default function SellerLayout() {
               </NavLink>
             ))}
           </nav>
+          {user.role === 'admin' && user.portal === 'admin' && (
+            <div className="hub-staff-links">
+              <Link to="/crm" className="hub-staff-link"><Icon name="grid" size={16} /> Open the CRM</Link>
+              <Link to="/" className="hub-staff-link"><Icon name="store" size={16} /> View store</Link>
+            </div>
+          )}
           <div className="seller-help">
             <Icon name="help" size={16} />
             <span>Need help? <a href="/help">Seller support</a></span>
