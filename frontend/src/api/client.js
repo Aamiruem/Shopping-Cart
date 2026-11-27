@@ -129,8 +129,9 @@ export const api = {
   // Which code channels are connected (store API): { email, sms, whatsapp }
   otpChannels: () => request('/auth/otp/channels'),
   // Mobile-first sign-in: a code to the number, then log in, or finish a new account with name and email
-  mobileStart: (phone, channel) => request('/auth/mobile/start', { method: 'POST', body: { phone, channel } }),
-  mobileLogin: (phone, code) => request('/auth/mobile/login', { method: 'POST', body: { phone, code } }),
+  // One-field sign-in: an email or a mobile number gets a code; the code signs in, or starts a new account
+  mobileStart: (identifier, channel) => request('/auth/mobile/start', { method: 'POST', body: { identifier, channel } }),
+  mobileLogin: (identifier, code) => request('/auth/mobile/login', { method: 'POST', body: { identifier, code } }),
   mobileComplete: (body) => request('/auth/mobile/complete', { method: 'POST', body }),
   forgotPassword: (identifier, channel) => request('/auth/password/forgot', { method: 'POST', body: { identifier, channel } }),
   resetPassword: (identifier, code, password) => request('/auth/password/reset', { method: 'POST', body: { identifier, code, password } }),

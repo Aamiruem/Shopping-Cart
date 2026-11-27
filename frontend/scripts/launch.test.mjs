@@ -168,6 +168,32 @@ test('mobile sign-in: one code proves one number once, then signs in or creates 
   assert.equal(prod.status, 503);
 });
 
+test('one-field sign-in also works with an email: a code signs in, or creates the account with just a name', async () => {
+  const sent = await auth('mobile/start', { identifier: 'New.Shopper@Example.com' });
+  assert.equal(sent.status, 200);
+  assert.equal(sent.body.channel, 'email');
+  const first = await auth('mobile/login', { identifier: 'new.shopper@example.com', code: sent.body.devCode });
+  assert.deepEqual([first.body.needsProfile, first.body.email], [true, 'new.shopper@example.com']);
+  const made = await auth('mobile/complete', { signupToken: first.body.signupToken, name: 'Nisha Shah', phone: '98765 43210' });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  assert.deepEqual([made.body.user.email, made.body.user.emailVerified, made.body.user.phone, made.body.user.phoneVerified], ['new.shopper@example.com', true, '9876543210', false]);
+  assert.equal((await auth('mobile/complete', { signupToken: first.body.signupToken, name: 'Again' })).status, 409, 'one account per email');
+
+  // An existing email account signs straight in, and the code marks its email verified
+  await person('known@example.com');
+  await db("UPDATE verification_codes SET created_at = NOW() - INTERVAL '2 minutes'");
+  const s2 = await auth('mobile/start', { identifier: 'known@example.com' });
+  const l2 = await auth('mobile/login', { identifier: 'known@example.com', code: s2.body.devCode });
+  assert.deepEqual([l2.body.user.email, l2.body.user.emailVerified, l2.body.user.portal], ['known@example.com', true, 'customer']);
+
+  // The store admin is sent to the admin portal, as with the password login
+  await person('boss@example.com');
+  await db("UPDATE users SET role = 'admin' WHERE email = 'boss@example.com'");
+  const s3 = await auth('mobile/start', { identifier: 'boss@example.com' });
+  assert.equal((await auth('mobile/login', { identifier: 'boss@example.com', code: s3.body.devCode })).status, 403);
+  assert.equal((await auth('mobile/start', { identifier: 'not-an-email@' })).status, 400);
+});
+
 test('courier: no claims without a connection; real answers when connected; tracking events count once', async () => {
   assert.deepEqual(await serviceability('411001', {}, { env: {} }), { checked: false, provider: null });
   const env = { SHIPROCKET_EMAIL: 'api@x.in', SHIPROCKET_PASSWORD: 'p', SHIPROCKET_PICKUP_POSTCODE: '560001' };

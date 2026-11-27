@@ -153,3 +153,45 @@
 .phone-input:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-light); }
 .welcome-alt { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-light); }
 .welcome-alt .btn-link { justify-self: center; background: none; border: 0; color: var(--brand); font-weight: 600; cursor: pointer; padding: 6px; }
+
+/* ---------- One-field login and sign-up (QuickAuth.jsx): the popup and the /login and /register pages ---------- */
+.auth-modal:has(.quick-auth) { width: min(100%, 440px); }
+.quick-auth-page { display: grid; place-items: center; padding-block: 24px 48px; }
+.quick-auth { position: relative; display: grid; gap: 16px; width: min(100%, 440px); padding: 26px 26px 20px; overflow: hidden; background: var(--surface); color: var(--text); border-radius: 22px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.32); }
+.quick-auth::before { content: ''; position: absolute; inset: 0 0 auto; height: 5px; background: var(--grad-brand, var(--brand)); }
+.qa-head { display: flex; align-items: center; gap: 14px; }
+.qa-logo { flex-shrink: 0; width: 44px; height: 44px; padding: 6px; border-radius: 14px; background: linear-gradient(135deg, #f1ecff, #ffeaf2); }
+.qa-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.qa-sub { margin: 2px 0 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.qa-form { display: grid; gap: 12px; }
+.qa-label { display: grid; gap: 6px; font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.qa-label small { font-weight: 400; color: var(--text-muted); }
+.qa-label input, .qa-password input { width: 100%; padding: 13px 14px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; font-size: 16px; font-weight: 500; transition: border-color var(--transition), box-shadow var(--transition); }
+.qa-label input:focus, .qa-password input:focus { outline: none; border-color: #7c3aed; box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.14); }
+.qa-label input[aria-invalid='true'] { border-color: var(--error); }
+.qa-password { position: relative; display: block; }
+.qa-password input { padding-right: 46px; }
+.qa-eye { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 8px; background: none; color: var(--text-muted); cursor: pointer; }
+.qa-eye:hover { background: var(--bg); color: var(--text); }
+.qa-channels { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--text-muted); }
+.qa-channels > span { margin-right: 2px; }
+.qa-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-pill); background: var(--surface); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.qa-chip.on.qa-chip-sms { border-color: #2563eb; background: #e6f1ff; color: #1d4ed8; }
+.qa-chip.on.qa-chip-whatsapp { border-color: #16a34a; background: #e3f9ef; color: #047857; }
+.qa-alt, .qa-back, .qa-forgot, .qa-guest { justify-self: center; display: inline-flex; align-items: center; gap: 6px; }
+.qa-forgot { justify-self: end; margin-top: -4px; font-size: var(--fs-sm); }
+.qa-guest { color: var(--text-muted) !important; font-weight: 500 !important; }
+.qa-switch { margin: 0; text-align: center; font-size: var(--fs-sm); color: var(--text-muted); }
+.qa-hint, .qa-tip { margin: 0; text-align: center; }
+.qa-tip { text-align: left; margin-top: -6px; }
+.qa-verified { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 12px; background: #e3f9ef; color: #047857; font-size: var(--fs-sm); font-weight: 600; }
+.qa-terms { margin: 0; text-align: center; color: var(--text-muted); font-size: var(--fs-xs); }
+.qa-terms a, .quick-auth .alert a { color: var(--brand); font-weight: 600; }
+.quick-auth .btn-link { padding: 0; border: 0; background: none; color: var(--brand); font: inherit; font-weight: 600; cursor: pointer; }
+@media (max-width: 520px) {
+  .quick-auth { padding: 22px 18px 18px; border-radius: 18px; }
+  .qa-title { font-size: 20px; }
+}
+.quick-auth .alert { display: block; }
+.quick-auth .btn-buy, .quick-auth .btn-primary { background: var(--grad-brand, var(--brand)); border-color: transparent; color: #fff; }
+.quick-auth .btn-buy:hover:not(:disabled), .quick-auth .btn-primary:hover:not(:disabled) { filter: brightness(1.07); }

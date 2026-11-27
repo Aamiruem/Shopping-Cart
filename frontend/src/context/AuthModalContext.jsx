@@ -5,9 +5,9 @@ import Icon from '../components/common/Icon';
 import { SHOPPING } from '../config';
 import { useAuth } from './AuthContext';
 
-const loadLoginForm = () => import('../pages/Login');
-const LoginForm = lazy(() => loadLoginForm().then((m) => ({ default: m.LoginForm })));
-const WelcomeSheet = lazy(() => import('../components/account/WelcomeSheet'));
+// One simple form for every way in: an email or mobile number, then a code (email, SMS, WhatsApp) or a password
+const loadQuickAuth = () => import('../components/account/QuickAuth');
+const QuickAuth = lazy(loadQuickAuth);
 const AuthModalContext = createContext({ openLogin: () => {} });
 
 // Login and sign-up in a dialog over the current page, so shoppers stay where they were.
@@ -55,9 +55,7 @@ export function AuthModalProvider({ children }) {
               <Icon name="x" size={22} />
             </button>
             <Suspense fallback={<Spinner />}>
-              {mode === 'welcome'
-                ? <WelcomeSheet onDone={close} onEmail={setMode} reason={reason} />
-                : <LoginForm key={mode} mode={mode} embedded onDone={close} onSwitch={setMode} />}
+              <QuickAuth key={mode} initial={mode === 'register' ? 'register' : 'login'} reason={reason} onDone={close} onGuest={close} />
             </Suspense>
           </div>
         </div>
@@ -87,7 +85,7 @@ function useFirstVisitPrompt(openLogin, alreadyOpen) {
       seen = localStorage.getItem(WELCOMED_KEY) === '1';
     } catch { /* private window: show it, just don't remember */ }
     if (seen) return undefined;
-    loadLoginForm(); // fetched during the wait, so the popup opens with the form, not a spinner
+    loadQuickAuth(); // fetched during the wait, so the popup opens with the form, not a spinner
     const timer = setTimeout(() => {
       try {
         localStorage.setItem(WELCOMED_KEY, '1');

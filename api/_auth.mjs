@@ -319,28 +319,48 @@ async function phoneVerify(body, ctx) {
 //    email create the account, its number already verified. One code proves one number once.
 const SIGNUP_TOKEN_SECONDS = 15 * 60;
 
+// The same three steps also work with an email address (the one-field login popup): the code goes by email, a
+// correct code signs in the account with that email (and marks it verified) or returns a signup token for it.
 async function mobileStart(body, ctx) {
-  const phone = loginTarget(body.phone);
-  if (phone.isEmail) throw new ApiError(400, 'Please enter your 10-digit mobile number');
-  const channel = body.channel === 'whatsapp' ? 'whatsapp' : 'sms';
-  if (!availableChannels(ctx.env)[channel]) throw new ApiError(503, `${CHANNEL_LABEL[channel]} codes aren’t available right now. Please log in with your email instead.`);
+  const who = loginTarget(body.identifier ?? body.phone);
+  const channel = who.isEmail ? 'email' : body.channel === 'whatsapp' ? 'whatsapp' : 'sms';
+  if (!availableChannels(ctx.env)[channel]) throw new ApiError(503, `${CHANNEL_LABEL[channel]} codes aren’t available right now. Please use your password instead.`);
   await limit(ctx.store, `otp:${ctx.ip}`, OTP_IP_LIMIT, 'Too many code requests. Please try again in 15 minutes.');
-  return { body: await sendCode(ctx.store.db, { purpose: 'mobile', target: phone.target, channel }, ctx.otp) };
+  return { body: await sendCode(ctx.store.db, { purpose: 'mobile', target: who.target, channel }, ctx.otp) };
 }
 
 async function mobileLogin(body, ctx) {
-  const phone = loginTarget(body.phone);
-  if (phone.isEmail) throw new ApiError(400, 'Please enter your 10-digit mobile number');
+  const who = loginTarget(body.identifier ?? body.phone);
   await limit(ctx.store, `verify:${ctx.ip}`, VERIFY_IP_LIMIT, 'Too many attempts. Please try again in 15 minutes.');
-  await checkCode(ctx.store.db, { purpose: 'mobile', target: phone.target, code: body.code }, ctx.otp);
-  const [user] = await ctx.store.db('SELECT * FROM users WHERE phone = $1 AND phone_verified ORDER BY id LIMIT 1', [phone.target]);
+  await checkCode(ctx.store.db, { purpose: 'mobile', target: who.target, code: body.code }, ctx.otp);
+  const user = await accountFor(ctx, who);
   if (user) {
     assertSessionValid({ disabled_at: user.disabled_at });
-    await ctx.store.touchLogin(user.id);
-    return { body: await session(user, ctx.store) };
+    // Like the password login: the store admin uses the admin portal (with MFA when it's on)
+    if (user.role === 'admin') throw new ApiError(403, 'This account signs in through the admin portal.');
+    const [signedIn] = await ctx.store.db(
+      `UPDATE users SET last_login = NOW()${who.isEmail ? ', email_verified = TRUE' : ''} WHERE id = $1 RETURNING *`, // the code proves the address
+      [user.id],
+    );
+    return { body: await session(signedIn, ctx.store) };
   }
-  const signupToken = jwt.sign({ phone: phone.target, purpose: 'phone-signup' }, jwtSecret(), { algorithm: 'HS256', expiresIn: SIGNUP_TOKEN_SECONDS });
-  return { body: { needsProfile: true, phone: phone.target, signupToken } };
+  const claims = who.isEmail ? { email: who.target, purpose: 'email-signup' } : { phone: who.target, purpose: 'phone-signup' };
+  const signupToken = jwt.sign(claims, jwtSecret(), { algorithm: 'HS256', expiresIn: SIGNUP_TOKEN_SECONDS });
+  return { body: { needsProfile: true, ...(who.isEmail ? { email: who.target } : { phone: who.target }), signupToken } };
+}
+
+// A new account from a verified email: just a name (a mobile number is optional and stays unverified)
+async function emailComplete(claims, body, ctx) {
+  const name = text(body.name).trim();
+  const phone = text(body.phone).replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '') || null;
+  await limit(ctx.store, `register:${ctx.ip}`, IP_LIMIT);
+  const error = nameError(name) || emailError(claims.email) || phoneError(phone);
+  if (error) throw new ApiError(400, error);
+  await emailFree(ctx, claims.email);
+  const user = await ctx.store.create({ name, email: claims.email, phone, passwordHash: null, emailVerified: true });
+  if (!user) throw new ApiError(409, 'An account with this email already exists. Please log in.');
+  await welcome(ctx.store.db, user);
+  return { status: 201, body: await session(user, ctx.store) };
 }
 
 async function mobileComplete(body, ctx) {
@@ -350,6 +370,7 @@ async function mobileComplete(body, ctx) {
   } catch {
     throw new ApiError(400, 'Your verification expired. Please request a new code.');
   }
+  if (claims.purpose === 'email-signup') return emailComplete(claims, body, ctx);
   if (claims.purpose !== 'phone-signup' || !PHONE_RE.test(claims.phone ?? '')) throw new ApiError(400, 'Please request a new code.');
   const name = text(body.name).trim();
   const email = normalizeEmail(body.email);
