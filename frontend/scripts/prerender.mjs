@@ -131,7 +131,10 @@ async function catalogState() {
       const [{ syncCatalogState }, { query }] = await Promise.all([import('../../api/_inventory.mjs'), import('../../api/_auth.mjs')]);
       await syncCatalogState(query, Date.now(), true);
       const [row] = await query("SELECT value FROM crm_settings WHERE key = 'catalog'");
-      required = row ? row.value?.requireVerification !== false : true;
+      // Exactly as the live API reads it (api/_inventory.mjs): only an explicit "require verification" locks the
+      // catalogue. Reading a missing setting as "locked" built 0 product pages and an empty sitemap while the store
+      // was selling every product, so all product links answered 404.
+      required = row?.value?.requireVerification === true;
     } catch (err) {
       console.warn('prerender: catalog state unavailable, listing no unverified products:', err.message);
     }

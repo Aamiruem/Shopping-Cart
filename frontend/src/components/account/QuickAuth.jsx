@@ -74,6 +74,10 @@ export default function QuickAuth({ initial = 'login', reason = '', onDone, onGu
   // The code channel for an address, or null when nothing can send one (then the password is the way in)
   const codeChannel = (w) => (w.kind === 'email' ? (channels.email ? 'email' : null) : channels[mobileVia] ? mobileVia : mobileChannels[0] || null);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  // No code provider connected at all (no email, SMS or WhatsApp service): the form opens on email + password, and
+  // nothing mentions codes it can't send
+  const noCodes = channels.ready && !channels.any;
+  const view = step === 'start' && noCodes ? (initial === 'register' ? 'register' : 'password') : step;
 
   const run = async (fn) => {
     setError('');
@@ -213,7 +217,7 @@ export default function QuickAuth({ initial = 'login', reason = '', onDone, onGu
         <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={busy}>{busy ? 'Creating…' : 'Create my account'}</button>
       </form>
     );
-  } else if (step === 'password') {
+  } else if (view === 'password') {
     body = (
       <form className="qa-form" onSubmit={passwordLogin}>
         {notice && <p className="alert alert-info" role="status">{notice}</p>}
@@ -224,10 +228,10 @@ export default function QuickAuth({ initial = 'login', reason = '', onDone, onGu
         <ErrorLine error={error} />
         <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={busy}>{busy ? 'Please wait…' : 'Log in'}</button>
         <p className="qa-switch">New to Arvixa? <button type="button" className="btn-link" onClick={toRegister}>Create an account</button></p>
-        <button type="button" className="btn-link qa-back" onClick={back}><Icon name="chevronLeft" size={14} /> Use a one-time code instead</button>
+        {!noCodes && <button type="button" className="btn-link qa-back" onClick={back}><Icon name="chevronLeft" size={14} /> Use a one-time code instead</button>}
       </form>
     );
-  } else if (step === 'register') {
+  } else if (view === 'register') {
     body = (
       <form className="qa-form" onSubmit={passwordSignup}>
         <label className="qa-label">Your name<input required minLength={2} value={form.name} onChange={set('name')} autoComplete="name" autoFocus /></label>
@@ -278,7 +282,7 @@ export default function QuickAuth({ initial = 'login', reason = '', onDone, onGu
     );
   }
 
-  const title = { start: initial === 'register' ? 'Create your account' : 'Login or sign up', code: 'Check your messages', 'signup-code': 'Verify your email', profile: 'Almost done', password: 'Log in with password', register: 'Create your account', forgot: 'Reset your password' }[step];
+  const title = { start: initial === 'register' ? 'Create your account' : 'Login or sign up', code: 'Check your messages', 'signup-code': 'Verify your email', profile: 'Almost done', password: noCodes ? 'Log in' : 'Log in with password', register: 'Create your account', forgot: 'Reset your password' }[view];
   return (
     <div className="quick-auth">
       <div className="qa-head">
