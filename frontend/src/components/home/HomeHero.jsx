@@ -18,6 +18,14 @@ function pickTiles(products) {
     .slice(0, 3);
 }
 
+// The store's promises under the headline, each in its own colour
+const PERKS = [
+  { icon: 'truck', title: 'Free delivery', text: 'On orders above ₹499', tone: 'violet' },
+  { icon: 'returns', title: 'Easy returns', text: '7-day return policy', tone: 'peach' },
+  { icon: 'shield', title: 'Secure payments', text: 'UPI, cards and COD', tone: 'mint' },
+  { icon: 'headphones', title: 'Real support', text: 'WhatsApp and AI chat', tone: 'sky' },
+];
+
 // Top of the home page: the promise in a sentence, one clear action, and three real products to start from
 export default function HomeHero() {
   const [tiles, setTiles] = useState(null);
@@ -36,7 +44,7 @@ export default function HomeHero() {
       <div className="home-hero-head">
         <div className="home-hero-copy">
           <p className="home-hero-eyebrow"><Icon name="truck" size={14} /> Delivering across India</p>
-          <h2 id="home-hero-title" className="home-hero-title">Shop beyond limits.<br />Everyday essentials, delivered.</h2>
+          <h2 id="home-hero-title" className="home-hero-title"><span className="grad-text">Shop beyond limits.</span><br />Everyday essentials, delivered.</h2>
           <p className="home-hero-text">Mobiles, electronics, fashion, beauty, home and groceries in one place. Free delivery from ₹499, and easy 7-day returns.</p>
         </div>
         <div className="home-hero-actions">
@@ -44,6 +52,14 @@ export default function HomeHero() {
           <Link to="/products?sort=popularity" className="btn btn-ghost btn-lg">See what’s popular</Link>
         </div>
       </div>
+      <ul className="hero-perks">
+        {PERKS.map((p) => (
+          <li key={p.title} className={`perk perk-${p.tone}`}>
+            <span className="perk-icon"><Icon name={p.icon} size={18} /></span>
+            <span><strong>{p.title}</strong><small>{p.text}</small></span>
+          </li>
+        ))}
+      </ul>
       {tiles?.length !== 0 && (
         <div className="home-hero-tiles">
           {(tiles || Array.from({ length: 3 }, () => null)).map((p, i) => (p ? (

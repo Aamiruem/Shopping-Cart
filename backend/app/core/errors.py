@@ -12,8 +12,8 @@ log = logging.getLogger("api")
 # The admin portal, the CRM and the seller portal live only in the Node store API (api/), not in this backend
 _PORTAL_PATHS = ("/api/auth/admin/", "/api/auth/seller/", "/api/crm")
 _PORTAL_MESSAGE = (
-    "The admin portal is not part of the Python backend. Close the Python API window "
-    "and start the store with start-store.ps1 (or: npm run local)."
+    "The admin portal runs on the store API, not the Python backend. Restart the website "
+    "(npm run dev in frontend/): it starts the store API by itself."
 )
 
 

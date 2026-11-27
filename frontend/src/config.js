@@ -27,3 +27,8 @@ export const LEGAL = {
 };
 
 export const OPENING_SOON_MESSAGE = 'Arvixa Store is opening soon. Ordering isn’t available yet.';
+
+// Customer support on WhatsApp: the floating button and the announcement bar. Digits only, with the country code.
+export const SUPPORT_WHATSAPP = (import.meta.env.VITE_SUPPORT_WHATSAPP || '919931879953').replace(/\D/g, '');
+export const SUPPORT_WHATSAPP_LABEL = `+${SUPPORT_WHATSAPP.slice(0, 2)} ${SUPPORT_WHATSAPP.slice(2, 7)} ${SUPPORT_WHATSAPP.slice(7)}`;
+export const whatsappLink = (text) => `https://wa.me/${SUPPORT_WHATSAPP}${text ? `?text=${encodeURIComponent(text)}` : ''}`;

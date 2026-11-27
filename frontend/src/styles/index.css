@@ -8,6 +8,7 @@
 @import './account.css';
 @import './seller.css';
 @import './theme.css'; /* the premium look: refines everything above */
+@import './colorful.css'; /* vibrant gradients and pastel tiles over the theme */
 
 /* Opening-soon notice, cookie consent and legal pages */
 .preview-banner { margin: 0; padding: 8px 16px; background: #fff4e5; color: #663c00; font-size: var(--fs-sm); line-height: 1.4; text-align: center; }

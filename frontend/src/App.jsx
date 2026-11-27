@@ -11,6 +11,8 @@ import { ConsentBanner, PreviewBanner } from './components/layout/NoticeBars';
 import MobileTabBar, { showsTabBar } from './components/layout/MobileTabBar';
 import PageToolbar from './components/layout/PageToolbar';
 import SiteHeader from './components/layout/SiteHeader';
+import AnnouncementBar from './components/layout/AnnouncementBar';
+import WhatsAppButton from './components/common/WhatsAppButton';
 import { AuthModalProvider } from './context/AuthModalContext';
 import PortalRoute from './components/routing/PortalRoute';
 import ProtectedRoute from './components/routing/ProtectedRoute';
@@ -101,6 +103,7 @@ export default function App() {
     <div className={`app ${showsTabBar(pathname) ? 'with-tabbar' : ''}`}>
       <ScrollToTop />
       <PreviewBanner />
+      {!/^\/(crm|seller|admin)/.test(pathname) && <AnnouncementBar />}
       <SiteHeader>
         <Navbar />
         {WITH_CATEGORY_BAR.includes(pathname) && <CategoryBar />}
@@ -195,6 +198,7 @@ export default function App() {
 
       <Footer />
       <MobileTabBar />
+      <WhatsAppButton />
       <ChatWidget />
       <ConsentBanner />
     </div>
