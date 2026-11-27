@@ -9,6 +9,19 @@
 #   Admin:     /admin/login   owner@example.com    / secret123   -> the CRM, and More -> CRM Dashboard
 
 $root = $PSScriptRoot
+
+# The Python backend (start-dev.ps1) also uses port 5000. Left running, it answers /admin/login with
+# "No route for POST /api/auth/admin/login", so stop it first.
+foreach ($c in Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue) {
+    $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($c.OwningProcess)" -ErrorAction SilentlyContinue
+    if ($p -and $p.Name -like 'python*') {
+        Write-Host "Stopping the Python backend on port 5000 (PID $($p.ProcessId))"
+        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+    } elseif ($p) {
+        Write-Warning "Port 5000 is used by $($p.Name) (PID $($p.ProcessId)). Close it, then run this script again."
+        return
+    }
+}
 function Start-Window($title, $dir, $cmd) {
     Start-Process powershell -WorkingDirectory (Join-Path $root $dir) -ArgumentList '-NoExit', '-Command', "`$Host.UI.RawUI.WindowTitle='$title'; $cmd"
 }

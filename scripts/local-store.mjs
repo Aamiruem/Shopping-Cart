@@ -43,8 +43,9 @@ const rz = { configured: false, refund: async () => {} };
 
 // ---------- Demo data ----------
 const store = postgresStore(db);
-async function account(name, email, role = 'customer') {
-  const { body } = await handleAuth({ method: 'POST', rest: 'register', body: { name, email, password: 'secret123', phone: '9876543210' }, ip: 'local' }, { store, domainError: async () => null });
+async function account(name, email, role = 'customer', password = 'secret123') {
+  const { status, body } = await handleAuth({ method: 'POST', rest: 'register', body: { name, email, password, phone: '9876543210' }, ip: 'local' }, { store, domainError: async () => null });
+  if (!body?.user) throw new Error(`Could not create ${email}: ${body?.error ?? `status ${status}`}`);
   if (role !== 'customer') await db('UPDATE users SET role = $1 WHERE id = $2', [role, body.user.id]);
   // Each demo account acts through its own portal: the admin through the admin portal, the seller through the seller portal
   const portal = role === 'admin' ? 'admin' : role === 'seller' ? 'seller' : 'customer';
@@ -76,6 +77,12 @@ const ravi = await account('Ravi Kumar', 'ravi@example.com');
 const seller = await account('Meera Textiles', 'seller@example.com', 'seller');
 const owner = await account('Store Owner', 'owner@example.com', 'admin');
 const sales = await account('Sam Sales', 'sales@example.com');
+// Optionally your own admin login as well (PowerShell):  $env:ADMIN_EMAIL='you@gmail.com'; $env:ADMIN_PASSWORD='yourPass1'; npm run local
+const ownAdmin = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+if (ownAdmin && ownAdmin !== 'owner@example.com') {
+  if (!process.env.ADMIN_PASSWORD) throw new Error('ADMIN_EMAIL is set but ADMIN_PASSWORD is not');
+  await account(process.env.ADMIN_NAME || 'Store Admin', ownAdmin, 'admin', process.env.ADMIN_PASSWORD);
+}
 await db("INSERT INTO crm_staff (user_id, role_key, title) VALUES ($1, 'sales_executive', 'Sales executive')", [sales.id]);
 for (const who of [asha, ravi]) {
   await who.shop('POST', 'addresses', { name: who === asha ? 'Asha Rao' : 'Ravi Kumar', phone: '9876543210', line1: '12 MG Road', city: 'Bengaluru', state: 'Karnataka', pincode: '560001' });
@@ -154,9 +161,18 @@ createServer((req, res) => {
       res.end(JSON.stringify({ error: 'local store error' }));
     }
   });
+}).on('error', (err) => {
+  if (err.code !== 'EADDRINUSE') throw err;
+  // Usually the Python backend (start-dev.ps1) still running: it has no admin portal, CRM or seller portal, so
+  // /admin/login would answer "No route for POST /api/auth/admin/login"
+  console.error(`Port ${PORT} is already in use, probably by the Python backend (start-dev.ps1). Close that window, or stop it with:`);
+  console.error(`  powershell -Command "Get-NetTCPConnection -LocalPort ${PORT} -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }"`);
+  console.error('then run npm run local again.');
+  process.exit(1);
 }).listen(PORT, '127.0.0.1', () => {
   console.log(`Local store API on http://127.0.0.1:${PORT} (in memory: restart for fresh demo data)`);
   console.log('Now run:  cd frontend && VITE_STORE_MODE=store npm run dev   then open http://localhost:5173');
   console.log(`Demo logins (password secret123): asha@example.com, ravi@example.com, seller@example.com, owner@example.com, sales@example.com`);
+  console.log(`Admin portal: http://localhost:5173/admin/login  as owner@example.com / secret123${ownAdmin ? ` or ${ownAdmin} / your ADMIN_PASSWORD` : ''}`);
   console.log(`Try: order #${reviewable} (review it), order #${returnable} (return it), the Seller Hub as owner@example.com`);
 });

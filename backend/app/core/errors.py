@@ -9,6 +9,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 log = logging.getLogger("api")
 
+# The admin portal, the CRM and the seller portal live only in the Node store API (api/), not in this backend
+_PORTAL_PATHS = ("/api/auth/admin/", "/api/auth/seller/", "/api/crm")
+_PORTAL_MESSAGE = (
+    "The admin portal is not part of the Python backend. Close the Python API window "
+    "and start the store with start-store.ps1 (or: npm run local)."
+)
+
 
 class ApiError(Exception):
     def __init__(self, status: int, message: str, headers: dict | None = None):
@@ -36,6 +43,8 @@ def register_error_handlers(app: FastAPI) -> None:
     async def http_error(request: Request, exc: StarletteHTTPException):
         unknown_route = exc.status_code == 404 and exc.detail == "Not Found"
         message = f"No route for {request.method} {request.url.path}" if unknown_route else exc.detail
+        if unknown_route and request.url.path.startswith(_PORTAL_PATHS):
+            message = _PORTAL_MESSAGE
         return JSONResponse({"error": message}, status_code=exc.status_code)
 
     @app.exception_handler(RequestValidationError)
