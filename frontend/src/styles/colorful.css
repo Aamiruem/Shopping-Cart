@@ -97,21 +97,33 @@
 .footer::before { content: ''; position: absolute; inset: 0 0 auto; height: 4px; background: var(--grad-brand); }
 
 /* ---------- Floating WhatsApp button (above the AI assistant's) ---------- */
-.wa-fab {
-  position: fixed; right: 20px; bottom: 84px; z-index: 200; display: inline-flex; align-items: center; gap: 8px;
-  padding: 11px 16px; border-radius: 28px; background: #16a34a; color: #fff; font-weight: 600; text-decoration: none;
-  box-shadow: 0 12px 26px -12px rgba(22, 163, 74, 0.8); transition: transform var(--transition), background var(--transition);
+/* Both buttons are compact circles stacked bottom-right; on desktop the label slides out on hover.
+   --fab-base is where the stack starts: above the phone tab bar, the product page Buy bar and the cart Place-order bar,
+   so they never cover a button. */
+.app { --fab-base: 20px; }
+.chat-fab, .wa-fab {
+  position: fixed; right: 20px; z-index: 200; display: inline-flex; align-items: center; justify-content: center; gap: 0;
+  min-width: 52px; height: 52px; padding: 0 14px; border: 0; border-radius: 26px; color: #fff; font-weight: 600; text-decoration: none; cursor: pointer;
+  transition: transform var(--transition), filter var(--transition), bottom 0.2s ease;
 }
-.wa-fab:hover { transform: translateY(-2px); background: #15803d; color: #fff; }
-.chat-fab { background: var(--grad-brand); box-shadow: 0 12px 26px -12px rgba(124, 58, 237, 0.8); }
-@media (max-width: 520px) {
-  .wa-fab span { display: none; }
-  .wa-fab { padding: 13px; bottom: 80px; }
+.chat-fab { bottom: var(--fab-base); background: var(--grad-brand); box-shadow: 0 12px 26px -12px rgba(124, 58, 237, 0.8); }
+.wa-fab { bottom: calc(var(--fab-base) + 62px); background: #16a34a; box-shadow: 0 12px 26px -12px rgba(22, 163, 74, 0.8); }
+.chat-fab span, .wa-fab span { display: inline-block; max-width: 0; overflow: hidden; white-space: nowrap; transition: max-width 0.25s ease, margin 0.25s ease; }
+.chat-fab:hover, .wa-fab:hover { transform: translateY(-2px); filter: brightness(1.07); color: #fff; }
+@media (hover: hover) {
+  .chat-fab:hover span, .chat-fab:focus-visible span, .wa-fab:hover span, .wa-fab:focus-visible span { max-width: 110px; margin-left: 8px; }
 }
-/* Phones with the bottom tab bar: both buttons sit above it instead of covering the Account tab */
+@media (max-width: 520px) { .chat-fab, .wa-fab { right: 14px; min-width: 48px; height: 48px; padding: 0 12px; } .wa-fab { bottom: calc(var(--fab-base) + 56px); } }
 @media (max-width: 900px) {
-  .app.with-tabbar .chat-fab { bottom: calc(76px + env(safe-area-inset-bottom)); }
-  .app.with-tabbar .wa-fab { bottom: calc(136px + env(safe-area-inset-bottom)); }
+  .app.with-tabbar { --fab-base: calc(76px + env(safe-area-inset-bottom)); }
+  .app.with-tabbar:has(.cart-footer) { --fab-base: calc(152px + env(safe-area-inset-bottom)); }
 }
-@media (prefers-reduced-motion: reduce) { .wa-fab, .hero-tile-img, .announce-list li.current { transition: none; animation: none; } }
-@media print { .wa-fab, .announce { display: none !important; } }
+@media (max-width: 700px) {
+  .app:has(.detail-actions) { --fab-base: calc(84px + env(safe-area-inset-bottom)); }
+}
+/* The page end can always scroll clear of the buttons */
+.footer-bottom-inner { padding-right: 76px; }
+/* .app .footer: index.css sets the footer's bottom padding (the iPhone home bar) after this file; this keeps that too */
+@media (max-width: 900px) { .app .footer { padding-bottom: calc(130px + env(safe-area-inset-bottom)); } .footer-bottom-inner { padding-right: 0; } }
+@media (prefers-reduced-motion: reduce) { .wa-fab, .chat-fab, .wa-fab span, .chat-fab span, .hero-tile-img, .announce-list li.current { transition: none; animation: none; } }
+@media print { .wa-fab, .chat-fab, .announce { display: none !important; } }
